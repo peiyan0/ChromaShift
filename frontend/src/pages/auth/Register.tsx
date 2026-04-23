@@ -12,7 +12,7 @@ import {
   Link as ChakraLink
 } from '@chakra-ui/react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -25,7 +25,7 @@ const Register = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await axios.post('http://localhost:8000/api/v1/auth/register', {
+      await api.post('/auth/register', {
         email,
         password
       });
