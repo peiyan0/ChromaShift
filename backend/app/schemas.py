@@ -38,3 +38,30 @@ class VisionProfileResponse(VisionProfileBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+# Media Schemas
+class MediaUploadResponse(BaseModel):
+    job_id: str
+    filename: str
+    status: str
+
+class MediaProcessRequest(BaseModel):
+    # Optional overrides; defaults to user profile if not provided
+    cvd_type: Optional[str] = None
+    severity: Optional[float] = None
+
+class MediaProcessResponse(BaseModel):
+    task_id: str
+    status: str
+
+class MediaStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: float
+    download_url: Optional[str] = None
+
+class MediaHistoryResponse(BaseModel):
+    job_id: str
+    filename: str
+    status: str
+    created_at: str
+    type: str # 'image', 'video', 'pdf'
