@@ -1,0 +1,232 @@
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
+from sqlalchemy.orm import Session
+from typing import List, Any
+import uuid
+import time
+import os
+from datetime import datetime
+
+from app.api import deps
+from app import schemas
+from app.db.session import SessionLocal
+from app.db.models import MediaJob, User
+from app.services.storage import storage_service
+from app.services.media_processor import MediaProcessor
+
+router = APIRouter()
+processor = MediaProcessor()
+
+def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float):
+    """
+    Background task to process media using the AI models.
+    Opens its own DB session to avoid sharing state with HTTP request threads.
+    """
+    print(f"Background task started for job {job_id}")
+    
+    # Simulate processing delay
+    time.sleep(5) 
+    
+    # In a real implementation, we would download, process, and upload.
+    # For this simulation, we copy the original file to the 'processed/' prefix.
+    file_ext = os.path.splitext(s3_key)[1] if s3_key else ".jpg"
+    processed_key = f"processed/{job_id}_processed{file_ext}"
+    
+    try:
+        storage_service.copy_file(s3_key, processed_key)
+        print(f"File copied to {processed_key}")
+        
+        # 4. Update Database Job Status to 'completed'
+        db = SessionLocal()
+        try:
+            job = db.query(MediaJob).filter(MediaJob.job_id == job_id).first()
+            if job:
+                job.status = "completed"
+                job.s3_key_processed = processed_key
+                db.commit()
+                print(f"Background task completed for job {job_id}")
+        except Exception as e:
+            print(f"Error updating job status: {e}")
+            db.rollback()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Error in background processing (copying file): {e}")
+        # Update job to failed if copy fails
+        db = SessionLocal()
+        try:
+            job = db.query(MediaJob).filter(MediaJob.job_id == job_id).first()
+            if job:
+                job.status = "failed"
+                db.commit()
+        except:
+            db.rollback()
+        finally:
+            db.close()
+
+
+@router.post("/upload", response_model=schemas.MediaUploadResponse)
+async def upload_media(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Validate and store media to S3; Create database record; return job_id.
+    """
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "application/pdf"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file format"
+        )
+        
+    try:
+        s3_key = storage_service.upload_file(file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Storage upload failed")
+        
+    # Determine type
+    media_type = "image"
+    if "video" in file.content_type: media_type = "video"
+    if "pdf" in file.content_type: media_type = "pdf"
+        
+    job_id = str(uuid.uuid4())
+    new_job = MediaJob(
+        job_id=job_id,
+        user_id=current_user.id,
+        filename=file.filename,
+        media_type=media_type,
+        status="uploaded",
+        s3_key_original=s3_key
+    )
+    db.add(new_job)
+    db.commit()
+    
+    return {
+        "job_id": job_id,
+        "filename": file.filename,
+        "status": "uploaded"
+    }
+
+@router.post("/{job_id}/process", response_model=schemas.MediaProcessResponse)
+async def process_media(
+    job_id: str,
+    request: schemas.MediaProcessRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Trigger server-side AI transformation asynchronously.
+    """
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    if job.status == "processing":
+        raise HTTPException(status_code=400, detail="Job is already processing")
+
+    cvd_type = request.cvd_type or "deuteranopia"
+    severity = request.severity or 1.0
+    
+    job.status = "processing"
+    db.commit()
+    
+    background_tasks.add_task(
+        background_process_media, 
+        job_id=job.job_id, 
+        s3_key=job.s3_key_original, 
+        cvd_type=cvd_type, 
+        severity=severity
+    )
+    
+    return {
+        "task_id": job.job_id,
+        "status": "processing"
+    }
+
+@router.get("/{job_id}/status", response_model=schemas.MediaStatusResponse)
+async def get_media_status(
+    job_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Poll actual processing status from the database.
+    """
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    download_url = None
+    if job.status == "completed" and job.s3_key_processed:
+        download_url = storage_service.generate_presigned_url(job.s3_key_processed)
+        
+    # Mock progress calculation
+    progress = 100.0 if job.status == "completed" else (50.0 if job.status == "processing" else 0.0)
+    
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "progress": progress,
+        "download_url": download_url
+    }
+
+@router.get("/{job_id}/download")
+async def get_download_url(
+    job_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Return presigned S3 download URL for completed jobs.
+    """
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job or job.status != "completed" or not job.s3_key_processed:
+        raise HTTPException(status_code=404, detail="Processed file not found or not completed")
+        
+    url = storage_service.generate_presigned_url(job.s3_key_processed, expiration=3600)
+    if not url:
+        raise HTTPException(status_code=500, detail="Failed to generate download URL")
+        
+    return {"url": url}
+
+@router.post("/{job_id}/share")
+async def generate_share_link(
+    job_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Generate time-limited public share link for completed jobs.
+    """
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job or job.status != "completed" or not job.s3_key_processed:
+        raise HTTPException(status_code=404, detail="Processed file not found or not completed")
+        
+    share_url = storage_service.generate_presigned_url(job.s3_key_processed, expiration=7*24*3600)
+    share_id = str(uuid.uuid4())[:8] # In a real app, save this mapping in the DB
+    
+    return {"share_url": share_url}
+
+@router.get("/history", response_model=List[schemas.MediaHistoryResponse])
+async def get_media_history(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Return upload/processing history for the authenticated user's dashboard.
+    """
+    jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id).order_by(MediaJob.created_at.desc()).all()
+    
+    return [
+        {
+            "job_id": job.job_id,
+            "filename": job.filename,
+            "status": job.status,
+            "created_at": job.created_at.isoformat() if job.created_at else datetime.now().isoformat(),
+            "type": job.media_type
+        }
+        for job in jobs
+    ]
+
