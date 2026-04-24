@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, VStack, Heading, Text, Spinner, useToast, Button } from '@chakra-ui/react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
