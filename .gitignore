@@ -67,3 +67,5 @@ build/
 # AI Datasets
 ai/datasets/
 ai/checkpoints/
+ai/docs/
+docs/
