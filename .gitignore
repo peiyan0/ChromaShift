@@ -63,3 +63,7 @@ coverage/
 .next/
 out/
 build/
+
+# AI Datasets
+ai/datasets/
+ai/checkpoints/
