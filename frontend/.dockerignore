@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.DS_Store
+.git/
+.github/
+README.md
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.stylelintcache
+.prettiercache
+.vite/
