@@ -1,14 +1,48 @@
+import axios from 'axios';
+
+const api = axios.create({
+  // Use a trailing slash to ensure sub-paths join correctly
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/',
+});
+
+// Request interceptor to add the auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for generic error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Optional: Handle 401 globally (e.g., redirect to login)
+    if (error.response?.status === 401) {
+      console.warn('Unauthorized request - check token');
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const processFrame = async (blob: Blob): Promise<string> => {
   const formData = new FormData();
   formData.append('file', blob, 'frame.jpg');
 
-  const response = await fetch('http://localhost:8000/process-frame', {
-    method: 'POST',
-    body: formData,
+  // Use relative path without leading slash to join with baseURL correctly
+  const response = await api.post('inference/process-frame', formData, {
+    responseType: 'blob',
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   });
 
-  if (!response.ok) throw new Error('Failed to process frame');
-
-  const imageBlob = await response.blob();
+  const imageBlob = response.data;
   return URL.createObjectURL(imageBlob);
 };
+
+export default api;
