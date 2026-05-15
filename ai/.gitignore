@@ -1,9 +1,0 @@
-# --- AI / ML ---
-ai/datasets/
-ai/exports/
-ai/checkpoints/
-*.pth
-*.onnx
-*.weights
-*.h5
-.ipynb_checkpoints/

@@ -64,8 +64,21 @@ coverage/
 out/
 build/
 
-# AI Datasets
+# --- AI / ML ---
 ai/datasets/
+ai/exports/
 ai/checkpoints/
-ai/docs/
+backend/app/services/models
+*.pth
+*.onnx
+*.weights
+*.h5
+
+# docs
 docs/
+backend/docs/
+frontend/docs/
+ai/docs/
+
+# test
+backend/scratch/
