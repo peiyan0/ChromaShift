@@ -19,23 +19,43 @@ processor = MediaProcessor()
 def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float):
     """
     Background task to process media using the AI models.
-    Opens its own DB session to avoid sharing state with HTTP request threads.
     """
     print(f"Background task started for job {job_id}")
     
-    # Simulate processing delay
-    time.sleep(5) 
-    
-    # In a real implementation, we would download, process, and upload.
-    # For this simulation, we copy the original file to the 'processed/' prefix.
+    # 1. Setup paths
     file_ext = os.path.splitext(s3_key)[1] if s3_key else ".jpg"
+    local_input = f"/tmp/{job_id}{file_ext}"
+    local_output = f"/tmp/{job_id}_processed{file_ext}"
     processed_key = f"processed/{job_id}_processed{file_ext}"
     
+    # Create tmp dir if not exists (inside container /tmp is usually fine)
+    os.makedirs("/tmp", exist_ok=True)
+    
     try:
-        storage_service.copy_file(s3_key, processed_key)
-        print(f"File copied to {processed_key}")
+        # 2. Download from S3
+        storage_service.download_file(s3_key, local_input)
+        print(f"File downloaded for processing: {local_input}")
         
-        # 4. Update Database Job Status to 'completed'
+        # 3. Process using AI models
+        # Determine media type for processing
+        if file_ext.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
+            processor.process_image(local_input, local_output, cvd_type, severity)
+        elif file_ext.lower() in ['.mp4', '.webm']:
+            processor.process_video(local_input, local_output, cvd_type, severity)
+        elif file_ext.lower() == '.pdf':
+            processor.process_pdf(local_input, local_output, cvd_type, severity)
+        else:
+            # Fallback for unknown types
+            import shutil
+            shutil.copy2(local_input, local_output)
+            
+        print(f"File processed: {local_output}")
+        
+        # 4. Upload back to S3
+        storage_service.upload_from_path(local_output, processed_key)
+        print(f"Processed file uploaded to {processed_key}")
+        
+        # 5. Update Database Job Status to 'completed'
         db = SessionLocal()
         try:
             job = db.query(MediaJob).filter(MediaJob.job_id == job_id).first()
@@ -49,9 +69,10 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
             db.rollback()
         finally:
             db.close()
+            
     except Exception as e:
-        print(f"Error in background processing (copying file): {e}")
-        # Update job to failed if copy fails
+        print(f"Error in background processing: {e}")
+        # Update job to failed
         db = SessionLocal()
         try:
             job = db.query(MediaJob).filter(MediaJob.job_id == job_id).first()
@@ -62,6 +83,10 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
             db.rollback()
         finally:
             db.close()
+    finally:
+        # Cleanup local files
+        if os.path.exists(local_input): os.remove(local_input)
+        if os.path.exists(local_output): os.remove(local_output)
 
 
 @router.post("/upload", response_model=schemas.MediaUploadResponse)

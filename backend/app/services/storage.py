@@ -54,6 +54,26 @@ class StorageService:
             print(f"Error uploading file to S3: {e}")
             raise e
 
+    def download_file(self, object_key: str, local_path: str):
+        """
+        Downloads a file from S3 to a local path.
+        """
+        try:
+            self.s3_client.download_file(self.bucket_name, object_key, local_path)
+        except ClientError as e:
+            print(f"Error downloading file from S3: {e}")
+            raise e
+
+    def upload_from_path(self, local_path: str, object_key: str):
+        """
+        Uploads a file from a local path to S3.
+        """
+        try:
+            self.s3_client.upload_file(local_path, self.bucket_name, object_key)
+        except ClientError as e:
+            print(f"Error uploading file from path to S3: {e}")
+            raise e
+
     def copy_file(self, source_key: str, dest_key: str):
         """
         Copies an object within the same bucket.

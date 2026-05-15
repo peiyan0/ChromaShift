@@ -1,61 +1,52 @@
 import os
 import cv2
 import numpy as np
-import onnxruntime as ort
+from app.services.inference import inference_service
 
 class MediaProcessor:
     """
     Service for integrating AI models into the server-side processing pipeline.
     Handles Images, Videos, and PDFs.
     """
-    def __init__(self, model_dir="ai/exports"):
-        self.model_dir = model_dir
-        # Initialize ONNX runtime sessions (lazily or at startup)
-        self.transunet_session = None
-        
-    def _get_transunet(self):
-        if self.transunet_session is None:
-            model_path = os.path.join(self.model_dir, "transunet_int8.onnx")
-            if os.path.exists(model_path):
-                # Load quantized INT8 model for fast CPU inference
-                self.transunet_session = ort.InferenceSession(model_path)
-            else:
-                print(f"Warning: Model not found at {model_path}")
-        return self.transunet_session
+    def __init__(self):
+        # We use the shared inference_service instance
+        self.inference = inference_service
 
-    def process_image(self, file_path: str, cvd_type: str, severity: float):
+    def process_image(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
         1. Read image (OpenCV)
         2. Run ONNX TransUNet for semantic mask
         3. Apply Hybrid Adaptive Color Remapping
         4. Save and return path
         """
-        # --- Stub implementation ---
-        # image = cv2.imread(file_path)
-        # session = self._get_transunet()
-        # mask = run_inference(session, image)
-        # result = remapper.process(image, mask)
-        # cv2.imwrite(output_path, result)
+        image = cv2.imread(input_path)
+        if image is None:
+            raise ValueError(f"Could not read image at {input_path}")
+            
+        # Process using our verified AI service
+        # intensity could be derived from severity
+        processed_img = self.inference.remap_colors(image, intensity=severity * 1.5)
         
-        output_path = file_path.replace(".jpg", "_processed.jpg")
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Save processed image
+        cv2.imwrite(output_path, processed_img)
         return output_path
 
-    def process_video(self, file_path: str, cvd_type: str, severity: float):
+    def process_video(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
-        1. Extract frames (FFmpeg/OpenCV)
-        2. Process frames via image pipeline
-        3. Apply Temporal Coherence (Optical Flow)
-        4. Re-encode video (FFmpeg)
+        Placeholder for video processing.
         """
-        output_path = file_path.replace(".mp4", "_processed.mp4")
+        # For now, just copy if it's a video, as full video processing is heavy
+        import shutil
+        shutil.copy2(input_path, output_path)
         return output_path
 
-    def process_pdf(self, file_path: str, cvd_type: str, severity: float):
+    def process_pdf(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
-        1. Parse PDF layout via DiT
-        2. Extract images/charts
-        3. Process extracted elements
-        4. Reassemble PDF
+        Placeholder for PDF processing.
         """
-        output_path = file_path.replace(".pdf", "_processed.pdf")
+        import shutil
+        shutil.copy2(input_path, output_path)
         return output_path
