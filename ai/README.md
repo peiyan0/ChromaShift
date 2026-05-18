@@ -1,6 +1,6 @@
-# AI/ML Workspace - Phase 2
+# ChromaShift AI/ML Workspace
 
-This directory is dedicated to **Phase 2: AI/ML Model Development & Training** of the Google Antigravity CVD Accessibility Platform.
+This directory is dedicated to **AI/ML Model Development & Training** of the ChromaShift Platform.
 
 ## Directory Structure
 - `datasets/`: Storage for raw and curated datasets (Ishihara, CVD Recoloring, etc.). *Ignored by Git.*
@@ -24,7 +24,7 @@ python -m venv .venv
 pip install .
 ```
 
-### 2. Phase 2 Objectives
+### 2. Objectives
 - [ ] **Dataset Curation**: Collect and split datasets (70/20/10).
 - [ ] **Model Training**: Fine-tune TransUNet, RT-DETR, and DiT.
 - [ ] **Core Algorithm**: Implement Hybrid Adaptive Color Remapping.

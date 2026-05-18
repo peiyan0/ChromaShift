@@ -1,6 +1,6 @@
-# CVD Accessibility Platform
+# ChromaShift
 
-> **Empowering the perceptual digital divide.** An AI-powered suite designed to make digital media accessible to the 300 million individuals living with Color Vision Deficiency (CVD).
+> **Empowering the chromatic digital divide.** An AI-powered suite designed to make digital media accessible to the 300 million individuals living with Color Vision Deficiency (CVD).
 
 ---
 
@@ -42,34 +42,24 @@
 - [Node.js v20+](https://nodejs.org/)
 - [Python 3.11+ & Poetry](https://python-poetry.org/)
 
-### Quick Start (Full Stack)
+### Run the platform in Docker
+
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/peiyan0/cvd-accessibility-platform.git
-   cd cvd-accessibility-platform
+   git clone https://github.com/peiyan0/chromashift.git
+   cd chromashift
    ```
 
-2. **Start infrastructure**:
+2. **Start the containers**:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-3. **Launch Backend**:
-   ```bash
-   cd backend
-   poetry install
-   poetry run uvicorn app.main:app --reload
+3. **Access the platform**:
+   - **Frontend**: `http://localhost` (Port 80)
+   - **Backend API**: `http://localhost:8000`
+   - **Swagger UI**: `http://localhost:8000/docs`
    ```
-
-4. **Launch Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-Visit `http://localhost:5173` to access the platform.
-
 ---
 
 ## 🏗️ Architecture
