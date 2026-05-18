@@ -24,7 +24,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Top Navbar */}
       <Flex as="header" w="full" bg="white" borderBottom="1px" borderColor="gray.200" py={4} px={8} align="center" justify="space-between" shadow="sm">
         <Text fontSize="xl" fontWeight="black" color="blue.600" letterSpacing="tight">
-          Google Antigravity
+          ChromaShift
         </Text>
         
         <HStack spacing={6}>

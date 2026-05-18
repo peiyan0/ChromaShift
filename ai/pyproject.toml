@@ -1,7 +1,7 @@
 [project]
 name = "cvd-ai"
 version = "0.1.0"
-description = "AI/ML Model Development for Google Antigravity CVD Platform"
+description = "AI/ML Model Development for ChromaShift Platform"
 requires-python = ">=3.12"
 dependencies = [
     "torch>=2.3.0",

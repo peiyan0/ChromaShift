@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Backend API for Google Antigravity CVD Platform"
+description = "Backend API for ChromaShift Platform"
 requires-python = "^3.12"
 dependencies = [
     "fastapi>=0.111.0",

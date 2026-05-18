@@ -55,7 +55,7 @@ const Register = () => {
       <Box p={8} maxWidth="400px" borderWidth={1} borderRadius={8} boxShadow="lg" bg="white">
         <VStack spacing={4} as="form" onSubmit={handleRegister}>
           <Heading size="lg">Create Account</Heading>
-          <Text color="gray.500">Google Antigravity Platform</Text>
+          <Text color="gray.500">CVD Accessibility Platform</Text>
           
           <FormControl isRequired>
             <FormLabel>Email address</FormLabel>
