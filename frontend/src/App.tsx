@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink, useLocation } from 'react-router-dom';
-import { Box, Flex, HStack, Button, Text, Container } from '@chakra-ui/react';
+import { Box, Flex, HStack, Button, Text, Container, Badge } from '@chakra-ui/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -15,7 +15,7 @@ import { WorkspaceStudio } from './components/WorkspaceStudio';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const { logout } = useAuth();
+  const { logout, isGuest } = useAuth();
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
@@ -24,9 +24,16 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     <Box minH="100vh" bg="gray.50">
       {/* Top Navbar */}
       <Flex as="header" w="full" bg="white" borderBottom="1px" borderColor="gray.200" py={4} px={8} align="center" justify="space-between" shadow="sm">
-        <Text fontSize="xl" fontWeight="black" color="blue.600" letterSpacing="tight">
-          ChromaShift
-        </Text>
+        <HStack spacing={3}>
+          <Text fontSize="xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text" letterSpacing="tight">
+            ChromaShift
+          </Text>
+          {isGuest && (
+            <Badge colorScheme="purple" borderRadius="md" px={2} py={0.5} fontSize="xs" fontWeight="bold">
+              Guest Mode
+            </Badge>
+          )}
+        </HStack>
         
         <HStack spacing={6}>
           <Button as={RouterLink} to="/" variant={isActive('/') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
@@ -41,11 +48,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           
           <Box w="1px" h="24px" bg="gray.300" mx={2} />
           
-          <Button onClick={logout} variant="outline" colorScheme="red" size="sm">
-            Logout
-          </Button>
+          {isGuest ? (
+            <Button as={RouterLink} to="/auth/login" colorScheme="blue" variant="solid" size="sm" onClick={logout}>
+              Log In / Register
+            </Button>
+          ) : (
+            <Button onClick={logout} variant="outline" colorScheme="red" size="sm">
+              Logout
+            </Button>
+          )}
         </HStack>
       </Flex>
+
 
       {/* Main Content Area */}
       <Container maxW="container.xl" py={8}>

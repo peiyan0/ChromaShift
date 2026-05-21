@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+import uuid
 
 from app.db.session import get_db
 from app.db import models
@@ -42,3 +43,20 @@ def login_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordR
         
     access_token = create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/guest", response_model=schemas.Token)
+def login_guest_user(db: Session = Depends(get_db)):
+    guest_uuid = str(uuid.uuid4())
+    guest_email = f"guest_{guest_uuid}@chromashift.guest"
+    # Use a random UUID password for security
+    guest_password = str(uuid.uuid4())
+    hashed_password = get_password_hash(guest_password)
+    
+    user = models.User(email=guest_email, hashed_password=hashed_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    access_token = create_access_token(subject=user.id)
+    return {"access_token": access_token, "token_type": "bearer"}
+
