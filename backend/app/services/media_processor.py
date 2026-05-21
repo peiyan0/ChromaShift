@@ -23,9 +23,8 @@ class MediaProcessor:
         if image is None:
             raise ValueError(f"Could not read image at {input_path}")
             
-        # Process using our verified AI service
-        # intensity could be derived from severity
-        processed_img = self.inference.remap_colors(image, intensity=severity * 1.5)
+        # Process using our dynamic CVD-specific AI service
+        processed_img = self.inference.remap_colors(image, intensity=severity * 1.5, cvd_type=cvd_type)
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -36,17 +35,115 @@ class MediaProcessor:
 
     def process_video(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
-        Placeholder for video processing.
+        Process video frame-by-frame, applying an Exponential Moving Average (EMA)
+        temporal smoothing mask filter to prevent flicker artifacts during playback.
         """
-        # For now, just copy if it's a video, as full video processing is heavy
-        import shutil
-        shutil.copy2(input_path, output_path)
+        cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            raise ValueError(f"Could not open video at {input_path}")
+            
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Output as standard MP4
+        
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        alpha = 0.5  # EMA smoothing factor (0.5 balance between responsiveness and flicker-filtering)
+        smoothed_mask = None
+        
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                    
+                # Compute mask for current frame
+                input_tensor = self.inference.preprocess(frame)
+                outputs = self.inference.session.run(None, {self.inference.input_name: input_tensor})
+                mask = outputs[0].squeeze()
+                mask = cv2.resize(mask, (width, height))
+                
+                if smoothed_mask is None:
+                    smoothed_mask = mask
+                else:
+                    smoothed_mask = alpha * mask + (1 - alpha) * smoothed_mask
+                    
+                # Apply remapping using the temporally-smoothed mask
+                result = frame.copy().astype(np.float32)
+                m = smoothed_mask * (severity * 1.5)
+                
+                cvd_lower = cvd_type.lower() if cvd_type else "deuteranopia"
+                if cvd_lower == "protanopia":
+                    # Protanopia (Red-blind): Shift red using green
+                    result[:, :, 2] = frame[:, :, 2] * (1 - 0.5 * m) + frame[:, :, 1] * (0.5 * m)
+                elif cvd_lower == "tritanopia":
+                    # Tritanopia (Blue-blind): Shift blue using green
+                    result[:, :, 0] = frame[:, :, 0] * (1 - 0.5 * m) + frame[:, :, 1] * (0.5 * m)
+                else: # Default: deuteranopia
+                    # Deuteranopia (Green-blind): Shift green using red
+                    result[:, :, 1] = frame[:, :, 1] * (1 - 0.5 * m) + frame[:, :, 2] * (0.5 * m)
+                    
+                processed_frame = np.clip(result, 0, 255).astype(np.uint8)
+                out.write(processed_frame)
+        finally:
+            cap.release()
+            out.release()
+            
         return output_path
 
     def process_pdf(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
-        Placeholder for PDF processing.
+        High-fidelity, layout-preserving PDF processing. Renders pages using Chrome's native
+        PDFium engine (pypdfium2), applies dynamic CVD remapping to all visual components
+        (text, charts, vector lines), and re-compiles pages back to a single PDF.
         """
-        import shutil
-        shutil.copy2(input_path, output_path)
+        import pypdfium2 as pdfium
+        from PIL import Image
+        
+        pdf = pdfium.PdfDocument(input_path)
+        corrected_images = []
+        
+        try:
+            for page in pdf:
+                # Render to high-res PIL Image (scale=2 is ~150 DPI)
+                bitmap = page.render(scale=2)
+                pil_img = bitmap.to_pil()
+                
+                # Convert to OpenCV image (RGB to BGR)
+                open_cv_image = np.array(pil_img)
+                if len(open_cv_image.shape) == 3:
+                    if open_cv_image.shape[2] == 4: # RGBA
+                        open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGBA2BGR)
+                    else: # RGB
+                        open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2BGR)
+                else: # Grayscale, make it BGR
+                    open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_GRAY2BGR)
+                
+                # Remap colors using dynamic CVD type and severity
+                processed_bgr = self.inference.remap_colors(open_cv_image, intensity=severity * 1.5, cvd_type=cvd_type)
+                
+                # Convert BGR back to PIL Image (RGB)
+                processed_rgb = cv2.cvtColor(processed_bgr, cv2.COLOR_BGR2RGB)
+                corrected_images.append(Image.fromarray(processed_rgb))
+                
+            if not corrected_images:
+                raise ValueError("No pages found in PDF")
+                
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Save all pages back into a single high-quality PDF
+            corrected_images[0].save(
+                output_path, 
+                "PDF", 
+                save_all=True, 
+                append_images=corrected_images[1:], 
+                quality=95
+            )
+        finally:
+            pdf.close()
+            
         return output_path
+

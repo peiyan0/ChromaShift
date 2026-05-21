@@ -22,7 +22,7 @@ class InferenceService:
         img = np.transpose(img, (2, 0, 1))  # HWC to CHW
         return np.expand_dims(img, axis=0)
 
-    def remap_colors(self, image, intensity=1.5):
+    def remap_colors(self, image, intensity=1.5, cvd_type="deuteranopia"):
         input_tensor = self.preprocess(image)
         outputs = self.session.run(None, {self.input_name: input_tensor})
         mask = outputs[0].squeeze()
@@ -32,9 +32,22 @@ class InferenceService:
         
         # Hybrid Adaptive Remapping Logic
         result = image.copy().astype(np.float32)
-        # Example: Deuteranopia shift
         m = mask * intensity
-        result[:,:,1] = image[:,:,1] * (1 - 0.5 * m) + image[:,:,2] * (0.5 * m)
+        
+        # Normalize cvd_type
+        cvd_type = cvd_type.lower() if cvd_type else "deuteranopia"
+        
+        if cvd_type == "protanopia":
+            # Protanopia (Red-blind): Shift red (index 2 in BGR) using green (index 1)
+            result[:, :, 2] = image[:, :, 2] * (1 - 0.5 * m) + image[:, :, 1] * (0.5 * m)
+        elif cvd_type == "tritanopia":
+            # Tritanopia (Blue-blind): Shift blue (index 0 in BGR) using green (index 1)
+            result[:, :, 0] = image[:, :, 0] * (1 - 0.5 * m) + image[:, :, 1] * (0.5 * m)
+        else: # Default: deuteranopia
+            # Deuteranopia (Green-blind): Shift green (index 1 in BGR) using red (index 2)
+            result[:, :, 1] = image[:, :, 1] * (1 - 0.5 * m) + image[:, :, 2] * (0.5 * m)
+            
         return np.clip(result, 0, 255).astype(np.uint8)
 
 inference_service = InferenceService()
+

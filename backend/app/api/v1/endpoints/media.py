@@ -187,6 +187,10 @@ async def get_media_status(
     if job.status == "completed" and job.s3_key_processed:
         download_url = storage_service.generate_presigned_url(job.s3_key_processed)
         
+    download_url_original = None
+    if job.s3_key_original:
+        download_url_original = storage_service.generate_presigned_url(job.s3_key_original)
+        
     # Mock progress calculation
     progress = 100.0 if job.status == "completed" else (50.0 if job.status == "processing" else 0.0)
     
@@ -194,7 +198,8 @@ async def get_media_status(
         "job_id": job.job_id,
         "status": job.status,
         "progress": progress,
-        "download_url": download_url
+        "download_url": download_url,
+        "download_url_original": download_url_original
     }
 
 @router.get("/{job_id}/download")

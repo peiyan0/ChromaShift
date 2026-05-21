@@ -1,10 +1,13 @@
+import os
+from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Any, List
 from pydantic import BaseModel
 
 from app.api import deps
-from app.db.models import MediaJob, ComplianceReport, User
+from app.db.models import MediaJob, ComplianceReport, User, VisionProfile
+from app.services.storage import storage_service
+from app.services.compliance_analyzer import analyze_media_compliance
 
 router = APIRouter()
 
@@ -34,6 +37,12 @@ async def run_compliance_check(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    if job.status != "completed" or not job.s3_key_processed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Media processing is not complete. Cannot run compliance check."
+        )
+
     # Check if report already exists
     existing_report = db.query(ComplianceReport).filter(ComplianceReport.media_job_id == job.id).first()
     if existing_report:
@@ -45,27 +54,37 @@ async def run_compliance_check(
             "issues": existing_report.issues
         }
 
-    # Simulate running WCAG analysis on the processed file
-    issues = [
-        {
-            "sc_id": "1.4.3",
-            "severity": "Error",
-            "description": "Contrast ratio of text to background is 3.1:1, requiring 4.5:1.",
-            "suggestion": "Increase the contrast slider by 15% in your Vision Profile."
-        },
-        {
-            "sc_id": "1.4.1",
-            "severity": "Warning",
-            "description": "Color is used as the only visual means of conveying information on a chart line.",
-            "suggestion": "Enable 'pattern overlays' in the advanced accessibility settings."
-        }
-    ]
+    # Fetch user's active Vision Profile for CVD context
+    profile = db.query(VisionProfile).filter(VisionProfile.user_id == current_user.id).first()
+    cvd_type = profile.cvd_type if profile else "deuteranopia"
+
+    # Setup temporary paths
+    file_ext = os.path.splitext(job.s3_key_processed)[1] if job.s3_key_processed else ".jpg"
+    local_path = f"/tmp/{job_id}_compliance{file_ext}"
+    os.makedirs("/tmp", exist_ok=True)
+
+    try:
+        # Download the processed file from storage
+        storage_service.download_file(job.s3_key_processed, local_path)
+        
+        # Analyze real visual compliance of the media
+        result = analyze_media_compliance(local_path, job.media_type, cvd_type)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Compliance check failed: {str(e)}"
+        )
+    finally:
+        # Cleanup temporary files
+        if os.path.exists(local_path):
+            os.remove(local_path)
 
     new_report = ComplianceReport(
         media_job_id=job.id,
-        status="fail",
-        score=82.5,
-        issues=issues
+        status=result["status"],
+        score=result["score"],
+        issues=result["issues"]
     )
     db.add(new_report)
     db.commit()
