@@ -11,6 +11,7 @@ import EmailVerification from './pages/auth/EmailVerification';
 import { DashboardHistory } from './components/DashboardHistory';
 import { DragDropUpload } from './components/DragDropUpload';
 import { CalibrationWizard } from './components/CalibrationWizard';
+import { WorkspaceStudio } from './components/WorkspaceStudio';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -84,6 +85,14 @@ function App() {
             <ProtectedRoute>
               <AppLayout>
                 <CalibrationWizard />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/workspace/:jobId" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <WorkspaceStudio />
               </AppLayout>
             </ProtectedRoute>
           } />

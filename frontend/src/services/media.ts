@@ -16,6 +16,7 @@ export interface MediaStatusResponse {
   status: string;
   progress: number;
   download_url: string | null;
+  download_url_original: string | null;
 }
 
 export interface MediaHistoryResponse {

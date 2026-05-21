@@ -1,4 +1,5 @@
 import { useEffect, useState, type FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Text, Table, Thead, Tbody, Tr, Th, Td, Badge, Button, HStack, Icon, IconButton, Spinner, Center, useDisclosure } from '@chakra-ui/react';
 import { mediaService, type MediaHistoryResponse } from '../services/media';
 import { ComplianceReportModal } from './ComplianceReportModal';
@@ -21,7 +22,14 @@ const AuditIcon = (props: any) => (
   </Icon>
 );
 
+const StudioIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path fill="currentColor" d="M19,3H5A2,2 0 0,0 3,5V15A2,2 0 0,0 5,17H10V19H8V21H16V19H14V17H19A2,2 0 0,0 21,15V5A2,2 0 0,0 19,3M19,15H5V5H19V15Z" />
+  </Icon>
+);
+
 export const DashboardHistory: FC = () => {
+  const navigate = useNavigate();
   const [history, setHistory] = useState<MediaHistoryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -119,6 +127,15 @@ export const DashboardHistory: FC = () => {
                     <Td textAlign="right">
                       <HStack justify="flex-end" spacing={2}>
                         <Button
+                          leftIcon={<StudioIcon w={4} h={4} />}
+                          size="sm"
+                          colorScheme="blue"
+                          isDisabled={item.status !== 'completed'}
+                          onClick={() => navigate(`/workspace/${item.job_id}`)}
+                        >
+                          Workspace
+                        </Button>
+                        <Button
                           leftIcon={<AuditIcon w={4} h={4} />}
                           size="sm"
                           colorScheme="teal"
@@ -140,6 +157,7 @@ export const DashboardHistory: FC = () => {
                         <Button 
                           leftIcon={<DownloadIcon w={4} h={4} />} 
                           size="sm" 
+                          variant="outline"
                           colorScheme="blue"
                           isDisabled={item.status !== 'completed'}
                           onClick={() => handleDownload(item.job_id)}
