@@ -10,7 +10,6 @@ ENV/
 htmlcov/
 .mypy_cache/
 .poetry/
-poetry.lock
 *.db
 *.sqlite3
 .git/
