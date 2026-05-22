@@ -25,6 +25,8 @@ export interface MediaHistoryResponse {
   status: string;
   created_at: string;
   type: string;
+  download_url: string | null;
+  download_url_original: string | null;
 }
 
 export const mediaService = {
@@ -63,6 +65,16 @@ export const mediaService = {
 
   getHistory: async (): Promise<MediaHistoryResponse[]> => {
     const response = await api.get('/media/history');
+    return response.data;
+  },
+
+  deleteMedia: async (jobId: string): Promise<{ status: string; message: string }> => {
+    const response = await api.delete(`/media/${jobId}`);
+    return response.data;
+  },
+
+  clearAllMedia: async (): Promise<{ status: string; message: string }> => {
+    const response = await api.delete('/media/clear-all');
     return response.data;
   }
 };

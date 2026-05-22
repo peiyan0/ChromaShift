@@ -66,3 +66,5 @@ class MediaHistoryResponse(BaseModel):
     status: str
     created_at: str
     type: str # 'image', 'video', 'pdf'
+    download_url: Optional[str] = None
+    download_url_original: Optional[str] = None

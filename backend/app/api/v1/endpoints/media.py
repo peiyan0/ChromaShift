@@ -255,8 +255,70 @@ async def get_media_history(
             "filename": job.filename,
             "status": job.status,
             "created_at": job.created_at.isoformat() if job.created_at else datetime.now().isoformat(),
-            "type": job.media_type
+            "type": job.media_type,
+            "download_url": storage_service.generate_presigned_url(job.s3_key_processed) if job.status == "completed" and job.s3_key_processed else None,
+            "download_url_original": storage_service.generate_presigned_url(job.s3_key_original) if job.s3_key_original else None
         }
         for job in jobs
     ]
+
+@router.delete("/clear-all")
+async def clear_all_media(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Delete all media jobs and physical S3 files for the authenticated user.
+    """
+    jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id).all()
+    for job in jobs:
+        # Delete original file physically
+        if job.s3_key_original:
+            try:
+                storage_service.delete_file(job.s3_key_original)
+            except Exception as e:
+                print(f"Failed to delete original key {job.s3_key_original}: {e}")
+        # Delete processed file physically
+        if job.s3_key_processed:
+            try:
+                storage_service.delete_file(job.s3_key_processed)
+            except Exception as e:
+                print(f"Failed to delete processed key {job.s3_key_processed}: {e}")
+        # Delete job from DB
+        db.delete(job)
+    
+    db.commit()
+    return {"status": "ok", "message": f"Successfully deleted {len(jobs)} jobs."}
+
+@router.delete("/{job_id}")
+async def delete_media_job(
+    job_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Delete a single media job and its physical files by job ID.
+    """
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    # Delete original file physically
+    if job.s3_key_original:
+        try:
+            storage_service.delete_file(job.s3_key_original)
+        except Exception as e:
+            print(f"Failed to delete original key {job.s3_key_original}: {e}")
+            
+    # Delete processed file physically
+    if job.s3_key_processed:
+        try:
+            storage_service.delete_file(job.s3_key_processed)
+        except Exception as e:
+            print(f"Failed to delete processed key {job.s3_key_processed}: {e}")
+            
+    db.delete(job)
+    db.commit()
+    return {"status": "ok", "message": "Job successfully deleted."}
+
 
