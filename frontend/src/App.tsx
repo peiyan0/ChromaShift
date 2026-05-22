@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink, useLocation } from 'react-router-dom';
-import { Box, Flex, HStack, Button, Text, Container, Badge } from '@chakra-ui/react';
+import { Box, Flex, HStack, Button, Text, Container, Badge, useDisclosure } from '@chakra-ui/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -12,16 +12,27 @@ import { DashboardHistory } from './components/DashboardHistory';
 import { DragDropUpload } from './components/DragDropUpload';
 import { CalibrationWizard } from './components/CalibrationWizard';
 import { WorkspaceStudio } from './components/WorkspaceStudio';
+import { PromoteModal } from './components/PromoteModal';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const { logout, isGuest } = useAuth();
   const location = useLocation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
     <Box minH="100vh" bg="gray.50">
+      {isGuest && (
+        <Box bgGradient="linear(to-r, blue.600, purple.600)" color="white" py={2.5} px={4} textAlign="center" fontSize={{ base: "xs", md: "sm" }} fontWeight="medium" shadow="inner">
+          🎨 Running in Guest Session. Your vision profile calibration and media history will be automatically pruned in 24 hours.
+          <Button size="xs" colorScheme="whiteAlpha" bg="whiteAlpha.300" ml={3} fontWeight="extrabold" borderRadius="md" _hover={{ bg: "whiteAlpha.450" }} onClick={onOpen}>
+            Secure Your Account
+          </Button>
+        </Box>
+      )}
+
       {/* Top Navbar */}
       <Flex as="header" w="full" bg="white" borderBottom="1px" borderColor="gray.200" py={4} px={8} align="center" justify="space-between" shadow="sm">
         <HStack spacing={3}>
@@ -49,9 +60,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <Box w="1px" h="24px" bg="gray.300" mx={2} />
           
           {isGuest ? (
-            <Button as={RouterLink} to="/auth/login" colorScheme="blue" variant="solid" size="sm" onClick={logout}>
-              Log In / Register
-            </Button>
+            <HStack spacing={3}>
+              <Button size="sm" colorScheme="purple" bgGradient="linear(to-r, blue.600, purple.600)" color="white" _hover={{ opacity: 0.9 }} onClick={onOpen}>
+                Secure Progress
+              </Button>
+              <Button as={RouterLink} to="/auth/login" colorScheme="blue" variant="ghost" size="sm">
+                Log In
+              </Button>
+            </HStack>
           ) : (
             <Button onClick={logout} variant="outline" colorScheme="red" size="sm">
               Logout
@@ -65,6 +81,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <Container maxW="container.xl" py={8}>
         {children}
       </Container>
+
+      {/* Guest Session Promotion Modal */}
+      <PromoteModal isOpen={isOpen} onClose={onClose} />
     </Box>
   );
 };

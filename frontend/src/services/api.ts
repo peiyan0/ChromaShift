@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/';
+const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
+
 const api = axios.create({
-  // Use a trailing slash to ensure sub-paths join correctly
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/',
+  baseURL,
 });
 
 // Request interceptor to add the auth token

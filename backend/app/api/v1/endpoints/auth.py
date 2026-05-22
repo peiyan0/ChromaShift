@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.db import models
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app import schemas
+from app.api import deps
 
 router = APIRouter()
 
@@ -59,4 +60,42 @@ def login_guest_user(db: Session = Depends(get_db)):
     
     access_token = create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/promote", response_model=schemas.UserResponse)
+def promote_guest_user(
+    user_in: schemas.UserCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_user)
+):
+    if not current_user.email.endswith("@chromashift.guest"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only guest accounts can be promoted."
+        )
+    
+    # Check if target email already exists
+    existing_user = db.query(models.User).filter(models.User.email == user_in.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The user with this email already exists in the system."
+        )
+    
+    # Update current guest record to permanent account
+    current_user.email = user_in.email
+    current_user.hashed_password = get_password_hash(user_in.password)
+    
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    return current_user
+
+@router.post("/cleanup", response_model=dict)
+def trigger_cleanup(max_age_hours: int = 24, db: Session = Depends(get_db)):
+    from app.services.cleanup import cleanup_guest_accounts
+    count = cleanup_guest_accounts(db, max_age_hours=max_age_hours)
+    return {"status": "success", "cleaned_count": count}
+
+
 

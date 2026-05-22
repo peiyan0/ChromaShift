@@ -7,11 +7,13 @@ interface AuthContextType {
   isInitializing: boolean;
   login: (token: string, isGuestUser?: boolean) => void;
   logout: () => void;
+  promote: (token?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/';
+const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/';
+const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -59,8 +61,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsGuest(false);
   };
 
+  const promote = (token?: string) => {
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+    localStorage.setItem('isGuest', 'false');
+    setIsGuest(false);
+    setIsAuthenticated(true);
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isGuest, isInitializing, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isGuest, isInitializing, login, logout, promote }}>
       {children}
     </AuthContext.Provider>
   );
