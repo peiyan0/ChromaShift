@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -13,6 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +21,13 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
+  const { isAuthenticated, isGuest } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      navigate('/');
+    }
+  }, [isAuthenticated, isGuest, navigate]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

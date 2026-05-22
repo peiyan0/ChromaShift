@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -21,7 +21,13 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isGuest } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      navigate('/');
+    }
+  }, [isAuthenticated, isGuest, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
