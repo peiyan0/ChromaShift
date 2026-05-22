@@ -99,9 +99,22 @@ class StorageService:
                 Params={'Bucket': self.bucket_name, 'Key': object_key},
                 ExpiresIn=expiration
             )
+            # Address client-side preview in docker environment by mapping internal container network hostname to localhost
+            if response:
+                response = response.replace("://minio:", "://localhost:")
             return response
         except ClientError as e:
             print(f"Error generating presigned URL: {e}")
             return None
+
+    def delete_file(self, object_key: str):
+        """
+        Deletes a file from S3.
+        """
+        try:
+            self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_key)
+        except ClientError as e:
+            print(f"Error deleting file from S3: {e}")
+            raise e
 
 storage_service = StorageService()
