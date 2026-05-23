@@ -342,9 +342,9 @@ export const CameraView: React.FC = () => {
                     borderColor="gray.200"
                     _hover={{ borderColor: 'blue.400' }}
                   >
-                    <option value="deuteranopia">Deuteranopia (Green-blind)</option>
-                    <option value="protanopia">Protanopia (Red-blind)</option>
-                    <option value="tritanopia">Tritanopia (Blue-blind)</option>
+                    <option value="deuteranopia">Green-blind (Deuteranopia) - struggle to tell green and red apart</option>
+                    <option value="protanopia">Red-blind (Protanopia) - struggle to tell red and green apart</option>
+                    <option value="tritanopia">Blue-blind (Tritanopia) - struggle to tell blue and green, yellow and pink apart</option>
                   </Select>
                 </FormControl>
 
@@ -352,7 +352,7 @@ export const CameraView: React.FC = () => {
                 <FormControl>
                   <Flex justify="space-between" align="center" mb={2}>
                     <FormLabel fontSize="sm" fontWeight="bold" color="gray.700" mb={0}>
-                      Remapping Severity
+                      Correction Strength (Severity)
                     </FormLabel>
                     <Text fontSize="xs" fontWeight="black" color="blue.600">
                       {(profile.severity * 100).toFixed(0)}%

@@ -101,28 +101,35 @@ def generate_suggestions(cvd_type: str, critical_count: int, warning_count: int)
                 "sc_id": "1.4.3",
                 "severity": "Error",
                 "description": f"Detected {critical_count} visual boundaries with extremely low contrast (under 3:1) for Red-Green transitions.",
-                "suggestion": "Increase the Protanopia compensation severity (intensity slider) by 15-25% in your profile to boost red-channel separation."
+                "suggestion": "Go to settings and increase your 'Correction Strength (Severity)' by 15-25% to make red-green boundaries clearer for Protanopia (red-blindness)."
             })
         elif cvd_lower == "tritanopia":
             issues.append({
                 "sc_id": "1.4.3",
                 "severity": "Error",
                 "description": f"Detected {critical_count} visual boundaries with extremely low contrast (under 3:1) for Blue-Yellow transitions.",
-                "suggestion": "Boost your Tritanopia compensation intensity by 20% to enhance blue-channel luminance separation from yellow backgrounds."
+                "suggestion": "Go to settings and increase your 'Correction Strength (Severity)' by 20% to make blue-yellow boundaries clearer against yellow backgrounds for Tritanopia (blue-blindness)."
+            })
+        elif cvd_lower == "normal":
+            issues.append({
+                "sc_id": "1.4.3",
+                "severity": "Error",
+                "description": f"Detected {critical_count} visual boundaries with extremely low contrast (under 3:1) for standard colors.",
+                "suggestion": "Adjust page typography or increase structural color separation to improve visibility for standard color vision."
             })
         else: # deuteranopia
             issues.append({
                 "sc_id": "1.4.3",
                 "severity": "Error",
                 "description": f"Detected {critical_count} visual boundaries with extremely low contrast (under 3:1) for Green-Red transitions.",
-                "suggestion": "Adjust your Deuteranopia contrast multiplier or severity slider upward to improve green-hue legibility."
+                "suggestion": "Go to settings and increase your 'Correction Strength (Severity)' or 'Contrast Booster' to make green-red transitions more visible for Deuteranopia (green-blindness)."
             })
             
         issues.append({
             "sc_id": "1.4.11",
             "severity": "Error",
             "description": f"Non-text graphical elements (charts/legends) exhibit critical contrast barriers (under 3:1) at {critical_count} boundary locations.",
-            "suggestion": "Apply structural design updates (e.g. increase line thickness, use patterns/shapes, or use higher-contrast primary colors)."
+            "suggestion": "Apply structural design updates (such as increasing border thickness, using visual patterns/textures, or choosing higher-contrast colors)."
         })
         
     if warning_count > 0:
@@ -130,7 +137,7 @@ def generate_suggestions(cvd_type: str, critical_count: int, warning_count: int)
             "sc_id": "1.4.3",
             "severity": "Warning",
             "description": f"Detected {warning_count} boundary areas with moderate contrast (between 3:1 and 4.5:1), violating WCAG AA for normal text.",
-            "suggestion": "In your Vision Profile, increase the global contrast multiplier to enhance text clarity against its adjacent background."
+            "suggestion": "Go to settings and increase your 'Overall Filter Intensity' or 'Contrast Booster' to enhance text readability."
         })
         
     return issues
