@@ -222,6 +222,38 @@ export const WorkspaceStudio: React.FC = () => {
     );
   }
 
+  if (status?.status === 'processing' || status?.status === 'uploaded') {
+    return (
+      <Center h="70vh" flexDir="column" p={6}>
+        <CircularProgress isIndeterminate color="blue.500" size="80px" thickness="8px" mb={6}>
+          <CircularProgressLabel color="blue.500" fontSize="xs" fontWeight="bold">AI</CircularProgressLabel>
+        </CircularProgress>
+        <Text fontSize="xl" fontWeight="black" color="gray.800" mb={2}>Processing Your File...</Text>
+        <Text color="gray.500" textAlign="center" maxW="md" mb={6}>
+          Our semantic AI pipeline is analyzing and remapping your colors for maximum WCAG compliance. This will take just a moment.
+        </Text>
+        <Button leftIcon={<RefreshIcon w={4} h={4} />} onClick={loadWorkspace} colorScheme="blue" variant="outline" borderRadius="xl">
+          Refresh Status
+        </Button>
+      </Center>
+    );
+  }
+
+  if (status?.status === 'failed') {
+    return (
+      <Center h="70vh" flexDir="column" p={6}>
+        <Icon as={WarningIcon} w={16} h={16} color="red.500" mb={6} />
+        <Text fontSize="xl" fontWeight="black" color="gray.800" mb={2}>Processing Failed</Text>
+        <Text color="gray.500" textAlign="center" maxW="md" mb={6}>
+          An error occurred in our AI processing pipeline while attempting to remap colors for this file.
+        </Text>
+        <Button onClick={() => navigate('/')} colorScheme="blue" borderRadius="xl">
+          Back to Dashboard
+        </Button>
+      </Center>
+    );
+  }
+
   return (
     <Box w="full" px={1} py={4}>
       {/* Studio Header Bar */}
