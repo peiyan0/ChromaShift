@@ -17,6 +17,7 @@ export interface MediaStatusResponse {
   progress: number;
   download_url: string | null;
   download_url_original: string | null;
+  thumbnail_url?: string | null;
 }
 
 export interface MediaHistoryResponse {
@@ -27,6 +28,7 @@ export interface MediaHistoryResponse {
   type: string;
   download_url: string | null;
   download_url_original: string | null;
+  thumbnail_url?: string | null;
 }
 
 export const mediaService = {

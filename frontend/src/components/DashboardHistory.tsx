@@ -363,10 +363,27 @@ export const DashboardHistory: FC = () => {
                           </Box>
                         </Box>
                       ) : item.type === 'pdf' ? (
-                        <Flex w="100%" h="100%" bgGradient="linear(to-br, red.500, orange.500)" align="center" justify="center" direction="column" color="white" p={4}>
-                          <Icon as={FiFileText} w={12} h={12} mb={2} />
-                          <Text fontSize="sm" fontWeight="black" letterSpacing="wide">PDF DOCUMENT</Text>
-                        </Flex>
+                        <Box w="100%" h="100%" overflow="hidden" bg="white" position="relative">
+                          {item.thumbnail_url ? (
+                            <Image 
+                              src={item.thumbnail_url} 
+                              alt={item.filename} 
+                              objectFit="cover" 
+                              w="100%" 
+                              h="100%" 
+                              loading="lazy"
+                              fallbackSrc="https://via.placeholder.com/400x225?text=PDF+Loading"
+                            />
+                          ) : (
+                            <iframe
+                              src={`${item.download_url}#page=1&toolbar=0&navpanes=0&scrollbar=0`}
+                              width="100%"
+                              height="100%"
+                              style={{ border: 'none', pointerEvents: 'none', display: 'block' }}
+                              title={item.filename}
+                            />
+                          )}
+                        </Box>
                       ) : (
                         <Flex w="100%" h="100%" bg="gray.100" align="center" justify="center">
                           <Text color="gray.500" fontSize="xs">No Preview Available</Text>
@@ -523,9 +540,21 @@ export const DashboardHistory: FC = () => {
                             />
                           </Box>
                         ) : item.type === 'pdf' ? (
-                          <Center boxSize="36px" bg="red.50" color="red.500" borderRadius="lg" border="1px" borderColor="red.100">
-                            <Icon as={FiFileText} w={5} h={5} />
-                          </Center>
+                          item.thumbnail_url ? (
+                            <Image
+                              src={item.thumbnail_url}
+                              boxSize="36px"
+                              objectFit="cover"
+                              borderRadius="lg"
+                              border="1px"
+                              borderColor="gray.200"
+                              fallbackSrc="https://via.placeholder.com/36?text=PDF"
+                            />
+                          ) : (
+                            <Center boxSize="36px" bg="red.50" color="red.500" borderRadius="lg" border="1px" borderColor="red.100">
+                              <Icon as={FiFileText} w={5} h={5} />
+                            </Center>
+                          )
                         ) : (
                           <Center boxSize="36px" bg="gray.100" color="gray.400" borderRadius="lg">
                             {item.status === 'processing' ? <Spinner size="xs" /> : <Icon as={FiFileText} w={5} h={5} />}
