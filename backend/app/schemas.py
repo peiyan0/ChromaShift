@@ -59,6 +59,7 @@ class MediaStatusResponse(BaseModel):
     progress: float
     download_url: Optional[str] = None
     download_url_original: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 class MediaHistoryResponse(BaseModel):
     job_id: str
@@ -68,3 +69,4 @@ class MediaHistoryResponse(BaseModel):
     type: str # 'image', 'video', 'pdf'
     download_url: Optional[str] = None
     download_url_original: Optional[str] = None
+    thumbnail_url: Optional[str] = None

@@ -55,6 +55,28 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         storage_service.upload_from_path(local_output, processed_key)
         print(f"Processed file uploaded to {processed_key}")
         
+        # 4b. Generate PDF page-1 thumbnail
+        if file_ext.lower() == '.pdf':
+            try:
+                import pypdfium2 as pdfium
+                pdf = pdfium.PdfDocument(local_output)
+                first_page = pdf[0]
+                bitmap = first_page.render(scale=2)
+                pil_img = bitmap.to_pil()
+                
+                local_thumb = f"/tmp/{job_id}_thumb.png"
+                pil_img.save(local_thumb, "PNG")
+                pdf.close()
+                
+                thumb_key = f"processed/{job_id}_processed_thumb.png"
+                storage_service.upload_from_path(local_thumb, thumb_key)
+                print(f"PDF page-1 thumbnail generated and uploaded to {thumb_key}")
+                
+                if os.path.exists(local_thumb):
+                    os.remove(local_thumb)
+            except Exception as thumb_err:
+                print(f"Error generating PDF thumbnail: {thumb_err}")
+        
         # 5. Update Database Job Status to 'completed'
         db = SessionLocal()
         try:
@@ -191,6 +213,13 @@ async def get_media_status(
     if job.s3_key_original:
         download_url_original = storage_service.generate_presigned_url(job.s3_key_original)
         
+    thumbnail_url = None
+    if job.status == "completed":
+        if job.media_type == "pdf":
+            thumbnail_url = storage_service.generate_presigned_url(f"processed/{job.job_id}_processed_thumb.png")
+        elif job.media_type == "image":
+            thumbnail_url = download_url
+            
     # Mock progress calculation
     progress = 100.0 if job.status == "completed" else (50.0 if job.status == "processing" else 0.0)
     
@@ -199,7 +228,8 @@ async def get_media_status(
         "status": job.status,
         "progress": progress,
         "download_url": download_url,
-        "download_url_original": download_url_original
+        "download_url_original": download_url_original,
+        "thumbnail_url": thumbnail_url
     }
 
 @router.get("/{job_id}/download")
@@ -249,18 +279,29 @@ async def get_media_history(
     """
     jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id).order_by(MediaJob.created_at.desc()).all()
     
-    return [
-        {
+    result = []
+    for job in jobs:
+        download_url = storage_service.generate_presigned_url(job.s3_key_processed) if job.status == "completed" and job.s3_key_processed else None
+        download_url_original = storage_service.generate_presigned_url(job.s3_key_original) if job.s3_key_original else None
+        
+        thumbnail_url = None
+        if job.status == "completed":
+            if job.media_type == "pdf":
+                thumbnail_url = storage_service.generate_presigned_url(f"processed/{job.job_id}_processed_thumb.png")
+            elif job.media_type == "image":
+                thumbnail_url = download_url
+                
+        result.append({
             "job_id": job.job_id,
             "filename": job.filename,
             "status": job.status,
             "created_at": job.created_at.isoformat() if job.created_at else datetime.now().isoformat(),
             "type": job.media_type,
-            "download_url": storage_service.generate_presigned_url(job.s3_key_processed) if job.status == "completed" and job.s3_key_processed else None,
-            "download_url_original": storage_service.generate_presigned_url(job.s3_key_original) if job.s3_key_original else None
-        }
-        for job in jobs
-    ]
+            "download_url": download_url,
+            "download_url_original": download_url_original,
+            "thumbnail_url": thumbnail_url
+        })
+    return result
 
 @router.delete("/clear-all")
 async def clear_all_media(
