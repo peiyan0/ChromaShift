@@ -37,6 +37,9 @@ class InferenceService:
         # Normalize cvd_type
         cvd_type = cvd_type.lower() if cvd_type else "deuteranopia"
         
+        if cvd_type == "normal" or intensity == 0:
+            return image
+            
         if cvd_type == "protanopia":
             # Protanopia (Red-blind): Shift red (index 2 in BGR) using green (index 1)
             result[:, :, 2] = image[:, :, 2] * (1 - 0.5 * m) + image[:, :, 1] * (0.5 * m)

@@ -18,14 +18,22 @@ import {
   Grid,
   GridItem,
   Code,
-  Badge
+  Badge,
+  SimpleGrid
 } from '@chakra-ui/react';
 import { profileService, type VisionProfile } from '../services/profile';
 
 // SVG Icons for clean, zero-dependency rendering
-const InfoIcon = () => (
-  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-blue-500">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+const CheckIcon = () => (
+  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-green-600">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const CrossIcon = () => (
+  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-600">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
@@ -77,10 +85,10 @@ export const CalibrationWizard: FC = () => {
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [currentPair, setCurrentPair] = useState<[Hypothesis, Hypothesis] | null>(null);
   const [circles, setCircles] = useState<Circle[]>([]);
-  const [currentSymbol, setCurrentSymbol] = useState<string>('E');
   
   // Converged Diagnostic Profile
   const [diagnosedProfile, setDiagnosedProfile] = useState<Hypothesis | null>(null);
+  const [selections, setSelections] = useState<string[]>([]);
 
   // Manual adjustment settings for the results stage
   const [customSeverity, setCustomSeverity] = useState<number>(1.0);
@@ -96,12 +104,42 @@ export const CalibrationWizard: FC = () => {
 
   // Load existing profile on mount (for baseline defaults)
   useEffect(() => {
+    // Try local storage first for quick restore
+    const cachedProfile = localStorage.getItem('chromashift_cvd_profile');
+    if (cachedProfile) {
+      try {
+        const parsed = JSON.parse(cachedProfile);
+        setCustomSeverity(parsed.severity || 1.0);
+        setCustomContrast(parsed.contrast_multiplier || 1.0);
+        setCustomSaturation(parsed.saturation_multiplier || 1.0);
+        setCustomIntensity(parsed.intensity || 1.0);
+        if (parsed.cvd_type) {
+          setDiagnosedProfile({ type: parsed.cvd_type, severity: parsed.severity || 1.0, probability: 1.0 });
+        }
+      } catch (err) {
+        console.error("Error parsing cached profile", err);
+      }
+    }
+    
     profileService.getProfile().then(data => {
       if (data) {
         setCustomSeverity(data.severity || 1.0);
         setCustomContrast(data.contrast_multiplier || 1.0);
         setCustomSaturation(data.saturation_multiplier || 1.0);
         setCustomIntensity(data.intensity || 1.0);
+        
+        const payload = {
+          cvd_type: data.cvd_type,
+          severity: data.severity,
+          contrast_multiplier: data.contrast_multiplier,
+          saturation_multiplier: data.saturation_multiplier,
+          intensity: data.intensity
+        };
+        localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
+        
+        if (data.cvd_type) {
+          setDiagnosedProfile({ type: data.cvd_type, severity: data.severity || 1.0, probability: 1.0 });
+        }
       }
     }).catch(e => console.error("Could not load baseline profile", e));
   }, []);
@@ -338,6 +376,7 @@ export const CalibrationWizard: FC = () => {
       probability: 1 / hypothesesSpace.length
     }));
     setHypotheses(initialHyps);
+    setSelections([]); // Reset trackers
     setStep('calibration');
     startNextRound(1, initialHyps);
   };
@@ -346,7 +385,6 @@ export const CalibrationWizard: FC = () => {
   const startNextRound = (nextRound: number, currentHyps: Hypothesis[]) => {
     const symbols = ['E', 'C', 'O', 'X'];
     const nextSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-    setCurrentSymbol(nextSymbol);
     
     const packed = packCircles(250, 250, nextSymbol);
     setCircles(packed);
@@ -373,12 +411,15 @@ export const CalibrationWizard: FC = () => {
   }, [step, round, currentPair, circles]);
 
   // 6. Handle User Comparative Choice Update
-  const handleSelection = (selected: 'A' | 'B' | 'neither') => {
+  const handleSelection = (selected: 'A' | 'B' | 'both_clear' | 'neither') => {
     if (!currentPair) return;
+    
+    const newSelections = [...selections, selected];
+    setSelections(newSelections);
     
     let updatedHyps: Hypothesis[];
     
-    if (selected === 'neither') {
+    if (selected === 'neither' || selected === 'both_clear') {
       const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
         if (hTrue.type === hTest.type) {
           return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
@@ -389,7 +430,9 @@ export const CalibrationWizard: FC = () => {
       updatedHyps = hypotheses.map(h => {
         const visA = getVisibility(h, currentPair[0]);
         const visB = getVisibility(h, currentPair[1]);
-        const likelihood = 1.0 - 0.55 * (visA + visB); // penalize highly visible pairs
+        // both_clear: both are clear to user (visA and visB are high -> reward visA + visB)
+        // neither: both look unclear to user (visA and visB are low -> penalize visA + visB)
+        const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
         return {
           ...h,
           probability: h.probability * likelihood
@@ -423,15 +466,29 @@ export const CalibrationWizard: FC = () => {
     setHypotheses(updatedHyps);
 
     if (round >= 5) {
-      // Find the argmax hypothesis (highest probability posterior state)
-      let bestHyp = updatedHyps[0];
-      for (const h of updatedHyps) {
-        if (h.probability > bestHyp.probability) {
-          bestHyp = h;
+      const allClear = newSelections.length === 5 && newSelections.every(s => s === 'both_clear');
+      if (allClear) {
+        const normalProfile: Hypothesis = {
+          type: 'normal',
+          severity: 0.0,
+          probability: 1.0
+        };
+        setDiagnosedProfile(normalProfile);
+        setCustomSeverity(0.0);
+        setCustomContrast(1.0);
+        setCustomSaturation(1.0);
+        setCustomIntensity(1.0);
+      } else {
+        // Find the argmax hypothesis (highest probability posterior state)
+        let bestHyp = updatedHyps[0];
+        for (const h of updatedHyps) {
+          if (h.probability > bestHyp.probability) {
+            bestHyp = h;
+          }
         }
+        setDiagnosedProfile(bestHyp);
+        setCustomSeverity(bestHyp.severity);
       }
-      setDiagnosedProfile(bestHyp);
-      setCustomSeverity(bestHyp.severity);
       setStep('results');
       toast({
         title: "Calibration Complete",
@@ -486,6 +543,7 @@ export const CalibrationWizard: FC = () => {
     
     try {
       await profileService.updateProfile(payload);
+      localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
       toast({
         title: "Matrix Remapping Applied",
         description: "Your personalized active calibration coefficients are locked and synced.",
@@ -497,6 +555,7 @@ export const CalibrationWizard: FC = () => {
       // Create if it doesn't exist
       try {
         await profileService.createProfile(payload);
+        localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
         toast({
           title: "Profile Created & Saved",
           status: "success",
@@ -527,7 +586,7 @@ export const CalibrationWizard: FC = () => {
                 Personalized Vision Calibration
               </Heading>
               <Text fontSize="lg" color="gray.600" maxW="2xl">
-                An interactive Bayesian active-learning anomaloscope wizard that fine-tunes a unique color-transformation matrix for your specific color perception.
+                An easy, interactive 5-round game that maps your color sensitivity to create a personalized color correction filter tailored just for you.
               </Text>
             </VStack>
 
@@ -630,20 +689,39 @@ export const CalibrationWizard: FC = () => {
                   variant="outline"
                   borderRadius="2xl"
                   overflow="hidden"
-                  className="transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-gray-100 hover:border-blue-400 group cursor-pointer"
-                  onClick={() => handleSelection('A')}
+                  borderWidth="2px"
+                  borderColor="gray.100"
                 >
-                  <CardBody className="flex flex-col items-center p-6 space-y-6">
-                    <Badge colorScheme="blue" fontSize="md" px={3} py={1} borderRadius="full">Option A</Badge>
-                    <Box className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800">
-                      <canvas ref={canvasRefA} width={250} height={250} className="rounded-2xl" />
+                  <CardBody p={6} display="flex" flexDirection="column" gap={6} width="full" alignItems="center">
+                    {/* Top Left Title/Badge */}
+                    <Box alignSelf="flex-start">
+                      <Badge colorScheme="blue" fontSize="md" px={3} py={1} borderRadius="full">Option A</Badge>
                     </Box>
+                    
+                    {/* Visual Indicator (Canvas display) */}
+                    <Box 
+                      className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      flexShrink={0}
+                    >
+                      <canvas ref={canvasRefA} width={250} height={250} className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl" />
+                    </Box>
+                    
+                    {/* Action Button: directly below the visual indicator, perfectly centered */}
                     <Button
                       w="full"
                       size="lg"
-                      colorScheme="blue"
-                      variant="outline"
-                      className="group-hover:bg-blue-500 group-hover:text-white transition-all duration-300"
+                      onClick={() => handleSelection('A')}
+                      variant="solid"
+                      bg="blue.50"
+                      color="blue.700"
+                      border="1px"
+                      borderColor="blue.200"
+                      _hover={{ bg: "blue.500", color: "white", transform: "translateY(-2px)", shadow: "md" }}
+                      _active={{ bg: "blue.600" }}
+                      transition="all 0.2s"
                     >
                       Option A is Clearer
                     </Button>
@@ -657,20 +735,39 @@ export const CalibrationWizard: FC = () => {
                   variant="outline"
                   borderRadius="2xl"
                   overflow="hidden"
-                  className="transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-gray-100 hover:border-indigo-400 group cursor-pointer"
-                  onClick={() => handleSelection('B')}
+                  borderWidth="2px"
+                  borderColor="gray.100"
                 >
-                  <CardBody className="flex flex-col items-center p-6 space-y-6">
-                    <Badge colorScheme="indigo" fontSize="md" px={3} py={1} borderRadius="full">Option B</Badge>
-                    <Box className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800">
-                      <canvas ref={canvasRefB} width={250} height={250} className="rounded-2xl" />
+                  <CardBody p={6} display="flex" flexDirection="column" gap={6} width="full" alignItems="center">
+                    {/* Top Left Title/Badge */}
+                    <Box alignSelf="flex-start">
+                      <Badge colorScheme="purple" fontSize="md" px={3} py={1} borderRadius="full">Option B</Badge>
                     </Box>
+                    
+                    {/* Visual Indicator (Canvas display) */}
+                    <Box 
+                      className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      flexShrink={0}
+                    >
+                      <canvas ref={canvasRefB} width={250} height={250} className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl" />
+                    </Box>
+                    
+                    {/* Action Button: directly below the visual indicator, perfectly centered */}
                     <Button
                       w="full"
                       size="lg"
-                      colorScheme="indigo"
-                      variant="outline"
-                      className="group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300"
+                      onClick={() => handleSelection('B')}
+                      variant="solid"
+                      bg="purple.50"
+                      color="purple.700"
+                      border="1px"
+                      borderColor="purple.200"
+                      _hover={{ bg: "purple.500", color: "white", transform: "translateY(-2px)", shadow: "md" }}
+                      _active={{ bg: "purple.600" }}
+                      transition="all 0.2s"
                     >
                       Option B is Clearer
                     </Button>
@@ -679,20 +776,51 @@ export const CalibrationWizard: FC = () => {
               </GridItem>
             </Grid>
 
-            {/* Fail-Safe Button: Neither is Clear */}
-            <VStack w="full" align="center" pt={4}>
-              <Button
-                variant="ghost"
-                colorScheme="gray"
-                size="md"
-                onClick={() => handleSelection('neither')}
-                leftIcon={<InfoIcon />}
-                className="hover:bg-gray-100"
-              >
-                Both look equally unclear / I see no symbol
-              </Button>
-              <Text fontSize="xs" color="gray.400" textAlign="center" maxW="lg" mt={2}>
-                Pro-Tip: If the letter ({currentSymbol}) is completely missing or blurred in both plates, click this. The active engine will redistribute probabilities and query a different axis.
+            {/* 4 Bayesian Anomaloscope Choice Options */}
+            <VStack w="full" align="center" pt={4} spacing={4}>
+              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={6} w="full" maxW="2xl">
+                <Button
+                  leftIcon={<CheckIcon />}
+                  colorScheme="green"
+                  variant="solid"
+                  bg="green.50"
+                  color="green.700"
+                  border="1px"
+                  borderColor="green.200"
+                  _hover={{ bg: "green.100", transform: "translateY(-2px)", shadow: "md" }}
+                  _active={{ bg: "green.200" }}
+                  size="lg"
+                  py={7}
+                  borderRadius="2xl"
+                  onClick={() => handleSelection('both_clear')}
+                  fontWeight="bold"
+                  transition="all 0.2s"
+                >
+                  Both look clear
+                </Button>
+                <Button
+                  leftIcon={<CrossIcon />}
+                  colorScheme="red"
+                  variant="solid"
+                  bg="red.50"
+                  color="red.700"
+                  border="1px"
+                  borderColor="red.200"
+                  _hover={{ bg: "red.100", transform: "translateY(-2px)", shadow: "md" }}
+                  _active={{ bg: "red.200" }}
+                  size="lg"
+                  py={7}
+                  borderRadius="2xl"
+                  onClick={() => handleSelection('neither')}
+                  fontWeight="bold"
+                  transition="all 0.2s"
+                >
+                  Both look unclear
+                </Button>
+              </SimpleGrid>
+              
+              <Text fontSize="xs" color="gray.400" textAlign="center" maxW="lg">
+                Pro-Tip: Select "Option A is Clearer" or "Option B is Clearer" by clicking on the action buttons above. Use "Both look clear" or "Both look unclear" if there's no visual difference.
               </Text>
             </VStack>
           </VStack>
@@ -709,7 +837,7 @@ export const CalibrationWizard: FC = () => {
               <VStack align="start" spacing={1}>
                 <HStack>
                   <Badge colorScheme="green" px={2} py={0.5} borderRadius="md" fontSize="xs" fontWeight="bold">
-                    Bayesian Convergence Achieved
+                    Calibration Complete
                   </Badge>
                 </HStack>
                 <Heading fontSize="3xl" fontWeight="black" color="gray.800">
@@ -729,21 +857,27 @@ export const CalibrationWizard: FC = () => {
                   <Card variant="outline" borderRadius="2xl" border="1px" borderColor="gray.100" bg="gray.50/30">
                     <CardBody className="space-y-4">
                       <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
-                        Diagnosed Deficient State
+                        Detected Color Blindness / Color Sensitivity Type
                       </Text>
                       <Box className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <VStack align="start" spacing={0}>
                           <Text fontSize="2xl" fontWeight="extrabold" className="capitalize text-slate-800">
-                            {diagnosedProfile.type.replace('opia', 'omaly')}
+                            {diagnosedProfile.type === 'normal' ? 'Normal Color Vision' :
+                             diagnosedProfile.type === 'protanopia' ? 'Red sensitivity reduced' :
+                             diagnosedProfile.type === 'deuteranopia' ? 'Green sensitivity reduced' :
+                             diagnosedProfile.type === 'tritanopia' ? 'Blue sensitivity reduced' :
+                             diagnosedProfile.type.replace('opia', 'omaly')}
                           </Text>
                           <Text fontSize="sm" color="gray.500">
-                            {diagnosedProfile.type === 'protanopia' && 'Red-cone Sensitivity Reduction'}
-                            {diagnosedProfile.type === 'deuteranopia' && 'Green-cone Sensitivity Reduction'}
-                            {diagnosedProfile.type === 'tritanopia' && 'Blue-cone Sensitivity Reduction'}
+                            {diagnosedProfile.type === 'normal' && 'No color vision deficiency detected (Standard Vision)'}
+                            {diagnosedProfile.type === 'protanopia' && 'Reduced sensitivity to Red colors (Protanopia)'}
+                            {diagnosedProfile.type === 'deuteranopia' && 'Reduced sensitivity to Green colors (Deuteranopia)'}
+                            {diagnosedProfile.type === 'tritanopia' && 'Reduced sensitivity to Blue colors (Tritanopia)'}
                           </Text>
                         </VStack>
                         <Badge
                           colorScheme={
+                            diagnosedProfile.type === 'normal' ? 'teal' :
                             diagnosedProfile.type === 'protanopia' ? 'red' : 
                             diagnosedProfile.type === 'deuteranopia' ? 'green' : 'blue'
                           }
@@ -753,7 +887,7 @@ export const CalibrationWizard: FC = () => {
                           borderRadius="xl"
                           className="capitalize"
                         >
-                          {diagnosedProfile.type.replace('opia', '')}
+                          {diagnosedProfile.type === 'normal' ? 'Standard' : diagnosedProfile.type.replace('opia', '')}
                         </Badge>
                       </Box>
                     </CardBody>
@@ -770,7 +904,7 @@ export const CalibrationWizard: FC = () => {
                       {/* Severity Slider */}
                       <Box>
                         <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Severity Coefficient ($s$)</Text>
+                          <Text fontWeight="bold" color="gray.600">Correction Strength (Severity)</Text>
                           <Text fontWeight="black" color="blue.600">{customSeverity.toFixed(2)}</Text>
                         </HStack>
                         <Slider
@@ -787,14 +921,14 @@ export const CalibrationWizard: FC = () => {
                           <SliderThumb boxSize={5} shadow="md" border="2px" borderColor="blue.500" />
                         </Slider>
                         <Text fontSize="xs" color="gray.400" mt={1}>
-                          Determines the magnitude of the orthogonal color separation vector.
+                          Determines how strongly colors are shifted to make red, green, and blue details stand out.
                         </Text>
                       </Box>
 
                       {/* Intensity Slider */}
                       <Box>
                         <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Remapping Intensity</Text>
+                          <Text fontWeight="bold" color="gray.600">Overall Filter Intensity</Text>
                           <Text fontWeight="black" color="blue.600">{(customIntensity * 100).toFixed(0)}%</Text>
                         </HStack>
                         <Slider
