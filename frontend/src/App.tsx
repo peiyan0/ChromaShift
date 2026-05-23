@@ -13,6 +13,7 @@ import { DragDropUpload } from './components/DragDropUpload';
 import { CalibrationWizard } from './components/CalibrationWizard';
 import { WorkspaceStudio } from './components/WorkspaceStudio';
 import { PromoteModal } from './components/PromoteModal';
+import { VisionTest } from './components/VisionTest';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -49,6 +50,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         <HStack spacing={6}>
           <Button as={RouterLink} to="/" variant={isActive('/') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
             Dashboard
+          </Button>
+          <Button as={RouterLink} to="/test-vision" variant={isActive('/test-vision') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
+            Test Vision
           </Button>
           <Button as={RouterLink} to="/upload" variant={isActive('/upload') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
             Upload
@@ -118,6 +122,14 @@ function App() {
             <ProtectedRoute>
               <AppLayout>
                 <CalibrationWizard />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/test-vision" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <VisionTest />
               </AppLayout>
             </ProtectedRoute>
           } />
