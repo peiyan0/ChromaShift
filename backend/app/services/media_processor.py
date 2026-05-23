@@ -37,6 +37,7 @@ class MediaProcessor:
         """
         Process video frame-by-frame, applying an Exponential Moving Average (EMA)
         temporal smoothing mask filter to prevent flicker artifacts during playback.
+        Subsequently post-processes output with ffmpeg to ensure H.264/AAC browser compatibility.
         """
         cap = cv2.VideoCapture(input_path)
         if not cap.isOpened():
@@ -45,7 +46,7 @@ class MediaProcessor:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Output as standard MP4
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Temporary encoding, re-encoded below
         
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -90,6 +91,36 @@ class MediaProcessor:
         finally:
             cap.release()
             out.release()
+            
+        # Re-encode using ffmpeg to ensure standard H.264/AAC browser compatibility and restore original audio
+        temp_output = output_path + ".temp.mp4"
+        try:
+            os.rename(output_path, temp_output)
+            import subprocess
+            subprocess.run([
+                'ffmpeg', '-y',
+                '-i', temp_output,
+                '-i', input_path,
+                '-c:v', 'libx264',
+                '-pix_fmt', 'yuv420p',
+                '-map', '0:v:0',
+                '-map', '1:a:0?',
+                '-c:a', 'aac',
+                '-shortest',
+                output_path
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"Video successfully re-encoded with H.264/AAC web compliance: {output_path}")
+        except Exception as e:
+            print(f"Failed to re-encode video with ffmpeg: {e}")
+            # Fallback to original OpenCV output if ffmpeg fails or is missing
+            if os.path.exists(temp_output) and not os.path.exists(output_path):
+                os.rename(temp_output, output_path)
+        finally:
+            if os.path.exists(temp_output):
+                try:
+                    os.remove(temp_output)
+                except Exception as e:
+                    print(f"Failed to cleanup temp video file {temp_output}: {e}")
             
         return output_path
 

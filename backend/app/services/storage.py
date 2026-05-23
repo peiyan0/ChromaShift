@@ -3,6 +3,13 @@ from botocore.exceptions import ClientError
 from fastapi import UploadFile
 import uuid
 import os
+import mimetypes
+
+# Explicitly initialize and register core web-compatible MIME types
+mimetypes.init()
+mimetypes.add_type('video/mp4', '.mp4')
+mimetypes.add_type('video/webm', '.webm')
+mimetypes.add_type('application/pdf', '.pdf')
 
 from app.core.config import settings
 
@@ -31,9 +38,33 @@ class StorageService:
             # Bucket does not exist, create it
             try:
                 self.s3_client.create_bucket(Bucket=self.bucket_name)
-                # TODO: In production, configure bucket lifecycle policy here (e.g., 7-day expiration)
             except ClientError as e:
                 print(f"Failed to create bucket: {e}")
+                
+        # Always configure CORS policy to allow browser range requests and iframe previews
+        try:
+            cors_configuration = {
+                'CORSRules': [
+                    {
+                        'AllowedHeaders': ['*'],
+                        'AllowedMethods': ['GET', 'HEAD', 'PUT', 'POST', 'DELETE'],
+                        'AllowedOrigins': ['*'],
+                        'ExposeHeaders': ['ETag', 'Content-Type', 'Accept-Ranges', 'Content-Length', 'Content-Range'],
+                        'MaxAgeSeconds': 3000
+                    }
+                ]
+            }
+            self.s3_client.put_bucket_cors(
+                Bucket=self.bucket_name,
+                CORSConfiguration=cors_configuration
+            )
+            print("MinIO Bucket CORS policy configured successfully.")
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code == 'NotImplemented':
+                print("CORS is enabled by default on MinIO; S3 PutBucketCors is not required.")
+            else:
+                print(f"Failed to configure bucket CORS: {e}")
 
     def upload_file(self, file: UploadFile, prefix: str = "uploads/") -> str:
         """
@@ -66,10 +97,21 @@ class StorageService:
 
     def upload_from_path(self, local_path: str, object_key: str):
         """
-        Uploads a file from a local path to S3.
+        Uploads a file from a local path to S3 with content type detection.
         """
+        import mimetypes
+        content_type, _ = mimetypes.guess_type(local_path)
+        extra_args = {}
+        if content_type:
+            extra_args['ContentType'] = content_type
+            
         try:
-            self.s3_client.upload_file(local_path, self.bucket_name, object_key)
+            self.s3_client.upload_file(
+                local_path, 
+                self.bucket_name, 
+                object_key,
+                ExtraArgs=extra_args
+            )
         except ClientError as e:
             print(f"Error uploading file from path to S3: {e}")
             raise e
@@ -92,11 +134,23 @@ class StorageService:
         """
         Generates a presigned URL to download an object from S3.
         Default expiration is 1 hour (3600 seconds).
+        Framer-friendly: Forces inline content-disposition and corrects ContentType dynamically.
         """
+        import mimetypes
         try:
+            params = {
+                'Bucket': self.bucket_name, 
+                'Key': object_key,
+                'ResponseContentDisposition': 'inline'
+            }
+            # Guess the content type to override ResponseContentType
+            content_type, _ = mimetypes.guess_type(object_key)
+            if content_type:
+                params['ResponseContentType'] = content_type
+
             response = self.s3_client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': self.bucket_name, 'Key': object_key},
+                Params=params,
                 ExpiresIn=expiration
             )
             # Address client-side preview in docker environment by mapping internal container network hostname to localhost
