@@ -10,11 +10,17 @@ from app.db import models
 # In production, alembic migrations should be used
 models.Base.metadata.create_all(bind=engine)
 
-# Proactively alter table to add missing created_at column if it does not exist
+# Proactively alter table to add missing created_at and is_superuser columns if they do not exist
 from sqlalchemy import text
 try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"))
+except Exception as e:
+    pass
+
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_superuser BOOLEAN DEFAULT FALSE"))
 except Exception as e:
     pass
 

@@ -70,3 +70,86 @@ class MediaHistoryResponse(BaseModel):
     download_url: Optional[str] = None
     download_url_original: Optional[str] = None
     thumbnail_url: Optional[str] = None
+
+
+# Research Survey & Metrics Schemas
+
+class ResearchDemographicSchema(BaseModel):
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    occupation: Optional[str] = None
+    education_level: Optional[str] = None
+    cvd_type: Optional[str] = None
+    is_diagnosed: Optional[str] = None
+    prior_tool_use: Optional[str] = None
+    color_glasses_frequency: Optional[str] = None
+    web_app_comfort: Optional[str] = None
+    device_use_frequency: Optional[str] = None
+
+
+class VisionTaskPerformanceSchema(BaseModel):
+    original_time: Optional[float] = None
+    original_correct: Optional[bool] = None
+    corrected_time: Optional[float] = None
+    corrected_correct: Optional[bool] = None
+
+
+class VideoTrackingPerformanceSchema(BaseModel):
+    original_time: Optional[float] = None
+    original_clicks: Optional[int] = 0
+    original_accuracy: Optional[float] = 0.0
+    corrected_time: Optional[float] = None
+    corrected_clicks: Optional[int] = 0
+    corrected_accuracy: Optional[float] = 0.0
+
+
+class ResearchSessionPerformanceSchema(BaseModel):
+    task1: Optional[VisionTaskPerformanceSchema] = None
+    task2: Optional[VisionTaskPerformanceSchema] = None
+    task3: Optional[VisionTaskPerformanceSchema] = None
+    video: Optional[VideoTrackingPerformanceSchema] = None
+    document: Optional[VisionTaskPerformanceSchema] = None
+
+
+class ResearchSurveySchema(BaseModel):
+    # SUS Q1-10
+    sus_q1: Optional[int] = None
+    sus_q2: Optional[int] = None
+    sus_q3: Optional[int] = None
+    sus_q4: Optional[int] = None
+    sus_q5: Optional[int] = None
+    sus_q6: Optional[int] = None
+    sus_q7: Optional[int] = None
+    sus_q8: Optional[int] = None
+    sus_q9: Optional[int] = None
+    sus_q10: Optional[int] = None
+    
+    # NASA Task Load (0-20)
+    nasa_mental: Optional[int] = None
+    nasa_physical: Optional[int] = None
+    nasa_temporal: Optional[int] = None
+    nasa_performance: Optional[int] = None
+    nasa_effort: Optional[int] = None
+    nasa_frustration: Optional[int] = None
+    
+    # Custom Visual Comfort (1-5)
+    comfort_q1: Optional[int] = None
+    comfort_q2: Optional[int] = None
+    comfort_q3: Optional[int] = None
+    comfort_q4: Optional[int] = None
+    comfort_q5: Optional[int] = None
+    
+    # Qualitative notes / interview notes
+    interview_visual_transitions: Optional[str] = None
+    interview_naturalness: Optional[str] = None
+    interview_wizard_onboarding: Optional[str] = None
+    interview_frustrating_aspects: Optional[str] = None
+    interview_helpful_aspects: Optional[str] = None
+    interview_open_feedback: Optional[str] = None
+
+
+class ResearchSubmissionSchema(BaseModel):
+    demographics: ResearchDemographicSchema
+    performance: ResearchSessionPerformanceSchema
+    surveys: ResearchSurveySchema
+

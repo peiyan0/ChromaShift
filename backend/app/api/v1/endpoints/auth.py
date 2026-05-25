@@ -97,5 +97,15 @@ def trigger_cleanup(max_age_hours: int = 24, db: Session = Depends(get_db)):
     count = cleanup_guest_accounts(db, max_age_hours=max_age_hours)
     return {"status": "success", "cleaned_count": count}
 
+@router.get("/me", response_model=dict)
+def get_me(current_user: models.User = Depends(deps.get_current_active_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_superuser": getattr(current_user, "is_superuser", False) or current_user.email == "admin@chromashift.com",
+        "is_guest": current_user.email.endswith("@chromashift.guest")
+    }
+
+
 
 
