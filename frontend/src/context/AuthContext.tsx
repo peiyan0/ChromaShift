@@ -4,6 +4,7 @@ import axios from 'axios';
 interface AuthContextType {
   isAuthenticated: boolean;
   isGuest: boolean;
+  isAdmin: boolean;
   isInitializing: boolean;
   login: (token: string, isGuestUser?: boolean) => void;
   logout: () => void;
@@ -18,7 +19,20 @@ const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isGuest, setIsGuest] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+
+  const fetchUserDetails = async (token: string) => {
+    try {
+      const response = await axios.get(`${baseURL}auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setIsAdmin(response.data.is_superuser === true);
+    } catch (e) {
+      console.error("Could not fetch user profile details", e);
+      setIsAdmin(false);
+    }
+  };
 
   useEffect(() => {
     const initAuth = async () => {
@@ -27,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token) {
         setIsAuthenticated(true);
         setIsGuest(guestFlag === 'true');
+        await fetchUserDetails(token);
         setIsInitializing(false);
       } else {
         // Automatically login as guest in background
@@ -37,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem('isGuest', 'true');
           setIsAuthenticated(true);
           setIsGuest(true);
+          await fetchUserDetails(guestToken);
         } catch (e) {
           console.error("Could not automatically authenticate guest", e);
         } finally {
@@ -47,11 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initAuth();
   }, []);
 
-  const login = (token: string, isGuestUser: boolean = false) => {
+  const login = async (token: string, isGuestUser: boolean = false) => {
     localStorage.setItem('token', token);
     localStorage.setItem('isGuest', isGuestUser ? 'true' : 'false');
     setIsAuthenticated(true);
     setIsGuest(isGuestUser);
+    await fetchUserDetails(token);
   };
 
   const logout = () => {
@@ -59,19 +76,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('isGuest');
     setIsAuthenticated(false);
     setIsGuest(false);
+    setIsAdmin(false);
   };
 
-  const promote = (token?: string) => {
+  const promote = async (token?: string) => {
     if (token) {
       localStorage.setItem('token', token);
     }
     localStorage.setItem('isGuest', 'false');
     setIsGuest(false);
     setIsAuthenticated(true);
+    const activeToken = token || localStorage.getItem('token');
+    if (activeToken) {
+      await fetchUserDetails(activeToken);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isGuest, isInitializing, login, logout, promote }}>
+    <AuthContext.Provider value={{ isAuthenticated, isGuest, isAdmin, isInitializing, login, logout, promote }}>
       {children}
     </AuthContext.Provider>
   );

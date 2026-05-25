@@ -14,10 +14,11 @@ import { CalibrationWizard } from './components/CalibrationWizard';
 import { WorkspaceStudio } from './components/WorkspaceStudio';
 import { PromoteModal } from './components/PromoteModal';
 import { VisionTest } from './components/VisionTest';
+import { AdminAnalytics } from './components/AdminAnalytics';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const { logout, isGuest } = useAuth();
+  const { logout, isGuest, isAdmin } = useAuth();
   const location = useLocation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -60,6 +61,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <Button as={RouterLink} to="/settings" variant={isActive('/settings') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
             Vision Profile
           </Button>
+
+          {isAdmin && (
+            <Button as={RouterLink} to="/admin/analytics" variant={isActive('/admin/analytics') ? 'solid' : 'ghost'} colorScheme="purple" size="sm" fontWeight="black">
+              🛡️ Admin Panel
+            </Button>
+          )}
           
           <Box w="1px" h="24px" bg="gray.300" mx={2} />
           
@@ -130,6 +137,14 @@ function App() {
             <ProtectedRoute>
               <AppLayout>
                 <VisionTest />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin/analytics" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AdminAnalytics />
               </AppLayout>
             </ProtectedRoute>
           } />
