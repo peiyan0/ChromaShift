@@ -16,10 +16,15 @@ import {
   Divider,
   SimpleGrid,
   CircularProgress,
-  CircularProgressLabel
+  CircularProgressLabel,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb
 } from '@chakra-ui/react';
 import { mediaService, type MediaStatusResponse } from '../services/media';
 import { complianceService, type ComplianceReportResponse } from '../services/compliance';
+import { profileService, type VisionProfile } from '../services/profile';
 
 // Custom SVG Icons
 const BackIcon = (props: any) => (
@@ -85,6 +90,11 @@ export const WorkspaceStudio: React.FC = () => {
   const [displayMode, setDisplayMode] = useState<'side-by-side' | 'toggle'>('side-by-side');
   const [toggleActive, setToggleActive] = useState<'original' | 'processed'>('processed');
 
+  // Dynamic Filtering State
+  const [profile, setProfile] = useState<VisionProfile | null>(null);
+  const [intensity, setIntensity] = useState<number>(1.0);
+  const [svgMatrixValues, setSvgMatrixValues] = useState<string>("1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0");
+
   // Video Synced References
   const originalVideoRef = useRef<HTMLVideoElement>(null);
   const processedVideoRef = useRef<HTMLVideoElement>(null);
@@ -95,6 +105,51 @@ export const WorkspaceStudio: React.FC = () => {
       loadWorkspace();
     }
   }, [jobId]);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      let p = null;
+      const cached = localStorage.getItem('chromashift_cvd_profile');
+      if (cached) {
+        try { p = JSON.parse(cached); } catch (_) {}
+      }
+      if (!p) {
+        try { p = await profileService.getProfile(); } catch (_) {}
+      }
+      if (p) {
+        setProfile(p);
+        setIntensity(p.severity || 1.0);
+      }
+    };
+    loadProfile();
+  }, []);
+
+  useEffect(() => {
+    if (profile) {
+      const type = profile.cvd_type || 'deuteranopia';
+      const s = intensity;
+      
+      const mat = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ];
+      
+      if (type === 'protanopia') {
+        mat[0][0] = 1.0 - 0.5 * s;
+        mat[0][1] = 0.5 * s;
+      } else if (type === 'deuteranopia') {
+        mat[1][0] = 0.5 * s;
+        mat[1][1] = 1.0 - 0.5 * s;
+      } else if (type === 'tritanopia') {
+        mat[2][1] = 0.5 * s;
+        mat[2][2] = 1.0 - 0.5 * s;
+      }
+      
+      const valuesStr = `${mat[0][0]} ${mat[0][1]} ${mat[0][2]} 0 0  ${mat[1][0]} ${mat[1][1]} ${mat[1][2]} 0 0  ${mat[2][0]} ${mat[2][1]} ${mat[2][2]} 0 0  0 0 0 1 0`;
+      setSvgMatrixValues(valuesStr);
+    }
+  }, [profile, intensity]);
 
   const loadWorkspace = async () => {
     if (!jobId) return;
@@ -256,6 +311,13 @@ export const WorkspaceStudio: React.FC = () => {
 
   return (
     <Box w="full" px={1} py={4}>
+      <svg width="0" height="0" style={{ position: 'absolute', zIndex: -100, pointerEvents: 'none' }}>
+        <defs>
+          <filter id="workspace-daltonize-filter">
+            <feColorMatrix type="matrix" values={svgMatrixValues} />
+          </filter>
+        </defs>
+      </svg>
       {/* Studio Header Bar */}
       <Flex justify="space-between" align="center" mb={6} bg="white" p={4} borderRadius="2xl" border="1px" borderColor="gray.100" shadow="sm">
         <HStack spacing={4}>
@@ -306,6 +368,33 @@ export const WorkspaceStudio: React.FC = () => {
       <SimpleGrid columns={{ base: 1, lg: 12 }} spacing={6}>
         {/* MEDIA VIEWPORT PANEL */}
         <Box gridColumn={{ lg: displayMode === 'side-by-side' ? "span 12" : "span 8" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" overflow="hidden" p={6}>
+          {/* Intensity Slider */}
+          {(mediaType === 'image' || mediaType === 'video') && (
+            <Box mb={6} p={4} bg="gray.50" borderRadius="xl" border="1px" borderColor="gray.200">
+              <Flex justify="space-between" mb={2}>
+                <Text fontSize="sm" fontWeight="bold" color="gray.700">Live Correction Intensity (Severity)</Text>
+                <Text fontSize="sm" fontWeight="bold" color="blue.600">{Math.round(intensity * 100)}%</Text>
+              </Flex>
+              <Slider
+                aria-label="intensity-slider"
+                min={0}
+                max={2}
+                step={0.1}
+                value={intensity}
+                onChange={(val) => setIntensity(val)}
+                colorScheme="blue"
+              >
+                <SliderTrack bg="gray.300">
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb boxSize={6} shadow="md" />
+              </Slider>
+              <Text fontSize="xs" color="gray.500" mt={2}>
+                Adjusting this slider applies a real-time GPU filter to the original media. 
+              </Text>
+            </Box>
+          )}
+
           {displayMode === 'toggle' && (
             <Flex justify="center" mb={4}>
               <HStack spacing={1} bg="gray.100" p={1} borderRadius="lg">
@@ -350,9 +439,9 @@ export const WorkspaceStudio: React.FC = () => {
                     <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected Image (CVD Shifted)</Text>
                     <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50">
                       <img
-                        src={status?.download_url || ''}
+                        src={status?.download_url_original || ''}
                         alt="Corrected Accessible"
-                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain', filter: 'url(#workspace-daltonize-filter)' }}
                       />
                     </Box>
                   </VStack>
@@ -361,9 +450,15 @@ export const WorkspaceStudio: React.FC = () => {
                 <Center minH="400px">
                   <Box border="1px" borderColor="gray.200" borderRadius="2xl" overflow="hidden" shadow="lg" w="100%" display="flex" justifyContent="center" bg="gray.50">
                     <img
-                      src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
+                      src={status?.download_url_original || ''}
                       alt="Overlay View"
-                      style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
+                      style={{ 
+                        width: '100%', 
+                        height: 'auto', 
+                        maxHeight: '80vh', 
+                        objectFit: 'contain',
+                        filter: toggleActive === 'processed' ? 'url(#workspace-daltonize-filter)' : 'none'
+                      }}
                     />
                   </Box>
                 </Center>
@@ -396,10 +491,10 @@ export const WorkspaceStudio: React.FC = () => {
                     <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex">
                       <video
                         ref={processedVideoRef}
-                        src={status?.download_url || ''}
+                        src={status?.download_url_original || ''}
                         controls
                         playsInline
-                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain' }}
+                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain', filter: 'url(#workspace-daltonize-filter)' }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
                         onSeeking={() => syncPlayback('processed')}
@@ -413,12 +508,17 @@ export const WorkspaceStudio: React.FC = () => {
                   <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="100%" display="flex" justifyContent="center">
                     <video
                       key={toggleActive}
-                      src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
+                      src={status?.download_url_original || ''}
                       controls
                       autoPlay
                       muted
                       playsInline
-                      style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }}
+                      style={{ 
+                        width: '100%', 
+                        maxHeight: '80vh', 
+                        objectFit: 'contain',
+                        filter: toggleActive === 'processed' ? 'url(#workspace-daltonize-filter)' : 'none'
+                      }}
                     />
                   </Box>
                 </Center>
