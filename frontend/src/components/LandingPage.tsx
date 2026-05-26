@@ -1,0 +1,354 @@
+import React, { useState, useEffect } from 'react';
+import { Box, VStack, Heading, Text, Button, SimpleGrid, Icon, HStack, Badge, Flex, Card, CardBody, Select, Slider, SliderTrack, SliderFilledTrack, SliderThumb } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
+import { FiEye, FiZap, FiShield, FiCheckCircle, FiArrowRight, FiImage, FiVideo, FiFileText } from 'react-icons/fi';
+
+export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const [cvdType, setCvdType] = useState('protanopia');
+  const [severity, setSeverity] = useState(1.0);
+  const [intensity, setIntensity] = useState(1.0);
+  const [contrast, setContrast] = useState(1.0);
+  const [saturation, setSaturation] = useState(1.0);
+  
+  const [matrixValues, setMatrixValues] = useState("1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0");
+
+  useEffect(() => {
+    const mat = [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1]
+    ];
+    const s = severity;
+    if (cvdType === 'protanopia') {
+      mat[0][0] = 1.0 - 0.5 * s;
+      mat[0][1] = 0.5 * s;
+    } else if (cvdType === 'deuteranopia') {
+      mat[1][0] = 0.5 * s;
+      mat[1][1] = 1.0 - 0.5 * s;
+    } else if (cvdType === 'tritanopia') {
+      mat[2][1] = 0.5 * s;
+      mat[2][2] = 1.0 - 0.5 * s;
+    }
+    const values = `${mat[0][0]} ${mat[0][1]} ${mat[0][2]} 0 0  ${mat[1][0]} ${mat[1][1]} ${mat[1][2]} 0 0  ${mat[2][0]} ${mat[2][1]} ${mat[2][2]} 0 0  0 0 0 1 0`;
+    setMatrixValues(values);
+  }, [cvdType, severity]);
+
+  return (
+    <Box w="full">
+      {/* Hero Section */}
+      <Box pt={16} pb={20} textAlign="center">
+        <Badge colorScheme="purple" px={3} py={1} borderRadius="full" mb={6} fontSize="sm">
+          Bridging the Chromatic Digital Divide
+        </Badge>
+        <Heading 
+          as="h1" 
+          fontSize={{ base: "4xl", md: "6xl" }} 
+          fontWeight="black" 
+          letterSpacing="tight" 
+          color="gray.900" 
+          mb={6}
+          lineHeight="1.2"
+        >
+          Accessibility Without <Text as="span" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text">Compromise.</Text>
+        </Heading>
+        <Text fontSize={{ base: "lg", md: "xl" }} color="gray.600" maxW="3xl" mx="auto" mb={10} lineHeight="tall">
+          Over 300 million individuals with Color Vision Deficiency (CVD) are excluded from accessing visually-rich digital content. ChromaShift uses an intelligent Hybrid Adaptive AI framework to personalize media for your unique vision.
+        </Text>
+        <HStack justify="center" spacing={4}>
+          <Button 
+            size="lg" 
+            colorScheme="blue" 
+            bgGradient="linear(to-r, blue.600, purple.600)" 
+            _hover={{ bgGradient: "linear(to-r, blue.700, purple.700)" }}
+            px={10} 
+            py={7} 
+            fontSize="lg" 
+            fontWeight="bold" 
+            borderRadius="xl"
+            rightIcon={<FiArrowRight />}
+            onClick={() => navigate('/hub')}
+          >
+            Launch Media Hub
+          </Button>
+          <Button 
+            size="lg" 
+            variant="outline" 
+            colorScheme="gray" 
+            px={8} 
+            py={7} 
+            fontSize="lg" 
+            fontWeight="bold" 
+            borderRadius="xl"
+            onClick={() => navigate('/test-vision')}
+          >
+            Take Vision Test
+          </Button>
+        </HStack>
+
+        {/* Media Support Strip */}
+        <Box mt={16}>
+          <Text fontSize="sm" fontWeight="bold" color="gray.500" textTransform="uppercase" letterSpacing="wider" mb={6}>
+            Universal Media Processing
+          </Text>
+          <HStack justify="center" spacing={{ base: 6, md: 12 }}>
+            <VStack>
+              <Box p={4} bg="blue.50" borderRadius="2xl" color="blue.500" shadow="sm">
+                <Icon as={FiImage} boxSize={8} />
+              </Box>
+              <Text fontWeight="bold" color="gray.700">Images</Text>
+            </VStack>
+            <VStack>
+              <Box p={4} bg="purple.50" borderRadius="2xl" color="purple.500" shadow="sm">
+                <Icon as={FiVideo} boxSize={8} />
+              </Box>
+              <Text fontWeight="bold" color="gray.700">Videos</Text>
+            </VStack>
+            <VStack>
+              <Box p={4} bg="orange.50" borderRadius="2xl" color="orange.500" shadow="sm">
+                <Icon as={FiFileText} boxSize={8} />
+              </Box>
+              <Text fontWeight="bold" color="gray.700">PDFs</Text>
+            </VStack>
+          </HStack>
+          <Text fontSize="sm" color="gray.500" mt={6} maxW="xl" mx="auto">
+            Unlike standard web extensions, ChromaShift natively processes images, video files, and PDF documents with full hardware acceleration.
+          </Text>
+        </Box>
+      </Box>
+
+      {/* Interactive Demonstration Section */}
+      <Box py={16} textAlign="center" bg="gray.50" borderRadius="3xl" shadow="inner" mb={10} px={8}>
+        <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
+          <defs>
+            <filter id="demo-daltonize-filter">
+              <feColorMatrix type="matrix" values={matrixValues} />
+            </filter>
+          </defs>
+        </svg>
+
+        <VStack spacing={4} mb={8}>
+          <Badge colorScheme="blue">Live Demonstration</Badge>
+          <Heading fontSize="3xl" fontWeight="black" color="gray.800">Experience the Shift</Heading>
+          <Text fontSize="md" color="gray.500" maxW="2xl">
+            Play with the controls below to see how our algorithm dynamically shifts overlapping hues, making complex data visualizations accessible instantly.
+          </Text>
+        </VStack>
+
+        {/* Playground Controls */}
+        <Card variant="outline" borderRadius="2xl" mb={10} maxW="4xl" mx="auto" bg="white" shadow="sm">
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" color="gray.600" mb={2}>CVD Type</Text>
+                <Select value={cvdType} onChange={(e) => setCvdType(e.target.value)} colorScheme="blue" borderRadius="lg">
+                  <option value="protanopia">Protanopia (Red-Blind)</option>
+                  <option value="deuteranopia">Deuteranopia (Green-Blind)</option>
+                  <option value="tritanopia">Tritanopia (Blue-Blind)</option>
+                </Select>
+              </Box>
+              <Box>
+                <HStack justify="space-between" mb={2} fontSize="sm">
+                  <Text fontWeight="bold" color="gray.600">Severity</Text>
+                  <Text fontWeight="black" color="blue.600">{severity.toFixed(2)}</Text>
+                </HStack>
+                <Slider min={0.1} max={1.5} step={0.05} value={severity} onChange={(v) => setSeverity(v)} colorScheme="blue">
+                  <SliderTrack bg="gray.100" h="4px"><SliderFilledTrack /></SliderTrack>
+                  <SliderThumb boxSize={4} />
+                </Slider>
+              </Box>
+              <Box>
+                <HStack justify="space-between" mb={2} fontSize="sm">
+                  <Text fontWeight="bold" color="gray.600">Intensity (Brightness)</Text>
+                  <Text fontWeight="black" color="blue.600">{(intensity * 100).toFixed(0)}%</Text>
+                </HStack>
+                <Slider min={0.5} max={1.5} step={0.05} value={intensity} onChange={(v) => setIntensity(v)} colorScheme="blue">
+                  <SliderTrack bg="gray.100" h="4px"><SliderFilledTrack /></SliderTrack>
+                  <SliderThumb boxSize={4} />
+                </Slider>
+              </Box>
+              <Box>
+                <HStack justify="space-between" mb={2} fontSize="sm">
+                  <Text fontWeight="bold" color="gray.600">Contrast</Text>
+                  <Text fontWeight="black" color="blue.600">{(contrast * 100).toFixed(0)}%</Text>
+                </HStack>
+                <Slider min={0.5} max={1.5} step={0.05} value={contrast} onChange={(v) => setContrast(v)} colorScheme="blue">
+                  <SliderTrack bg="gray.100" h="4px"><SliderFilledTrack /></SliderTrack>
+                  <SliderThumb boxSize={4} />
+                </Slider>
+              </Box>
+              <Box>
+                <HStack justify="space-between" mb={2} fontSize="sm">
+                  <Text fontWeight="bold" color="gray.600">Saturation</Text>
+                  <Text fontWeight="black" color="blue.600">{(saturation * 100).toFixed(0)}%</Text>
+                </HStack>
+                <Slider min={0.5} max={1.5} step={0.05} value={saturation} onChange={(v) => setSaturation(v)} colorScheme="blue">
+                  <SliderTrack bg="gray.100" h="4px"><SliderFilledTrack /></SliderTrack>
+                  <SliderThumb boxSize={4} />
+                </Slider>
+              </Box>
+              <Flex align="flex-end">
+                <Button 
+                  size="md" 
+                  variant="ghost" 
+                  colorScheme="red" 
+                  w="full"
+                  onClick={() => {
+                    setCvdType('protanopia');
+                    setSeverity(1.0);
+                    setIntensity(1.0);
+                    setContrast(1.0);
+                    setSaturation(1.0);
+                  }}
+                >
+                  Reset Defaults
+                </Button>
+              </Flex>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
+
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8} maxW="5xl" mx="auto">
+          <VStack>
+            <Badge colorScheme="gray" mb={2}>Original Vision</Badge>
+            <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="gray.200" w="full">
+              <img src="/sample%20img%201.png" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} />
+            </Box>
+          </VStack>
+          
+          <VStack>
+            <Badge colorScheme="blue" mb={2}>ChromaShift Corrected</Badge>
+            <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="blue.200" position="relative" w="full">
+              <Box position="absolute" top={3} right={3} bg="blue.500" color="white" px={3} py={1} borderRadius="full" fontSize="xs" fontWeight="bold" shadow="md" zIndex={10}>
+                GPU Filter Active
+              </Box>
+              <img src="/sample%20img%201.png" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
+            </Box>
+          </VStack>
+        </SimpleGrid>
+
+        <Box mt={12} maxW="3xl" mx="auto">
+            <Text fontSize="sm" fontWeight="bold" color="gray.500" mb={4}>Works seamlessly on videos without dropped frames:</Text>
+            <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="gray.200" bg="black" position="relative">
+              <Box position="absolute" top={3} right={3} bg="blue.500" color="white" px={3} py={1} borderRadius="full" fontSize="xs" fontWeight="bold" shadow="md" zIndex={10}>
+                GPU Filter Active
+              </Box>
+              <video src="/sample%20vid%202.mp4" controls autoPlay loop muted playsInline style={{ width: '100%', height: 'auto', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
+            </Box>
+        </Box>
+      </Box>
+
+      {/* Features Section */}
+      <Box py={20} bg="white" borderRadius="3xl" shadow="sm" border="1px" borderColor="gray.100" px={8}>
+        <VStack spacing={4} mb={16} textAlign="center">
+          <Heading fontSize="3xl" fontWeight="black" color="gray.800">Advanced AI Remediation</Heading>
+          <Text fontSize="md" color="gray.500" maxW="2xl">
+            Our platform goes beyond generic filters. We use state-of-the-art machine learning models to provide semantically-aware color remapping for images, videos, and PDFs.
+          </Text>
+        </VStack>
+        
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10}>
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="blue.50" color="blue.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiZap} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Hybrid Adaptive Engine</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Leveraging Vision Transformers (ViT) and RT-DETR object detection to understand semantic context before shifting colors, preserving the meaning of complex diagrams and dashboards.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="purple.50" color="purple.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiEye} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Physiologically Grounded</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Our remapping algorithm is constrained by luminance-preserving models. We don't just shift hues randomly; we ensure the result is physically accurate and flicker-free for video playback.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="green.50" color="green.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiShield} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">WCAG 2.1 Compliance</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Integrated automated compliance checker evaluating outputs against WCAG SC 1.4.1 (Use of Color) and SC 1.4.3 (Contrast Minimum) to generate actionable accessibility reports.
+              </Text>
+            </CardBody>
+          </Card>
+        </SimpleGrid>
+      </Box>
+
+      {/* Impact / SDGs Section */}
+      <Box py={20} px={8} mt={10}>
+        <Flex direction={{ base: "column", lg: "row" }} align="center" justify="space-between" gap={12}>
+          <Box flex={1}>
+            <Badge colorScheme="green" mb={4} px={3} py={1} borderRadius="full">Global Impact</Badge>
+            <Heading fontSize="4xl" fontWeight="black" color="gray.900" mb={6} lineHeight="1.2">
+              Aligning with United Nations Sustainable Development Goals
+            </Heading>
+            <Text fontSize="lg" color="gray.600" mb={8} lineHeight="tall">
+              ChromaShift is designed to foster a more inclusive digital world, directly supporting several key UN SDGs by removing barriers in education, employment, and public communication.
+            </Text>
+            
+            <VStack align="start" spacing={5}>
+              <HStack align="start">
+                <Icon as={FiCheckCircle} color="blue.500" mt={1} boxSize={5} />
+                <Box>
+                  <Text fontWeight="bold" color="gray.800">SDG 4: Quality Education</Text>
+                  <Text color="gray.600" fontSize="sm">Ensuring students with visual impairments can fully engage with digital curricula and educational diagrams.</Text>
+                </Box>
+              </HStack>
+              <HStack align="start">
+                <Icon as={FiCheckCircle} color="purple.500" mt={1} boxSize={5} />
+                <Box>
+                  <Text fontWeight="bold" color="gray.800">SDG 8: Decent Work and Economic Growth</Text>
+                  <Text color="gray.600" fontSize="sm">Ensuring professional media, such as corporate dashboards, are legible for all employees.</Text>
+                </Box>
+              </HStack>
+              <HStack align="start">
+                <Icon as={FiCheckCircle} color="green.500" mt={1} boxSize={5} />
+                <Box>
+                  <Text fontWeight="bold" color="gray.800">SDG 10: Reduced Inequalities</Text>
+                  <Text color="gray.600" fontSize="sm">Promoting the social and economic inclusion of persons with disabilities globally.</Text>
+                </Box>
+              </HStack>
+            </VStack>
+          </Box>
+          <Box flex={1} bgGradient="linear(to-br, blue.50, purple.50)" p={10} borderRadius="3xl" border="1px" borderColor="blue.100" position="relative" overflow="hidden">
+            <Box position="absolute" top="-10%" right="-10%" boxSize="300px" bg="purple.200" filter="blur(100px)" opacity="0.4" borderRadius="full" />
+            <Box position="absolute" bottom="-10%" left="-10%" boxSize="300px" bg="blue.200" filter="blur(100px)" opacity="0.4" borderRadius="full" />
+            
+            <VStack spacing={6} position="relative" zIndex={1} align="start">
+              <Heading fontSize="2xl" fontWeight="black" color="gray.800">
+                Ready to transform your media?
+              </Heading>
+              <Text color="gray.600">
+                Create a personalized vision profile and start Daltonizing your images, videos, and PDFs instantly.
+              </Text>
+              <Button 
+                size="lg" 
+                colorScheme="blue" 
+                w="full"
+                py={7}
+                fontSize="md"
+                borderRadius="xl"
+                onClick={() => navigate('/settings')}
+              >
+                Create Vision Profile
+              </Button>
+            </VStack>
+          </Box>
+        </Flex>
+      </Box>
+    </Box>
+  );
+};

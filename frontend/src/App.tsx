@@ -15,6 +15,7 @@ import { WorkspaceStudio } from './components/WorkspaceStudio';
 import { PromoteModal } from './components/PromoteModal';
 import { VisionTest } from './components/VisionTest';
 import { AdminAnalytics } from './components/AdminAnalytics';
+import { LandingPage } from './components/LandingPage';
 
 // Simple Navigation Layout
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -38,9 +39,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Top Navbar */}
       <Flex as="header" w="full" bg="white" borderBottom="1px" borderColor="gray.200" py={4} px={8} align="center" justify="space-between" shadow="sm">
         <HStack spacing={3}>
-          <Text fontSize="xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text" letterSpacing="tight">
-            ChromaShift
-          </Text>
+          <RouterLink to="/">
+            <Text fontSize="xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text" letterSpacing="tight">
+              ChromaShift
+            </Text>
+          </RouterLink>
           {isGuest && (
             <Badge colorScheme="purple" borderRadius="md" px={2} py={0.5} fontSize="xs" fontWeight="bold">
               Guest Mode
@@ -49,8 +52,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </HStack>
         
         <HStack spacing={6}>
-          <Button as={RouterLink} to="/" variant={isActive('/') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
-            Dashboard
+          <Button as={RouterLink} to="/hub" variant={isActive('/hub') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
+            Media Hub
           </Button>
           <Button as={RouterLink} to="/test-vision" variant={isActive('/test-vision') ? 'solid' : 'ghost'} colorScheme="blue" size="sm">
             Test Vision
@@ -108,8 +111,15 @@ function App() {
           <Route path="/auth/register" element={<Register />} />
           <Route path="/auth/verify" element={<EmailVerification />} />
           
-          {/* Protected Routes wrapped in AppLayout */}
+          {/* Public Landing Page */}
           <Route path="/" element={
+            <AppLayout>
+              <LandingPage />
+            </AppLayout>
+          } />
+
+          {/* Protected Routes wrapped in AppLayout */}
+          <Route path="/hub" element={
             <ProtectedRoute>
               <AppLayout>
                 <DashboardHistory />
