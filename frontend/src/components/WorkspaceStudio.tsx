@@ -106,7 +106,7 @@ export const WorkspaceStudio: React.FC = () => {
       
       // Determine file type from file extension
       const ext = statusRes.download_url?.split('?')[0].split('.').pop()?.toLowerCase() || '';
-      if (['mp4', 'webm', 'ogg'].includes(ext)) {
+      if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'm4v'].includes(ext)) {
         setMediaType('video');
       } else if (ext === 'pdf') {
         setMediaType('pdf');
@@ -302,10 +302,10 @@ export const WorkspaceStudio: React.FC = () => {
         </HStack>
       </Flex>
 
-      {/* Main Grid: Left 2/3 Media Workspace, Right 1/3 WCAG Sidebar */}
+      {/* Main Grid: Left Media Workspace, Right/Bottom WCAG Sidebar */}
       <SimpleGrid columns={{ base: 1, lg: 12 }} spacing={6}>
-        {/* MEDIA VIEWPORT PANEL (8 cols out of 12) */}
-        <Box gridColumn={{ lg: "span 8" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" overflow="hidden" p={6}>
+        {/* MEDIA VIEWPORT PANEL */}
+        <Box gridColumn={{ lg: displayMode === 'side-by-side' ? "span 12" : "span 8" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" overflow="hidden" p={6}>
           {displayMode === 'toggle' && (
             <Flex justify="center" mb={4}>
               <HStack spacing={1} bg="gray.100" p={1} borderRadius="lg">
@@ -338,32 +338,32 @@ export const WorkspaceStudio: React.FC = () => {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                   <VStack align="stretch">
                     <Text fontWeight="bold" fontSize="sm" color="gray.500" mb={1} textAlign="center">Original Image</Text>
-                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" shadow="inner" maxH="550px">
+                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50">
                       <img
                         src={status?.download_url_original || ''}
                         alt="Original Upload"
-                        style={{ width: '100%', height: 'auto', maxHeight: '550px', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain' }}
                       />
                     </Box>
                   </VStack>
                   <VStack align="stretch">
                     <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected Image (CVD Shifted)</Text>
-                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" shadow="inner" maxH="550px">
+                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50">
                       <img
                         src={status?.download_url || ''}
                         alt="Corrected Accessible"
-                        style={{ width: '100%', height: 'auto', maxHeight: '550px', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain' }}
                       />
                     </Box>
                   </VStack>
                 </SimpleGrid>
               ) : (
                 <Center minH="400px">
-                  <Box border="1px" borderColor="gray.200" borderRadius="2xl" overflow="hidden" shadow="lg" maxW="80%">
+                  <Box border="1px" borderColor="gray.200" borderRadius="2xl" overflow="hidden" shadow="lg" w="100%" display="flex" justifyContent="center" bg="gray.50">
                     <img
                       src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                       alt="Overlay View"
-                      style={{ width: '100%', height: 'auto', maxHeight: '550px', objectFit: 'contain' }}
+                      style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
                     />
                   </Box>
                 </Center>
@@ -377,12 +377,13 @@ export const WorkspaceStudio: React.FC = () => {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                   <VStack align="stretch">
                     <Text fontWeight="bold" fontSize="sm" color="gray.500" mb={1} textAlign="center">Original Video</Text>
-                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="lg">
+                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex">
                       <video
                         ref={originalVideoRef}
                         src={status?.download_url_original || ''}
                         controls
-                        style={{ width: '100%', maxHeight: '420px' }}
+                        playsInline
+                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain' }}
                         onPlay={() => syncPlayback('original')}
                         onPause={() => syncPlayback('original')}
                         onSeeking={() => syncPlayback('original')}
@@ -392,12 +393,13 @@ export const WorkspaceStudio: React.FC = () => {
                   </VStack>
                   <VStack align="stretch">
                     <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected Video (Coherent Shift)</Text>
-                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" bg="black" shadow="lg">
+                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex">
                       <video
                         ref={processedVideoRef}
                         src={status?.download_url || ''}
                         controls
-                        style={{ width: '100%', maxHeight: '420px' }}
+                        playsInline
+                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain' }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
                         onSeeking={() => syncPlayback('processed')}
@@ -408,13 +410,15 @@ export const WorkspaceStudio: React.FC = () => {
                 </SimpleGrid>
               ) : (
                 <Center>
-                  <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="85%">
+                  <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="100%" display="flex" justifyContent="center">
                     <video
                       key={toggleActive}
                       src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                       controls
                       autoPlay
-                      style={{ width: '100%', maxHeight: '450px' }}
+                      muted
+                      playsInline
+                      style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }}
                     />
                   </Box>
                 </Center>
@@ -466,8 +470,8 @@ export const WorkspaceStudio: React.FC = () => {
           )}
         </Box>
 
-        {/* WCAG COMPLIANCE SIDEBAR (4 cols out of 12) */}
-        <Box gridColumn={{ lg: "span 4" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" p={6}>
+        {/* WCAG COMPLIANCE SIDEBAR */}
+        <Box gridColumn={{ lg: displayMode === 'side-by-side' ? "span 12" : "span 4" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" p={6}>
           {!report ? (
             <Center py={12} flexDir="column" h="100%">
               <Text mb={4} color="gray.600" textAlign="center" fontWeight="medium">

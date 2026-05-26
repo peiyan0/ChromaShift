@@ -46,7 +46,8 @@ class MediaProcessor:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Temporary encoding, re-encoded below
+        # Use avc1 (H.264) directly to maximize browser compatibility if ffmpeg is missing
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))

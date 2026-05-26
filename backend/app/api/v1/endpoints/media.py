@@ -24,9 +24,15 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
     
     # 1. Setup paths
     file_ext = os.path.splitext(s3_key)[1] if s3_key else ".jpg"
+    
+    # Force processed video extension to .mp4 to ensure ffmpeg libx264/aac compatibility
+    processed_ext = file_ext
+    if file_ext.lower() in ['.webm', '.mov', '.avi', '.mkv', '.m4v']:
+        processed_ext = ".mp4"
+        
     local_input = f"/tmp/{job_id}{file_ext}"
-    local_output = f"/tmp/{job_id}_processed{file_ext}"
-    processed_key = f"processed/{job_id}_processed{file_ext}"
+    local_output = f"/tmp/{job_id}_processed{processed_ext}"
+    processed_key = f"processed/{job_id}_processed{processed_ext}"
     
     # Create tmp dir if not exists (inside container /tmp is usually fine)
     os.makedirs("/tmp", exist_ok=True)
@@ -40,7 +46,7 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         # Determine media type for processing
         if file_ext.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
             processor.process_image(local_input, local_output, cvd_type, severity)
-        elif file_ext.lower() in ['.mp4', '.webm']:
+        elif file_ext.lower() in ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v']:
             processor.process_video(local_input, local_output, cvd_type, severity)
         elif file_ext.lower() == '.pdf':
             processor.process_pdf(local_input, local_output, cvd_type, severity)
