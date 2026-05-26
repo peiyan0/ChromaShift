@@ -20,7 +20,7 @@ import {
   Grid,
   GridItem
 } from '@chakra-ui/react';
-import { FiTrendingUp, FiCheckCircle, FiPlay, FiRefreshCw, FiGrid, FiClock, FiActivity, FiVideo, FiFileText } from 'react-icons/fi';
+import { FiTrendingUp, FiCheckCircle, FiPlay, FiRefreshCw, FiGrid, FiClock, FiActivity, FiFileText } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { profileService } from '../services/profile';
 import { SurveyWizard } from './SurveyWizard';
