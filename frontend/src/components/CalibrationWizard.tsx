@@ -63,6 +63,7 @@ interface Hypothesis {
   type: string;
   severity: number;
   probability: number;
+  alpha: number;
 }
 
 interface Circle {
@@ -85,6 +86,7 @@ export const CalibrationWizard: FC = () => {
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [currentPair, setCurrentPair] = useState<[Hypothesis, Hypothesis] | null>(null);
   const [circles, setCircles] = useState<Circle[]>([]);
+  const [entropyHistory, setEntropyHistory] = useState<number[]>([]);
   
   // Converged Diagnostic Profile
   const [diagnosedProfile, setDiagnosedProfile] = useState<Hypothesis | null>(null);
@@ -100,6 +102,7 @@ export const CalibrationWizard: FC = () => {
   
   const canvasRefA = useRef<HTMLCanvasElement>(null);
   const canvasRefB = useRef<HTMLCanvasElement>(null);
+  const canvasRefPreview = useRef<HTMLCanvasElement>(null);
   const toast = useToast();
 
   // Load existing profile on mount (for baseline defaults)
@@ -301,80 +304,33 @@ export const CalibrationWizard: FC = () => {
     });
   };
 
-  // 3. Active Learning Utility: Expected Entropy Minimizer
-  const computeExpectedEntropy = (
-    hA: Hypothesis,
-    hB: Hypothesis,
-    currHyps: Hypothesis[]
-  ): number => {
-    const beta = 3.5; // Rational user select coefficient
-    
-    const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
-      if (hTrue.type === hTest.type) {
-        return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
-      }
-      return 0.18; // cross-deficiency confusion score
-    };
-
-    const getProbSelectA = (hTrue: Hypothesis) => {
-      const visA = getVisibility(hTrue, hA);
-      const visB = getVisibility(hTrue, hB);
-      return 1.0 / (1.0 + Math.exp(-beta * (visA - visB)));
-    };
-
-    let pA = 0;
-    for (const h of currHyps) {
-      pA += getProbSelectA(h) * h.probability;
-    }
-    const pB = 1.0 - pA;
-
-    if (pA < 1e-5 || pB < 1e-5) return 999.0;
-
-    let entropyA = 0;
-    for (const h of currHyps) {
-      const pSelA_given_h = getProbSelectA(h);
-      const pPostA = (pSelA_given_h * h.probability) / pA;
-      if (pPostA > 1e-9) {
-        entropyA -= pPostA * Math.log2(pPostA);
-      }
-    }
-
-    let entropyB = 0;
-    for (const h of currHyps) {
-      const pSelB_given_h = 1.0 - getProbSelectA(h);
-      const pPostB = (pSelB_given_h * h.probability) / pB;
-      if (pPostB > 1e-9) {
-        entropyB -= pPostB * Math.log2(pPostB);
-      }
-    }
-
-    return pA * entropyA + pB * entropyB;
-  };
-
   const selectOptimalPair = (currHyps: Hypothesis[]): [Hypothesis, Hypothesis] => {
-    let bestPair: [Hypothesis, Hypothesis] = [currHyps[0], currHyps[1]];
-    let minExpectedEntropy = Infinity;
-
-    for (let i = 0; i < currHyps.length; i++) {
-      for (let j = i + 1; j < currHyps.length; j++) {
-        const hA = currHyps[i];
-        const hB = currHyps[j];
-        const expectedEntropy = computeExpectedEntropy(hA, hB, currHyps);
-        if (expectedEntropy < minExpectedEntropy) {
-          minExpectedEntropy = expectedEntropy;
-          bestPair = [hA, hB];
-        }
-      }
+    // Sort by probability descending
+    const sorted = [...currHyps].sort((a, b) => b.probability - a.probability);
+    const top1 = sorted[0];
+    
+    // 70% top 1 vs top 2. 30% top 1 vs random lower half.
+    if (Math.random() < 0.7) {
+      return [top1, sorted[1]];
+    } else {
+      const startIdx = Math.floor(sorted.length / 2);
+      const randomLower = sorted[startIdx + Math.floor(Math.random() * (sorted.length - startIdx))];
+      return [top1, randomLower];
     }
-    return bestPair;
   };
 
   // 4. Start Calibration Process
   const startCalibration = () => {
     const initialHyps = hypothesesSpace.map(h => ({
       ...h,
-      probability: 1 / hypothesesSpace.length
+      probability: 1 / hypothesesSpace.length,
+      alpha: 1.0 // Initial Dirichlet prior
     }));
+    
+    let maxH = 0;
+    initialHyps.forEach(h => maxH -= h.probability * Math.log2(h.probability));
+    
+    setEntropyHistory([maxH]);
     setHypotheses(initialHyps);
     setSelections([]); // Reset trackers
     setStep('calibration');
@@ -410,6 +366,21 @@ export const CalibrationWizard: FC = () => {
     }
   }, [step, round, currentPair, circles]);
 
+  // Render trigger for Live Preview in Results
+  useEffect(() => {
+    if (step === 'results' && diagnosedProfile) {
+      if (circles.length === 0) {
+         setCircles(packCircles(250, 250, 'E'));
+      }
+      const timer = setTimeout(() => {
+        if (canvasRefPreview.current && circles.length > 0) {
+          drawPlate(canvasRefPreview.current, circles, diagnosedProfile.type, customSeverity);
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [step, diagnosedProfile, customSeverity, circles]);
+
   // 6. Handle User Comparative Choice Update
   const handleSelection = (selected: 'A' | 'B' | 'both_clear' | 'neither') => {
     if (!currentPair) return;
@@ -419,36 +390,25 @@ export const CalibrationWizard: FC = () => {
     
     let updatedHyps: Hypothesis[];
     
-    if (selected === 'neither' || selected === 'both_clear') {
-      const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
-        if (hTrue.type === hTest.type) {
-          return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
-        }
-        return 0.18;
-      };
+    const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
+      if (hTrue.type === hTest.type) {
+        return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
+      }
+      return 0.18;
+    };
 
+    if (selected === 'neither' || selected === 'both_clear') {
       updatedHyps = hypotheses.map(h => {
         const visA = getVisibility(h, currentPair[0]);
         const visB = getVisibility(h, currentPair[1]);
-        // both_clear: both are clear to user (visA and visB are high -> reward visA + visB)
-        // neither: both look unclear to user (visA and visB are low -> penalize visA + visB)
         const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
         return {
           ...h,
-          probability: h.probability * likelihood
+          alpha: h.alpha + likelihood
         };
       });
-      const sum = updatedHyps.reduce((s, h) => s + h.probability, 0);
-      updatedHyps = updatedHyps.map(h => ({ ...h, probability: h.probability / sum }));
     } else {
       const beta = 3.5;
-      const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
-        if (hTrue.type === hTest.type) {
-          return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
-        }
-        return 0.18;
-      };
-
       updatedHyps = hypotheses.map(h => {
         const visA = getVisibility(h, currentPair[0]);
         const visB = getVisibility(h, currentPair[1]);
@@ -456,22 +416,41 @@ export const CalibrationWizard: FC = () => {
         const likelihood = selected === 'A' ? pA : 1.0 - pA;
         return {
           ...h,
-          probability: h.probability * likelihood
+          alpha: h.alpha + likelihood
         };
       });
-      const sum = updatedHyps.reduce((s, h) => s + h.probability, 0);
-      updatedHyps = updatedHyps.map(h => ({ ...h, probability: h.probability / sum }));
     }
 
+    // Recalculate probabilities based on new alphas
+    const sumAlphas = updatedHyps.reduce((s, h) => s + h.alpha, 0);
+    updatedHyps = updatedHyps.map(h => ({ ...h, probability: h.alpha / sumAlphas }));
+    
+    // Calculate new entropy
+    let newEntropy = 0;
+    updatedHyps.forEach(h => {
+      if (h.probability > 1e-9) {
+        newEntropy -= h.probability * Math.log2(h.probability);
+      }
+    });
+
+    const newEntropyHistory = [...entropyHistory, newEntropy];
+    setEntropyHistory(newEntropyHistory);
     setHypotheses(updatedHyps);
 
-    if (round >= 5) {
+    // Early Stopping Check
+    const prevEntropy = entropyHistory[entropyHistory.length - 1];
+    const deltaH = Math.abs(prevEntropy - newEntropy);
+    const hasConverged = round >= 5 && deltaH < 0.05;
+    const hitHardLimit = round >= 10;
+
+    if (hasConverged || hitHardLimit) {
       const allClear = newSelections.length === 5 && newSelections.every(s => s === 'both_clear');
-      if (allClear) {
+      if (allClear && !hitHardLimit) {
         const normalProfile: Hypothesis = {
           type: 'normal',
           severity: 0.0,
-          probability: 1.0
+          probability: 1.0,
+          alpha: 1.0
         };
         setDiagnosedProfile(normalProfile);
         setCustomSeverity(0.0);
@@ -479,7 +458,7 @@ export const CalibrationWizard: FC = () => {
         setCustomSaturation(1.0);
         setCustomIntensity(1.0);
       } else {
-        // Find the argmax hypothesis (highest probability posterior state)
+        // Find the argmax hypothesis
         let bestHyp = updatedHyps[0];
         for (const h of updatedHyps) {
           if (h.probability > bestHyp.probability) {
@@ -490,13 +469,24 @@ export const CalibrationWizard: FC = () => {
         setCustomSeverity(bestHyp.severity);
       }
       setStep('results');
-      toast({
-        title: "Calibration Complete",
-        description: "Successfully estimated your personalized color sensitivity profile.",
-        status: "success",
-        duration: 4000,
-        isClosable: true
-      });
+      
+      if (hitHardLimit && !hasConverged) {
+        toast({
+          title: "Confidence Limit Reached",
+          description: "Reached maximum rounds—profile may need manual refinement.",
+          status: "warning",
+          duration: 5000,
+          isClosable: true
+        });
+      } else {
+        toast({
+          title: "Calibration Complete",
+          description: "Successfully estimated your personalized color sensitivity profile.",
+          status: "success",
+          duration: 4000,
+          isClosable: true
+        });
+      }
     } else {
       startNextRound(round + 1, updatedHyps);
     }
@@ -670,12 +660,13 @@ export const CalibrationWizard: FC = () => {
                   Select the clearer symbol
                 </Heading>
               </VStack>
-              <VStack align="end" spacing={1} w={{ base: "full", md: "200px" }}>
+              <VStack align="end" spacing={1} w={{ base: "full", md: "250px" }}>
                 <HStack justify="space-between" w="full" fontSize="sm" fontWeight="bold" color="gray.600">
-                  <Text>Calibrating...</Text>
-                  <Text>{round} / 5 Rounds</Text>
+                  <Text>Confidence</Text>
+                  <Text>{entropyHistory.length > 0 ? Math.round((1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100) : 0}%</Text>
                 </HStack>
-                <Progress value={(round / 5) * 100} size="xs" colorScheme="blue" borderRadius="full" w="full" />
+                <Progress value={entropyHistory.length > 0 ? (1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100 : 0} size="sm" colorScheme="purple" borderRadius="full" w="full" />
+                <Text fontSize="xs" color="gray.400">Round {round} (Max 10)</Text>
               </VStack>
             </Box>
 
@@ -994,6 +985,32 @@ export const CalibrationWizard: FC = () => {
                   <Card variant="outline" borderRadius="2xl" border="1px" borderColor="gray.100" className="flex-1">
                     <CardBody className="space-y-4 flex flex-col justify-between p-6">
                       <VStack align="stretch" spacing={3}>
+                        <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
+                          Live Filter Preview
+                        </Text>
+                        <Box 
+                          className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          overflow="hidden"
+                        >
+                          <canvas 
+                            ref={canvasRefPreview} 
+                            width={250} 
+                            height={250} 
+                            className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl transition-all duration-75"
+                            style={{
+                              filter: `contrast(${customContrast}) saturate(${customSaturation}) brightness(${customIntensity})`
+                            }}
+                          />
+                        </Box>
+                        <Text fontSize="xs" color="gray.500" textAlign="center">
+                          Adjust the sliders to see how they affect the color separation in real-time.
+                        </Text>
+                      </VStack>
+
+                      <VStack align="stretch" spacing={3} pt={4}>
                         <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
                           Personalized 3x3 Correction Matrix
                         </Text>

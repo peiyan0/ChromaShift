@@ -430,6 +430,9 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
                 <video
                   ref={videoRef}
                   playsInline
+                  muted
+                  preload="auto"
+                  crossOrigin="anonymous"
                   style={{ display: 'none' }}
                   onEnded={() => {
                     setIsPlaying(false);
