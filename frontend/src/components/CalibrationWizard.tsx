@@ -76,7 +76,7 @@ interface Circle {
 const hypothesesSpace: Omit<Hypothesis, 'probability'>[] = [];
 for (const type of CVD_TYPES) {
   for (const severity of SEVERITY_LEVELS) {
-    hypothesesSpace.push({ type, severity });
+    hypothesesSpace.push({ type, severity, alpha: 1.0 });
   }
 }
 
@@ -117,7 +117,7 @@ export const CalibrationWizard: FC = () => {
         setCustomSaturation(parsed.saturation_multiplier || 1.0);
         setCustomIntensity(parsed.intensity || 1.0);
         if (parsed.cvd_type) {
-          setDiagnosedProfile({ type: parsed.cvd_type, severity: parsed.severity || 1.0, probability: 1.0 });
+          setDiagnosedProfile({ type: parsed.cvd_type, severity: parsed.severity || 1.0, probability: 1.0, alpha: 1.0 });
         }
       } catch (err) {
         console.error("Error parsing cached profile", err);
@@ -141,7 +141,7 @@ export const CalibrationWizard: FC = () => {
         localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
         
         if (data.cvd_type) {
-          setDiagnosedProfile({ type: data.cvd_type, severity: data.severity || 1.0, probability: 1.0 });
+          setDiagnosedProfile({ type: data.cvd_type, severity: data.severity || 1.0, probability: 1.0, alpha: 1.0 });
         }
       }
     }).catch(e => console.error("Could not load baseline profile", e));
@@ -256,6 +256,29 @@ export const CalibrationWizard: FC = () => {
       
       const noise = (Math.random() - 0.5) * 32; // Organic color noise
       
+      if (hType.startsWith('triage_')) {
+        // Triage hardcoded confusion plates
+        if (hType === 'triage_protan_A') {
+          baseR = c.isSymbol ? 200 : 20; baseG = c.isSymbol ? 0 : 20; baseB = c.isSymbol ? 0 : 20;
+        } else if (hType === 'triage_protan_B') {
+          baseR = c.isSymbol ? 255 : 20; baseG = c.isSymbol ? 255 : 20; baseB = c.isSymbol ? 255 : 20;
+        } else if (hType === 'triage_deutan_A') {
+          baseR = c.isSymbol ? 180 : 50; baseG = c.isSymbol ? 40 : 150; baseB = c.isSymbol ? 40 : 50;
+        } else if (hType === 'triage_deutan_B') {
+          baseR = c.isSymbol ? 255 : 50; baseG = c.isSymbol ? 255 : 150; baseB = c.isSymbol ? 255 : 50;
+        } else if (hType === 'triage_tritan_A') {
+          baseR = c.isSymbol ? 100 : 150; baseG = c.isSymbol ? 200 : 150; baseB = c.isSymbol ? 255 : 150;
+        } else if (hType === 'triage_tritan_B') {
+          baseR = c.isSymbol ? 255 : 150; baseG = c.isSymbol ? 255 : 150; baseB = c.isSymbol ? 255 : 150;
+        }
+        
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgb(${baseR}, ${baseG}, ${baseB})`;
+        ctx.fill();
+        return;
+      }
+
       if (hType === 'tritanopia') {
         // Tritan (Blue-Yellow confusion)
         if (c.isSymbol) {
@@ -345,8 +368,16 @@ export const CalibrationWizard: FC = () => {
     const packed = packCircles(250, 250, nextSymbol);
     setCircles(packed);
     
-    const nextPair = selectOptimalPair(currentHyps);
-    setCurrentPair(nextPair);
+    if (nextRound === 1) {
+      setCurrentPair([{ type: 'triage_protan_A', severity: 0, probability: 0, alpha: 0 }, { type: 'triage_protan_B', severity: 0, probability: 0, alpha: 0 }]);
+    } else if (nextRound === 2) {
+      setCurrentPair([{ type: 'triage_deutan_A', severity: 0, probability: 0, alpha: 0 }, { type: 'triage_deutan_B', severity: 0, probability: 0, alpha: 0 }]);
+    } else if (nextRound === 3) {
+      setCurrentPair([{ type: 'triage_tritan_A', severity: 0, probability: 0, alpha: 0 }, { type: 'triage_tritan_B', severity: 0, probability: 0, alpha: 0 }]);
+    } else {
+      const nextPair = selectOptimalPair(currentHyps);
+      setCurrentPair(nextPair);
+    }
     setRound(nextRound);
   };
 
@@ -388,37 +419,56 @@ export const CalibrationWizard: FC = () => {
     const newSelections = [...selections, selected];
     setSelections(newSelections);
     
-    let updatedHyps: Hypothesis[];
+    let updatedHyps: Hypothesis[] = [...hypotheses];
     
-    const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
-      if (hTrue.type === hTest.type) {
-        return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
-      }
-      return 0.18;
-    };
-
-    if (selected === 'neither' || selected === 'both_clear') {
-      updatedHyps = hypotheses.map(h => {
-        const visA = getVisibility(h, currentPair[0]);
-        const visB = getVisibility(h, currentPair[1]);
-        const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
-        return {
-          ...h,
-          alpha: h.alpha + likelihood
-        };
+    if (round <= 3) {
+      // Triage Phase: Map rounds to primary CVD types
+      const boostType = round === 1 ? 'protanopia' : round === 2 ? 'deuteranopia' : 'tritanopia';
+      
+      updatedHyps = updatedHyps.map(h => {
+        let newAlpha = h.alpha;
+        if (h.type === boostType) {
+          // If B is clearer, they struggled with the confusion color A -> Strongly boost this CVD hypothesis
+          if (selected === 'B' || selected === 'neither') {
+            newAlpha += 10.0; 
+          } else if (selected === 'both_clear' || selected === 'A') {
+            newAlpha *= 0.1; // Penalize if they can see the confusion color clearly
+          }
+        }
+        return { ...h, alpha: newAlpha };
       });
     } else {
-      const beta = 3.5;
-      updatedHyps = hypotheses.map(h => {
-        const visA = getVisibility(h, currentPair[0]);
-        const visB = getVisibility(h, currentPair[1]);
-        const pA = 1.0 / (1.0 + Math.exp(-beta * (visA - visB)));
-        const likelihood = selected === 'A' ? pA : 1.0 - pA;
-        return {
-          ...h,
-          alpha: h.alpha + likelihood
-        };
-      });
+      // Normal Bayesian Optimization Phase
+      const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
+        if (hTrue.type === hTest.type) {
+          return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
+        }
+        return 0.18;
+      };
+
+      if (selected === 'neither' || selected === 'both_clear') {
+        updatedHyps = hypotheses.map(h => {
+          const visA = getVisibility(h, currentPair![0]);
+          const visB = getVisibility(h, currentPair![1]);
+          const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
+          return {
+            ...h,
+            alpha: h.alpha + likelihood
+          };
+        });
+      } else {
+        const beta = 3.5;
+        updatedHyps = hypotheses.map(h => {
+          const visA = getVisibility(h, currentPair![0]);
+          const visB = getVisibility(h, currentPair![1]);
+          const pA = 1.0 / (1.0 + Math.exp(-beta * (visA - visB)));
+          const likelihood = selected === 'A' ? pA : 1.0 - pA;
+          return {
+            ...h,
+            alpha: h.alpha + likelihood
+          };
+        });
+      }
     }
 
     // Recalculate probabilities based on new alphas
@@ -442,10 +492,12 @@ export const CalibrationWizard: FC = () => {
     const deltaH = Math.abs(prevEntropy - newEntropy);
     const hasConverged = round >= 5 && deltaH < 0.05;
     const hitHardLimit = round >= 10;
+    
+    const perfectTriage = round === 3 && newSelections.length === 3 && newSelections.every(s => s === 'both_clear');
 
-    if (hasConverged || hitHardLimit) {
-      const allClear = newSelections.length === 5 && newSelections.every(s => s === 'both_clear');
-      if (allClear && !hitHardLimit) {
+    if (hasConverged || hitHardLimit || perfectTriage) {
+      const allClear = perfectTriage || newSelections.every(s => s === 'both_clear');
+      if (allClear) {
         const normalProfile: Hypothesis = {
           type: 'normal',
           severity: 0.0,
@@ -651,10 +703,10 @@ export const CalibrationWizard: FC = () => {
             <Box className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
               <VStack align="start" spacing={1}>
                 <HStack>
-                  <Badge colorScheme="blue" borderRadius="md" px={2} py={0.5} fontSize="xs" fontWeight="bold">
-                    Active learning
+                  <Badge colorScheme={round <= 3 ? "purple" : "blue"} borderRadius="md" px={2} py={0.5} fontSize="xs" fontWeight="bold">
+                    {round <= 3 ? "Triage Phase" : "Active learning"}
                   </Badge>
-                  <Text fontSize="sm" fontWeight="semibold" color="gray.400">Bayesian Anomaloscope</Text>
+                  <Text fontSize="sm" fontWeight="semibold" color="gray.400">{round <= 3 ? "Common Confusions" : "Bayesian Anomaloscope"}</Text>
                 </HStack>
                 <Heading fontSize="2xl" fontWeight="black" color="gray.800">
                   Select the clearer symbol
