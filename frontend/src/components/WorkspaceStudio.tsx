@@ -25,6 +25,7 @@ import {
 import { mediaService, type MediaStatusResponse } from '../services/media';
 import { complianceService, type ComplianceReportResponse } from '../services/compliance';
 import { profileService, type VisionProfile } from '../services/profile';
+import api from '../services/api';
 
 // Custom SVG Icons
 const BackIcon = (props: any) => (
@@ -236,6 +237,26 @@ export const WorkspaceStudio: React.FC = () => {
     }
   };
 
+  const handleExportReport = async () => {
+    if (!jobId) return;
+    try {
+      const response = await api.get(`compliance/${jobId}/report`, {
+        responseType: 'blob'
+      });
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `accessibility_report_${jobId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: "Export Failed", status: "error" });
+    }
+  };
+
   // Video Synchronizer Logic
   const syncPlayback = (source: 'processed' | 'original') => {
     if (isSyncing.current) return;
@@ -325,7 +346,7 @@ export const WorkspaceStudio: React.FC = () => {
             aria-label="Back to Dashboard"
             icon={<BackIcon w={5} h={5} />}
             variant="ghost"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/hub')}
             borderRadius="full"
           />
           <VStack align="flex-start" spacing={0}>
@@ -645,6 +666,17 @@ export const WorkspaceStudio: React.FC = () => {
                     Copy Link
                   </Button>
                 </SimpleGrid>
+                <Button
+                  leftIcon={<DownloadIcon w={4} h={4} />}
+                  w="full"
+                  mt={3}
+                  size="sm"
+                  colorScheme="purple"
+                  onClick={handleExportReport}
+                  borderRadius="xl"
+                >
+                  Export Audit Report (JSON)
+                </Button>
                 <Button
                   leftIcon={<RefreshIcon w={4} h={4} />}
                   w="full"

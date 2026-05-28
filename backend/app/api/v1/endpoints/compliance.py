@@ -120,3 +120,38 @@ async def get_compliance_report(
         "score": report.score,
         "issues": report.issues
     }
+
+@router.get("/{job_id}/report")
+async def get_accessibility_report(
+    job_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Export the detailed Accessibility Report (JSON) for a completed media job.
+    """
+    from app.services.compliance_analyzer import generate_accessibility_report
+    
+    job = db.query(MediaJob).filter(MediaJob.job_id == job_id, MediaJob.user_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    if job.status != "completed" or not job.s3_key_processed:
+        raise HTTPException(status_code=400, detail="Job is not complete")
+        
+    profile = db.query(VisionProfile).filter(VisionProfile.user_id == current_user.id).first()
+    cvd_type = profile.cvd_type if profile else "deuteranopia"
+    
+    file_ext = os.path.splitext(job.s3_key_processed)[1] if job.s3_key_processed else ".jpg"
+    local_path = f"/tmp/{job_id}_report{file_ext}"
+    os.makedirs("/tmp", exist_ok=True)
+    
+    try:
+        storage_service.download_file(job.s3_key_processed, local_path)
+        report = generate_accessibility_report(local_path, job.media_type, cvd_type)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(local_path):
+            os.remove(local_path)

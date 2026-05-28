@@ -20,6 +20,7 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { complianceService, type ComplianceReportResponse } from '../services/compliance';
+import api from '../services/api';
 
 // SVG Icons
 const WarningIcon = (props: any) => (
@@ -83,6 +84,26 @@ export const ComplianceReportModal: FC<Props> = ({ isOpen, onClose, jobId }) => 
       toast({ title: "Audit Failed", status: "error" });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    if (!jobId) return;
+    try {
+      const response = await api.get(`compliance/${jobId}/report`, {
+        responseType: 'blob'
+      });
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `accessibility_report_${jobId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: "Export Failed", status: "error" });
     }
   };
 
@@ -175,9 +196,14 @@ export const ComplianceReportModal: FC<Props> = ({ isOpen, onClose, jobId }) => 
         <ModalFooter borderTopWidth="1px" bg="gray.50" borderBottomRadius="xl">
           <Button variant="ghost" onClick={onClose}>Close</Button>
           {report && (
-            <Button colorScheme="blue" ml={3} onClick={handleRunCheck} isLoading={isGenerating}>
-              Re-Run Audit
-            </Button>
+            <>
+              <Button colorScheme="purple" ml={3} onClick={handleExportReport}>
+                Export Audit Report (JSON)
+              </Button>
+              <Button colorScheme="blue" ml={3} onClick={handleRunCheck} isLoading={isGenerating}>
+                Re-Run Audit
+              </Button>
+            </>
           )}
         </ModalFooter>
       </ModalContent>
