@@ -32,9 +32,22 @@ import {
   VStack,
   Card,
   CardBody,
-  CardFooter
+  CardFooter,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  Select,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItemOption,
+  MenuOptionGroup
 } from '@chakra-ui/react';
-import { FiGrid, FiList, FiTrash2, FiShare2, FiDownload, FiFileText, FiAlertCircle } from 'react-icons/fi';
+import { FiGrid, FiList, FiTrash2, FiShare2, FiDownload, FiFileText, FiAlertCircle, FiChevronUp, FiChevronDown, FiSearch, FiFilter } from 'react-icons/fi';
 import { mediaService, type MediaHistoryResponse } from '../services/media';
 import { ComplianceReportModal } from './ComplianceReportModal';
 
@@ -72,6 +85,17 @@ export const DashboardHistory: FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(
     (localStorage.getItem('chromashift_view_mode') as 'list' | 'grid') || 'grid'
   );
+  
+  // Sorting state
+  type SortField = 'filename' | 'type' | 'created_at' | 'status';
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Search, Filter and Grid State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterTypes, setFilterTypes] = useState<string[]>(['image', 'video', 'pdf']);
+  const [gridSize, setGridSize] = useState(3);
+  const columns = 7 - gridSize;
   
   // Deletion state
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
@@ -234,11 +258,48 @@ export const DashboardHistory: FC = () => {
     return <Center p={10}><Spinner size="xl" color="blue.500" /></Center>;
   }
 
+  const filteredHistory = history.filter(item => {
+    const matchesSearch = item.filename.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterTypes.length === 0 || filterTypes.includes(item.type);
+    return matchesSearch && matchesFilter;
+  });
+
+  const sortedHistory = [...filteredHistory].sort((a, b) => {
+    let valA = a[sortField];
+    let valB = b[sortField];
+    
+    if (sortField === 'created_at') {
+      valA = new Date(valA).getTime();
+      valB = new Date(valB).getTime();
+    } else if (typeof valA === 'string' && typeof valB === 'string') {
+      valA = valA.toLowerCase();
+      valB = valB.toLowerCase();
+    }
+
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <Icon as={FiChevronDown} opacity={0.3} ml={1} />;
+    return <Icon as={sortDirection === 'asc' ? FiChevronUp : FiChevronDown} ml={1} />;
+  };
+
   return (
     <>
       <Box className="w-full max-w-5xl mx-auto mt-10 p-6 rounded-2xl shadow-xl bg-white border border-gray-100">
         {/* Header and Control Bar */}
-        <Flex align="center" justify="space-between" mb={6} flexWrap="wrap" gap={4}>
+        <Flex align="center" justify="space-between" mb={4} flexWrap="wrap" gap={4}>
           <VStack align="flex-start" spacing={0.5}>
             <Text fontSize="2xl" fontWeight="black" color="gray.800">Recent Uploads</Text>
             <Text fontSize="sm" color="gray.500">Manage, preview, and audit your CVD-remapped files</Text>
@@ -277,6 +338,50 @@ export const DashboardHistory: FC = () => {
               </Tooltip>
             </HStack>
 
+            {viewMode === 'grid' && (
+              <Menu>
+                <MenuButton 
+                  as={Button} 
+                  size="sm"
+                  variant="outline"
+                  bg="white"
+                  borderRadius="xl"
+                  fontWeight="medium"
+                  color="gray.700"
+                  boxShadow="sm"
+                  rightIcon={<FiChevronDown />}
+                  _hover={{ bg: "gray.50" }}
+                >
+                  Sort: {
+                    sortField === 'created_at' && sortDirection === 'desc' ? 'Newest' :
+                    sortField === 'created_at' && sortDirection === 'asc' ? 'Oldest' :
+                    sortField === 'filename' ? 'Filename' :
+                    sortField === 'type' ? 'Type' : 'Status'
+                  }
+                </MenuButton>
+                <MenuList borderRadius="xl" boxShadow="lg" p={2} zIndex={10}>
+                  <MenuOptionGroup 
+                    type="radio" 
+                    value={`${sortField}-${sortDirection}`}
+                    onChange={(val) => {
+                      const [field, dir] = (val as string).split('-');
+                      setSortField(field as SortField);
+                      setSortDirection(dir as 'asc' | 'desc');
+                    }}
+                  >
+                    <MenuItemOption value="created_at-desc" borderRadius="md" _hover={{ bg: "gray.50" }}>Newest First</MenuItemOption>
+                    <MenuItemOption value="created_at-asc" borderRadius="md" _hover={{ bg: "gray.50" }}>Oldest First</MenuItemOption>
+                    <MenuItemOption value="filename-asc" borderRadius="md" _hover={{ bg: "gray.50" }}>Filename (A-Z)</MenuItemOption>
+                    <MenuItemOption value="filename-desc" borderRadius="md" _hover={{ bg: "gray.50" }}>Filename (Z-A)</MenuItemOption>
+                    <MenuItemOption value="type-asc" borderRadius="md" _hover={{ bg: "gray.50" }}>Type (A-Z)</MenuItemOption>
+                    <MenuItemOption value="type-desc" borderRadius="md" _hover={{ bg: "gray.50" }}>Type (Z-A)</MenuItemOption>
+                    <MenuItemOption value="status-asc" borderRadius="md" _hover={{ bg: "gray.50" }}>Status (A-Z)</MenuItemOption>
+                    <MenuItemOption value="status-desc" borderRadius="md" _hover={{ bg: "gray.50" }}>Status (Z-A)</MenuItemOption>
+                  </MenuOptionGroup>
+                </MenuList>
+              </Menu>
+            )}
+
             <Button
               leftIcon={<FiTrash2 />}
               size="sm"
@@ -292,7 +397,72 @@ export const DashboardHistory: FC = () => {
           </HStack>
         </Flex>
 
-        {history.length === 0 ? (
+        {/* Search, Filter, and Grid Size Toolbar */}
+        <Flex gap={4} mb={6} flexWrap="wrap" align="center">
+          <InputGroup maxW={{ base: '100%', md: '300px' }} size="sm">
+            <InputLeftElement pointerEvents="none">
+              <FiSearch color="gray.400" />
+            </InputLeftElement>
+            <Input 
+              placeholder="Search by filename..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              borderRadius="xl"
+              bg="white"
+            />
+          </InputGroup>
+          
+          <Menu closeOnSelect={false}>
+            <MenuButton 
+              as={Button} 
+              size="sm"
+              leftIcon={<FiFilter />} 
+              rightIcon={<FiChevronDown />}
+              bg="white"
+              borderRadius="xl"
+              fontWeight="medium"
+              color="gray.700"
+              boxShadow="sm"
+              border="1px"
+              borderColor="gray.200"
+              _hover={{ bg: "gray.50" }}
+            >
+              Filter ({filterTypes.length === 3 ? 'All' : filterTypes.length})
+            </MenuButton>
+            <MenuList borderRadius="xl" boxShadow="lg" p={2} zIndex={10}>
+              <MenuOptionGroup 
+                type="checkbox" 
+                value={filterTypes} 
+                onChange={(val) => setFilterTypes(val as string[])}
+              >
+                <MenuItemOption value="image" borderRadius="md" _hover={{ bg: "gray.50" }}>Images</MenuItemOption>
+                <MenuItemOption value="video" borderRadius="md" _hover={{ bg: "gray.50" }}>Videos</MenuItemOption>
+                <MenuItemOption value="pdf" borderRadius="md" _hover={{ bg: "gray.50" }}>PDFs</MenuItemOption>
+              </MenuOptionGroup>
+            </MenuList>
+          </Menu>
+          
+          {viewMode === 'grid' && (
+            <HStack spacing={3} flex={1} maxW="200px" ml={{ base: 0, md: 'auto' }} w={{ base: '100%', md: 'auto' }}>
+              <Text fontSize="xs" color="gray.500" whiteSpace="nowrap" fontWeight="bold">Grid Size</Text>
+              <Slider 
+                min={1} 
+                max={5} 
+                step={1} 
+                value={gridSize} 
+                onChange={(v) => setGridSize(v)}
+                colorScheme="blue"
+              >
+                <SliderTrack bg="gray.200">
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb boxSize={4} shadow="sm" />
+              </Slider>
+            </HStack>
+          )}
+        </Flex>
+
+        {sortedHistory.length === 0 ? (
           <Center py={16} border="2px" borderStyle="dashed" borderColor="gray.200" borderRadius="2xl">
             <VStack spacing={3}>
               <Icon as={FiFileText} w={10} h={10} color="gray.300" />
@@ -304,8 +474,8 @@ export const DashboardHistory: FC = () => {
           </Center>
         ) : viewMode === 'grid' ? (
           /* Grid View Layout with previews */
-          <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={6}>
-            {history.map((item) => (
+          <SimpleGrid columns={{ base: 1, sm: Math.max(1, columns - 2), md: Math.max(2, columns - 1), lg: columns }} spacing={6}>
+            {sortedHistory.map((item) => (
               <Card 
                 key={item.job_id} 
                 borderRadius="xl" 
@@ -411,32 +581,45 @@ export const DashboardHistory: FC = () => {
                 </AspectRatio>
 
                 {/* Card Title & Info */}
-                <CardBody p={4} pb={2}>
-                  <VStack align="stretch" spacing={2.5}>
-                    <Text fontWeight="bold" fontSize="md" color="gray.800" noOfLines={1} title={item.filename}>
-                      {item.filename}
-                    </Text>
-                    <HStack justify="space-between" align="center">
-                      <HStack spacing={1.5}>
-                        {getTypeBadge(item.type)}
-                        {getStatusBadge(item.status)}
-                      </HStack>
-                      <Text color="gray.400" fontSize="2xs" fontWeight="semibold">
-                        {new Date(item.created_at).toLocaleDateString()}
+                <CardBody p={columns >= 4 ? 3 : 4} pb={2}>
+                  {columns >= 5 ? (
+                    <HStack justify="space-between" align="center" spacing={2} w="100%">
+                      <Text flex="1" fontWeight="bold" fontSize="xs" color="gray.800" noOfLines={1} title={item.filename}>
+                        {item.filename}
                       </Text>
+                      <Box flexShrink={0}>
+                        {getTypeBadge(item.type)}
+                      </Box>
                     </HStack>
-                  </VStack>
+                  ) : (
+                    <VStack align="stretch" spacing={columns >= 4 ? 1.5 : 2.5}>
+                      <Text fontWeight="bold" fontSize={columns >= 4 ? "sm" : "md"} color="gray.800" noOfLines={1} title={item.filename}>
+                        {item.filename}
+                      </Text>
+                      <HStack justify="space-between" align="center">
+                        <HStack spacing={1.5}>
+                          {getTypeBadge(item.type)}
+                          {getStatusBadge(item.status)}
+                        </HStack>
+                        {columns < 4 && (
+                          <Text color="gray.400" fontSize="2xs" fontWeight="semibold">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </Text>
+                        )}
+                      </HStack>
+                    </VStack>
+                  )}
                 </CardBody>
 
                 {/* Card Actions Footer */}
-                <CardFooter px={4} py={3} borderTop="1px" borderColor="gray.50" bg="gray.50/50">
-                  <HStack w="100%" spacing={1.5} justify="space-between">
-                    <HStack spacing={1.5}>
+                <CardFooter px={columns >= 5 ? 2 : 4} py={3} borderTop="1px" borderColor="gray.50" bg="gray.50/50">
+                  <HStack w="100%" spacing={1} justify="space-between">
+                    <HStack spacing={1}>
                       <Tooltip label="Open in Studio Workspace" hasArrow>
                         <IconButton
                           aria-label="Studio Workspace"
-                          icon={<Icon as={StudioIcon} w={4} h={4} />}
-                          size="sm"
+                          icon={<Icon as={StudioIcon} w={columns >= 5 ? 3 : 4} h={columns >= 5 ? 3 : 4} />}
+                          size={columns >= 5 ? "xs" : "sm"}
                           colorScheme="blue"
                           borderRadius="lg"
                           isDisabled={item.status !== 'completed'}
@@ -447,8 +630,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="WCAG Compliance Audit Report" hasArrow>
                         <IconButton
                           aria-label="WCAG Report"
-                          icon={<Icon as={AuditIcon} w={4} h={4} />}
-                          size="sm"
+                          icon={<Icon as={AuditIcon} w={columns >= 5 ? 3 : 4} h={columns >= 5 ? 3 : 4} />}
+                          size={columns >= 5 ? "xs" : "sm"}
                           colorScheme="teal"
                           variant="outline"
                           borderRadius="lg"
@@ -460,8 +643,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Copy Public Share Link" hasArrow>
                         <IconButton
                           aria-label="Share"
-                          icon={<FiShare2 />}
-                          size="sm"
+                          icon={<FiShare2 size={columns >= 5 ? 12 : 16} />}
+                          size={columns >= 5 ? "xs" : "sm"}
                           variant="ghost"
                           colorScheme="blue"
                           borderRadius="lg"
@@ -471,12 +654,12 @@ export const DashboardHistory: FC = () => {
                       </Tooltip>
                     </HStack>
 
-                    <HStack spacing={1.5}>
+                    <HStack spacing={1}>
                       <Tooltip label="Download Processed Media" hasArrow>
                         <IconButton
                           aria-label="Download"
-                          icon={<FiDownload />}
-                          size="sm"
+                          icon={<FiDownload size={columns >= 5 ? 12 : 16} />}
+                          size={columns >= 5 ? "xs" : "sm"}
                           variant="outline"
                           colorScheme="blue"
                           borderRadius="lg"
@@ -488,8 +671,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Delete Upload Permanently" hasArrow>
                         <IconButton
                           aria-label="Delete File"
-                          icon={<FiTrash2 />}
-                          size="sm"
+                          icon={<FiTrash2 size={columns >= 5 ? 12 : 16} />}
+                          size={columns >= 5 ? "xs" : "sm"}
                           colorScheme="red"
                           variant="ghost"
                           borderRadius="lg"
@@ -509,15 +692,15 @@ export const DashboardHistory: FC = () => {
             <Table variant="simple" size="md">
               <Thead bg="gray.50">
                 <Tr>
-                  <Th py={4}>Filename</Th>
-                  <Th py={4}>Type</Th>
-                  <Th py={4}>Date</Th>
-                  <Th py={4}>Status</Th>
+                  <Th py={4} cursor="pointer" onClick={() => handleSort('filename')}>Filename <SortIcon field="filename" /></Th>
+                  <Th py={4} cursor="pointer" onClick={() => handleSort('type')}>Type <SortIcon field="type" /></Th>
+                  <Th py={4} cursor="pointer" onClick={() => handleSort('created_at')}>Date <SortIcon field="created_at" /></Th>
+                  <Th py={4} cursor="pointer" onClick={() => handleSort('status')}>Status <SortIcon field="status" /></Th>
                   <Th py={4} textAlign="right">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {history.map((item) => (
+                {sortedHistory.map((item) => (
                   <Tr key={item.job_id} _hover={{ bg: "gray.50/50" }} transition="background 0.2s">
                     <Td py={3}>
                       {/* Premium List Item Thumbnail & Text Row */}
