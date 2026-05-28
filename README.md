@@ -11,8 +11,8 @@
   - **Images**: Real-time client-side preview (TensorFlow.js) and high-fidelity server-side processing (TransUNet).
   - **Videos**: Flicker-free temporal coherence processing using Optical Flow.
   - **Documents**: Structural PDF parsing and chart-aware recoloring.
-- **🛡️ WCAG 2.1 Audit**: Automated accessibility checks (SC 1.4.1, 1.4.3, 1.4.11) with actionable remediation feedback.
-- **🔐 Privacy & Security**: JWT-based authentication and 7-day auto-expiry policies for all processed media.
+- **🛡️ WCAG 2.1 Audit & Accessibility Report**: Automated accessibility checks (SC 1.4.1, 1.4.3, 1.4.11) with actionable remediation feedback. Generate and export a detailed **Accessibility Report (JSON)** containing specific failing color pairs and calculated WCAG-compliant alternatives.
+- **🔐 Privacy & Security**: Strict data minimization and a 7-day auto-expiry policy. For full details on our security practices, please read [SECURITY.md](SECURITY.md).
 
 ---
 

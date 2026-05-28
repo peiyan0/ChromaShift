@@ -22,6 +22,23 @@ class InferenceService:
         img = np.transpose(img, (2, 0, 1))  # HWC to CHW
         return np.expand_dims(img, axis=0)
 
+    def generate_structural_mask(self, image):
+        """
+        Uses OpenCV heuristics to identify text and fine structural details.
+        Returns a mask (same size as image) where 0 = text/detail (do not remap) and 1 = large areas (remap).
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Edge detection
+        edges = cv2.Canny(gray, 50, 150)
+        # Dilate edges to cover character strokes
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        dilated_edges = cv2.dilate(edges, kernel, iterations=1)
+        
+        # Normalize and invert: text=0, background=1
+        text_mask = (dilated_edges / 255.0).astype(np.float32)
+        structural_mask = 1.0 - text_mask
+        return structural_mask
+
     def remap_colors(self, image, intensity=1.5, cvd_type="deuteranopia"):
         input_tensor = self.preprocess(image)
         outputs = self.session.run(None, {self.input_name: input_tensor})
@@ -29,6 +46,10 @@ class InferenceService:
         
         # Resize mask back to original image size
         mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
+        
+        # Apply OpenCV heuristic to suppress remapping on text/fine details
+        structural_mask = self.generate_structural_mask(image)
+        mask = mask * structural_mask
         
         # Hybrid Adaptive Remapping Logic
         result = image.copy().astype(np.float32)
