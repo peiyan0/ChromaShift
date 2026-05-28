@@ -66,6 +66,24 @@ export const DragDropUpload: React.FC = () => {
     setActiveTab(0);
   };
 
+  const loadSample = async (url: string, filename: string, type: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const sampleFile = new File([blob], filename, { type });
+      validateAndSetFile(sampleFile);
+      toast({
+        title: "Sample Loaded",
+        description: `Loaded ${filename} successfully.`,
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (e) {
+      toast({ title: 'Failed to load sample', status: 'error' });
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setIsUploading(true);
@@ -98,7 +116,7 @@ export const DragDropUpload: React.FC = () => {
           });
 
           // Redirect to dashboard to see the result
-          setTimeout(() => navigate('/'), 1500);
+          setTimeout(() => navigate('/hub'), 1500);
         } else if (statusRes.status === 'failed') {
           clearInterval(pollInterval);
           setIsUploading(false);
@@ -143,7 +161,8 @@ export const DragDropUpload: React.FC = () => {
         </Text>
 
         {!file ? (
-          <Box
+          <>
+            <Box
             w="full"
             p={12}
             border="2px dashed"
@@ -174,6 +193,23 @@ export const DragDropUpload: React.FC = () => {
               accept="image/jpeg,image/png,image/webp,video/mp4,application/pdf"
             />
           </Box>
+          <Box w="full" mt={2}>
+            <Text fontSize="sm" color="gray.500" textAlign="center" mb={3} fontWeight="medium">
+              Don't have a file? Try our sample media:
+            </Text>
+            <HStack justify="center" spacing={4} flexWrap="wrap">
+              <Button size="sm" variant="outline" colorScheme="blue" borderRadius="full" onClick={() => loadSample('/sample%20img%201.png', 'sample_chart.png', 'image/png')}>
+                Sample Image
+              </Button>
+              <Button size="sm" variant="outline" colorScheme="purple" borderRadius="full" onClick={() => loadSample('/sample%20vid%202.mp4', 'sample_video.mp4', 'video/mp4')}>
+                Sample Video
+              </Button>
+              <Button size="sm" variant="outline" colorScheme="orange" borderRadius="full" onClick={() => loadSample('/sample%20pdf%201.pdf', 'sample_report.pdf', 'application/pdf')}>
+                Sample PDF
+              </Button>
+            </HStack>
+          </Box>
+          </>
         ) : (
           <VStack spacing={5} w="full">
             {/* Selected File Details */}
