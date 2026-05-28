@@ -453,7 +453,7 @@ export const CalibrationWizard: FC = () => {
           const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
           return {
             ...h,
-            alpha: h.alpha + likelihood
+            alpha: h.alpha * likelihood
           };
         });
       } else {
@@ -465,7 +465,7 @@ export const CalibrationWizard: FC = () => {
           const likelihood = selected === 'A' ? pA : 1.0 - pA;
           return {
             ...h,
-            alpha: h.alpha + likelihood
+            alpha: h.alpha * likelihood
           };
         });
       }
@@ -641,9 +641,9 @@ export const CalibrationWizard: FC = () => {
                     <Box className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
                       <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                     </Box>
-                    <Text fontWeight="bold" color="gray.800">5-Round Anomaloscope</Text>
+                    <Text fontWeight="bold" color="gray.800">Adaptive Anomaloscope</Text>
                     <Text fontSize="sm" color="gray.500">
-                      Plays a short interactive game comparing two custom generated plates to pinpoint your exact visual deficiency.
+                      Plays an interactive game (up to 10 rounds) comparing dynamically generated plates to pinpoint your exact visual deficiency.
                     </Text>
                   </CardBody>
                 </Card>
@@ -657,7 +657,7 @@ export const CalibrationWizard: FC = () => {
                     </Box>
                     <Text fontWeight="bold" color="gray.800">Active Learning</Text>
                     <Text fontSize="sm" color="gray.500">
-                      Uses entropy minimization and Bayes theorem to dynamically choose queries that extract the most information.
+                      Driven by Bayesian optimization and real-time in-browser WebGPU heuristics to dynamically choose queries without latency.
                     </Text>
                   </CardBody>
                 </Card>
@@ -671,7 +671,7 @@ export const CalibrationWizard: FC = () => {
                     </Box>
                     <Text fontWeight="bold" color="gray.800">Custom 3x3 Matrices</Text>
                     <Text fontSize="sm" color="gray.500">
-                      Calculates an individualized correction matrix to instantly Daltonize your real-time camera and media uploads.
+                      Calculates an individualized physiological correction matrix to instantly Daltonize your real-time camera and media uploads.
                     </Text>
                   </CardBody>
                 </Card>
@@ -947,7 +947,7 @@ export const CalibrationWizard: FC = () => {
                       {/* Severity Slider */}
                       <Box>
                         <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Correction Strength (Severity)</Text>
+                          <Text fontWeight="bold" color="gray.600">Photo Severity</Text>
                           <Text fontWeight="black" color="blue.600">{customSeverity.toFixed(2)}</Text>
                         </HStack>
                         <Slider
@@ -971,7 +971,7 @@ export const CalibrationWizard: FC = () => {
                       {/* Intensity Slider */}
                       <Box>
                         <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Overall Filter Intensity</Text>
+                          <Text fontWeight="bold" color="gray.600">Text Clarity (Filter Intensity)</Text>
                           <Text fontWeight="black" color="blue.600">{(customIntensity * 100).toFixed(0)}%</Text>
                         </HStack>
                         <Slider
@@ -993,7 +993,7 @@ export const CalibrationWizard: FC = () => {
                       <Grid templateColumns="1fr 1fr" gap={4}>
                         <Box>
                           <HStack justify="space-between" mb={2} fontSize="xs">
-                            <Text fontWeight="bold" color="gray.500">Contrast Boost</Text>
+                            <Text fontWeight="bold" color="gray.500">Chart Contrast</Text>
                             <Text fontWeight="black" color="blue.600">{(customContrast * 100).toFixed(0)}%</Text>
                           </HStack>
                           <Slider

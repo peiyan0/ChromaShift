@@ -213,7 +213,8 @@ export const LandingPage: React.FC = () => {
           <VStack>
             <Badge colorScheme="gray" mb={2}>Original Vision</Badge>
             <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="gray.200" w="full">
-              <img src="/sample%20img%201.png" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} />
+              <img src="/gen1.webp" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} />
+              {/* <img src="/sample%20img%201.png" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} /> */}
             </Box>
           </VStack>
           
@@ -223,7 +224,8 @@ export const LandingPage: React.FC = () => {
               <Box position="absolute" top={3} right={3} bg="blue.500" color="white" px={3} py={1} borderRadius="full" fontSize="xs" fontWeight="bold" shadow="md" zIndex={10}>
                 GPU Filter Active
               </Box>
-              <img src="/sample%20img%201.png" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
+              <img src="/gen1.webp" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
+              {/* <img src="/sample%20img%201.png" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} /> */}
             </Box>
           </VStack>
         </SimpleGrid>
@@ -248,15 +250,15 @@ export const LandingPage: React.FC = () => {
           </Text>
         </VStack>
         
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10}>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
           <Card variant="unstyled" bg="transparent">
             <CardBody>
               <Box boxSize="48px" bg="blue.50" color="blue.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
                 <Icon as={FiZap} boxSize={6} />
               </Box>
-              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Hybrid Adaptive Engine</Heading>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Hardware-Accelerated Engine</Heading>
               <Text color="gray.600" lineHeight="tall">
-                Leveraging Vision Transformers (ViT) and RT-DETR object detection to understand semantic context before shifting colors, preserving the meaning of complex diagrams and dashboards.
+                Leveraging real-time WebGL and WebGPU pipelines to process high-resolution media in the browser, providing instantaneous Daltonization without server latency.
               </Text>
             </CardBody>
           </Card>
@@ -281,6 +283,18 @@ export const LandingPage: React.FC = () => {
               <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">WCAG 2.1 Compliance</Heading>
               <Text color="gray.600" lineHeight="tall">
                 Integrated automated compliance checker evaluating outputs against WCAG SC 1.4.1 (Use of Color) and SC 1.4.3 (Contrast Minimum) to generate actionable accessibility reports.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="orange.50" color="orange.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiFileText} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Accessibility Reports</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Export concrete JSON compliance reports detailing tested color pairs, contrast ratios, and actionable remediation suggestions. Perfect for design hand-offs and accessibility teams.
               </Text>
             </CardBody>
           </Card>
@@ -348,6 +362,55 @@ export const LandingPage: React.FC = () => {
             </VStack>
           </Box>
         </Flex>
+      </Box>
+
+      {/* Privacy & Security Section */}
+      <Box py={20} bg="white" borderRadius="3xl" shadow="sm" border="1px" borderColor="gray.100" px={8} mt={10} mb={10}>
+        <VStack spacing={4} mb={12} textAlign="center">
+          <Badge colorScheme="blue">Privacy by Design</Badge>
+          <Heading fontSize="3xl" fontWeight="black" color="gray.800">Your Data Stays Yours</Heading>
+          <Text fontSize="md" color="gray.500" maxW="2xl">
+            We treat accessibility data as sensitive health and corporate information. Our architecture is built on absolute data minimization.
+          </Text>
+        </VStack>
+        
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10}>
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="blue.50" color="blue.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiShield} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">7-Day Auto-Expiry</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                All uploaded media and processed counterparts are permanently deleted from our storage backend after 7 days. A chronological cron job ensures orphaned files are pruned automatically.
+              </Text>
+            </CardBody>
+          </Card>
+          
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="purple.50" color="purple.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiZap} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Local-First Execution</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                During calibration and live preview, we use WebGPU and TensorFlow.js so visual data never leaves your browser.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="green.50" color="green.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiEye} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Anonymous Calibration</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Vision profiles track mathematical transformation variables (contrast, severity matrices). We never ask for or require formal medical diagnoses.
+              </Text>
+            </CardBody>
+          </Card>
+        </SimpleGrid>
       </Box>
     </Box>
   );
