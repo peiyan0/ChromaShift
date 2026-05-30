@@ -678,6 +678,22 @@ export const CalibrationWizard: FC = () => {
               </GridItem>
             </Grid>
 
+            {diagnosedProfile && (
+              <Box w="full" maxW="4xl" mt={4} mb={2} p={6} bg="purple.50" borderRadius="2xl" border="1px" borderColor="purple.100" textAlign="left" shadow="sm">
+                <VStack align="start" spacing={1}>
+                  <Text fontSize="xs" fontWeight="black" textTransform="uppercase" color="purple.500" letterSpacing="wider">Active Vision Profile</Text>
+                  <Heading fontSize="xl" color="gray.800" textTransform="capitalize">
+                    {diagnosedProfile.type.replace('_', ' ')}
+                  </Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    Severity: <Text as="span" fontWeight="bold" color="purple.600">{(customSeverity * 100).toFixed(0)}%</Text> &nbsp;&bull;&nbsp; 
+                    Contrast: <Text as="span" fontWeight="bold" color="purple.600">{(customContrast * 100).toFixed(0)}%</Text> &nbsp;&bull;&nbsp; 
+                    Saturation: <Text as="span" fontWeight="bold" color="purple.600">{(customSaturation * 100).toFixed(0)}%</Text>
+                  </Text>
+                </VStack>
+              </Box>
+            )}
+
             <Button
               size="lg"
               px={10}
@@ -691,7 +707,7 @@ export const CalibrationWizard: FC = () => {
               onClick={startCalibration}
               shadow="lg"
             >
-              Start Interactive Calibration
+              {diagnosedProfile ? "Recalibrate Vision Profile" : "Start Interactive Calibration"}
             </Button>
           </VStack>
         )}
