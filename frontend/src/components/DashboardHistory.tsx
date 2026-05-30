@@ -488,7 +488,13 @@ export const DashboardHistory: FC = () => {
                 bg="white"
               >
                 {/* Visual Preview / Status Area */}
-                <AspectRatio ratio={16 / 9} bg="gray.50" overflow="hidden" position="relative" borderBottom="1px" borderColor="gray.100">
+                <Box 
+                  cursor="pointer" 
+                  onClick={() => { if (item.status === 'completed') navigate(`/workspace/${item.job_id}`) }}
+                  _hover={{ opacity: 0.9 }}
+                  transition="opacity 0.2s"
+                >
+                  <AspectRatio ratio={16 / 9} bg="gray.50" overflow="hidden" position="relative" borderBottom="1px" borderColor="gray.100">
                   <Box w="100%" h="100%">
                     {item.status === 'completed' ? (
                       item.type === 'image' ? (
@@ -584,7 +590,7 @@ export const DashboardHistory: FC = () => {
                 <CardBody p={columns >= 4 ? 3 : 4} pb={2}>
                   {columns >= 5 ? (
                     <HStack justify="space-between" align="center" spacing={2} w="100%">
-                      <Text flex="1" fontWeight="bold" fontSize="xs" color="gray.800" noOfLines={1} title={item.filename}>
+                      <Text flex="1" fontWeight="bold" fontSize="sm" color="gray.800" noOfLines={1} title={item.filename}>
                         {item.filename}
                       </Text>
                       <Box flexShrink={0}>
@@ -593,7 +599,7 @@ export const DashboardHistory: FC = () => {
                     </HStack>
                   ) : (
                     <VStack align="stretch" spacing={columns >= 4 ? 1.5 : 2.5}>
-                      <Text fontWeight="bold" fontSize={columns >= 4 ? "sm" : "md"} color="gray.800" noOfLines={1} title={item.filename}>
+                      <Text fontWeight="bold" fontSize={columns >= 4 ? "md" : "lg"} color="gray.800" noOfLines={1} title={item.filename}>
                         {item.filename}
                       </Text>
                       <HStack justify="space-between" align="center">
@@ -602,7 +608,7 @@ export const DashboardHistory: FC = () => {
                           {getStatusBadge(item.status)}
                         </HStack>
                         {columns < 4 && (
-                          <Text color="gray.400" fontSize="2xs" fontWeight="semibold">
+                          <Text color="gray.500" fontSize="xs" fontWeight="semibold">
                             {new Date(item.created_at).toLocaleDateString()}
                           </Text>
                         )}
@@ -610,6 +616,7 @@ export const DashboardHistory: FC = () => {
                     </VStack>
                   )}
                 </CardBody>
+                </Box>
 
                 {/* Card Actions Footer */}
                 <CardFooter px={columns >= 5 ? 2 : 4} py={3} borderTop="1px" borderColor="gray.50" bg="gray.50/50">
@@ -618,8 +625,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Open in Studio Workspace" hasArrow>
                         <IconButton
                           aria-label="Studio Workspace"
-                          icon={<Icon as={StudioIcon} w={columns >= 5 ? 3 : 4} h={columns >= 5 ? 3 : 4} />}
-                          size={columns >= 5 ? "xs" : "sm"}
+                          icon={<Icon as={StudioIcon} w={columns >= 5 ? 4 : 5} h={columns >= 5 ? 4 : 5} />}
+                          size={columns >= 5 ? "sm" : "md"}
                           colorScheme="blue"
                           borderRadius="lg"
                           isDisabled={item.status !== 'completed'}
@@ -630,8 +637,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="WCAG Compliance Audit Report" hasArrow>
                         <IconButton
                           aria-label="WCAG Report"
-                          icon={<Icon as={AuditIcon} w={columns >= 5 ? 3 : 4} h={columns >= 5 ? 3 : 4} />}
-                          size={columns >= 5 ? "xs" : "sm"}
+                          icon={<Icon as={AuditIcon} w={columns >= 5 ? 4 : 5} h={columns >= 5 ? 4 : 5} />}
+                          size={columns >= 5 ? "sm" : "md"}
                           colorScheme="teal"
                           variant="outline"
                           borderRadius="lg"
@@ -643,8 +650,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Copy Public Share Link" hasArrow>
                         <IconButton
                           aria-label="Share"
-                          icon={<FiShare2 size={columns >= 5 ? 12 : 16} />}
-                          size={columns >= 5 ? "xs" : "sm"}
+                          icon={<FiShare2 size={columns >= 5 ? 16 : 20} />}
+                          size={columns >= 5 ? "sm" : "md"}
                           variant="ghost"
                           colorScheme="blue"
                           borderRadius="lg"
@@ -658,8 +665,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Download Processed Media" hasArrow>
                         <IconButton
                           aria-label="Download"
-                          icon={<FiDownload size={columns >= 5 ? 12 : 16} />}
-                          size={columns >= 5 ? "xs" : "sm"}
+                          icon={<FiDownload size={columns >= 5 ? 16 : 20} />}
+                          size={columns >= 5 ? "sm" : "md"}
                           variant="outline"
                           colorScheme="blue"
                           borderRadius="lg"
@@ -671,8 +678,8 @@ export const DashboardHistory: FC = () => {
                       <Tooltip label="Delete Upload Permanently" hasArrow>
                         <IconButton
                           aria-label="Delete File"
-                          icon={<FiTrash2 size={columns >= 5 ? 12 : 16} />}
-                          size={columns >= 5 ? "xs" : "sm"}
+                          icon={<FiTrash2 size={columns >= 5 ? 16 : 20} />}
+                          size={columns >= 5 ? "sm" : "md"}
                           colorScheme="red"
                           variant="ghost"
                           borderRadius="lg"
@@ -701,8 +708,14 @@ export const DashboardHistory: FC = () => {
               </Thead>
               <Tbody>
                 {sortedHistory.map((item) => (
-                  <Tr key={item.job_id} _hover={{ bg: "gray.50/50" }} transition="background 0.2s">
-                    <Td py={3}>
+                  <Tr 
+                    key={item.job_id} 
+                    _hover={{ bg: "gray.50" }} 
+                    transition="background 0.2s" 
+                    cursor="pointer" 
+                    onClick={() => { if(item.status === 'completed') navigate(`/workspace/${item.job_id}`) }}
+                  >
+                    <Td py={4}>
                       {/* Premium List Item Thumbnail & Text Row */}
                       <HStack spacing={3}>
                         {item.status === 'completed' && item.type === 'image' && item.download_url ? (
@@ -743,19 +756,19 @@ export const DashboardHistory: FC = () => {
                             {item.status === 'processing' ? <Spinner size="xs" /> : <Icon as={FiFileText} w={5} h={5} />}
                           </Center>
                         )}
-                        <Text fontWeight="bold" color="gray.700" noOfLines={1} maxW="xs">{item.filename}</Text>
+                        <Text fontWeight="bold" fontSize="md" color="gray.800" noOfLines={1} maxW="xs">{item.filename}</Text>
                       </HStack>
                     </Td>
-                    <Td py={3}>{getTypeBadge(item.type)}</Td>
-                    <Td py={3} color="gray.500" fontSize="xs" fontWeight="semibold">
+                    <Td py={4}>{getTypeBadge(item.type)}</Td>
+                    <Td py={4} color="gray.600" fontSize="sm" fontWeight="semibold">
                       {new Date(item.created_at).toLocaleString()}
                     </Td>
-                    <Td py={3}>{getStatusBadge(item.status)}</Td>
-                    <Td py={3} textAlign="right">
-                      <HStack justify="flex-end" spacing={1.5}>
+                    <Td py={4}>{getStatusBadge(item.status)}</Td>
+                    <Td py={4} textAlign="right" onClick={(e) => e.stopPropagation()}>
+                      <HStack justify="flex-end" spacing={2}>
                         <Button
-                          leftIcon={<StudioIcon w={4} h={4} />}
-                          size="sm"
+                          leftIcon={<StudioIcon w={5} h={5} />}
+                          size="md"
                           colorScheme="blue"
                           borderRadius="lg"
                           isDisabled={item.status !== 'completed'}
@@ -764,8 +777,8 @@ export const DashboardHistory: FC = () => {
                           Workspace
                         </Button>
                         <Button
-                          leftIcon={<AuditIcon w={4} h={4} />}
-                          size="sm"
+                          leftIcon={<AuditIcon w={5} h={5} />}
+                          size="md"
                           colorScheme="teal"
                           variant="outline"
                           borderRadius="lg"
@@ -777,8 +790,8 @@ export const DashboardHistory: FC = () => {
                         <Tooltip label="Copy Share Link" hasArrow>
                           <IconButton 
                             aria-label="Share" 
-                            icon={<ShareIcon w={4} h={4} />} 
-                            size="sm" 
+                            icon={<ShareIcon w={5} h={5} />} 
+                            size="md" 
                             variant="ghost"
                             colorScheme="blue"
                             borderRadius="lg"
@@ -789,8 +802,8 @@ export const DashboardHistory: FC = () => {
                         <Tooltip label="Download Processed" hasArrow>
                           <IconButton 
                             aria-label="Download"
-                            icon={<DownloadIcon w={4} h={4} />} 
-                            size="sm" 
+                            icon={<DownloadIcon w={5} h={5} />} 
+                            size="md" 
                             variant="outline"
                             colorScheme="blue"
                             borderRadius="lg"
