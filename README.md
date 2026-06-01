@@ -8,7 +8,7 @@
 
 - **🎯 Personalized Vision Calibration**: An interactive Bayesian optimization wizard that fine-tunes a unique transformation matrix for your specific color perception.
 - **🧠 Semantic Media Remapping**: 
-  - **Images**: Real-time client-side preview (TensorFlow.js) and high-fidelity server-side processing (TransUNet).
+  - **Images**: Real-time client-side preview (MobileSAM via TensorFlow.js) and high-fidelity server-side processing (MobileViT-S + YOLOv8n Cascade).
   - **Videos**: Flicker-free temporal coherence processing using Optical Flow.
   - **Documents**: Structural PDF parsing and chart-aware recoloring.
 - **🛡️ WCAG 2.1 Audit & Accessibility Report**: Automated accessibility checks (SC 1.4.1, 1.4.3, 1.4.11) with actionable remediation feedback. Generate and export a detailed **Accessibility Report (JSON)** containing specific failing color pairs and calculated WCAG-compliant alternatives.
@@ -65,7 +65,7 @@
 ## 🏗️ Architecture
 
 The platform uses a **three-tier hybrid architecture**:
-1.  **Frontend**: Handles real-time previews using lightweight ONNX models via TensorFlow.js to provide instant feedback (< 3s).
+1.  **Frontend**: Handles real-time previews using MobileSAM ONNX models (with SLIC fallback) via TensorFlow.js to provide instant feedback (< 3s).
 2.  **Backend API**: Orchestrates heavy-duty AI processing, compliance audits, and storage management.
 3.  **Storage Layer**: Maintains user profiles and media with strict lifecycle policies.
 
