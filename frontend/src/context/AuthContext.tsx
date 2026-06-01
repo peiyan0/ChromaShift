@@ -74,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('isGuest');
+    localStorage.removeItem('chromashift_cvd_profile');
     setIsAuthenticated(false);
     setIsGuest(false);
     setIsAdmin(false);

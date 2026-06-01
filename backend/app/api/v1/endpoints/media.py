@@ -16,7 +16,7 @@ from app.services.media_processor import MediaProcessor
 router = APIRouter()
 processor = MediaProcessor()
 
-def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float):
+def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float, auto_loop: bool = True):
     """
     Background task to process media using the AI models.
     """
@@ -42,18 +42,50 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         storage_service.download_file(s3_key, local_input)
         print(f"File downloaded for processing: {local_input}")
         
-        # 3. Process using AI models
         # Determine media type for processing
-        if file_ext.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
-            processor.process_image(local_input, local_output, cvd_type, severity)
-        elif file_ext.lower() in ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v']:
-            processor.process_video(local_input, local_output, cvd_type, severity)
+        media_type = "image"
+        if file_ext.lower() in ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v']:
+            media_type = "video"
         elif file_ext.lower() == '.pdf':
-            processor.process_pdf(local_input, local_output, cvd_type, severity)
-        else:
-            # Fallback for unknown types
-            import shutil
-            shutil.copy2(local_input, local_output)
+            media_type = "pdf"
+            
+        # 3. Process using AI models with Automated WCAG Iterative Loop
+        from app.services.compliance_analyzer import analyze_media_compliance
+        
+        max_iterations = 5
+        iteration = 0
+        current_severity = severity
+        passed = False
+        
+        while iteration < max_iterations and not passed:
+            iteration += 1
+            if media_type == "image":
+                processor.process_image(local_input, local_output, cvd_type, current_severity)
+            elif media_type == "video":
+                processor.process_video(local_input, local_output, cvd_type, current_severity)
+            elif media_type == "pdf":
+                processor.process_pdf(local_input, local_output, cvd_type, current_severity)
+            else:
+                import shutil
+                shutil.copy2(local_input, local_output)
+                passed = True
+                break
+                
+            try:
+                report = analyze_media_compliance(local_output, media_type, cvd_type)
+                
+                if not auto_loop:
+                    passed = True
+                    print(f"Manual severity used. WCAG score {report.get('score')} at severity {current_severity}")
+                elif report["status"] == "pass" or current_severity >= 2.0:
+                    passed = True
+                    print(f"WCAG loop completed: Passed with score {report.get('score')} at severity {current_severity}")
+                else:
+                    current_severity += 0.25
+                    print(f"WCAG loop: Iteration {iteration} failed (score {report.get('score')}). Increasing severity to {current_severity}...")
+            except Exception as e:
+                print(f"WCAG check failed during loop: {e}")
+                passed = True # Break out safely
             
         print(f"File processed: {local_output}")
         
@@ -83,6 +115,25 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
             except Exception as thumb_err:
                 print(f"Error generating PDF thumbnail: {thumb_err}")
         
+        # 4c. Generate Video thumbnail
+        elif file_ext.lower() in ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.m4v']:
+            try:
+                import cv2
+                cap = cv2.VideoCapture(local_output)
+                ret, frame = cap.read()
+                cap.release()
+                if ret:
+                    local_thumb = f"/tmp/{job_id}_thumb.png"
+                    os.makedirs('/tmp', exist_ok=True)
+                    cv2.imwrite(local_thumb, frame)
+                    thumb_key = f"processed/{job_id}_processed_thumb.png"
+                    storage_service.upload_from_path(local_thumb, thumb_key)
+                    print(f"Video thumbnail generated and uploaded to {thumb_key}")
+                    if os.path.exists(local_thumb):
+                        os.remove(local_thumb)
+            except Exception as thumb_err:
+                print(f"Error generating Video thumbnail: {thumb_err}")
+
         # 5. Update Database Job Status to 'completed'
         db = SessionLocal()
         try:
@@ -179,8 +230,19 @@ async def process_media(
     if job.status == "processing":
         raise HTTPException(status_code=400, detail="Job is already processing")
 
-    cvd_type = request.cvd_type or "deuteranopia"
-    severity = request.severity or 1.0
+    cvd_type = request.cvd_type
+    severity = request.severity
+    
+    # Fallback to current user's vision profile if not explicitly requested
+    if (not cvd_type or severity is None) and current_user.vision_profile:
+        if not cvd_type:
+            cvd_type = current_user.vision_profile.cvd_type
+        if severity is None:
+            severity = current_user.vision_profile.severity
+            
+    # Default fallback values
+    cvd_type = cvd_type or "deuteranopia"
+    severity = severity if severity is not None else 1.0
     
     job.status = "processing"
     db.commit()
@@ -190,7 +252,8 @@ async def process_media(
         job_id=job.job_id, 
         s3_key=job.s3_key_original, 
         cvd_type=cvd_type, 
-        severity=severity
+        severity=severity,
+        auto_loop=False
     )
     
     return {

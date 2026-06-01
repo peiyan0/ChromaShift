@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Box, Text, VStack, Icon, Progress, useToast, Button, HStack, Tabs, TabList, TabPanels, Tab, TabPanel, Card, CardBody, Badge } from '@chakra-ui/react';
+import { Box, Text, VStack, Icon, Progress, useToast, Button, HStack, Tabs, TabList, TabPanels, Tab, TabPanel, Card, CardBody, Badge, SimpleGrid, Image, Center } from '@chakra-ui/react';
 import { mediaService } from '../services/media';
+import { profileService } from '../services/profile';
 import { useNavigate } from 'react-router-dom';
 import { ClientSideVideoProcessor } from './ClientSideVideoProcessor';
 import { FiCloud, FiCpu } from 'react-icons/fi';
@@ -94,8 +95,20 @@ export const DragDropUpload: React.FC = () => {
       const uploadRes = await mediaService.uploadMedia(file);
       setProgress(40);
       
-      // 2. Trigger processing
-      await mediaService.processMedia(uploadRes.job_id, {});
+      // 2. Trigger processing with the user's calibrated vision profile
+      let cvdType = "deuteranopia";
+      let severity = 1.0;
+      try {
+        const savedProfile = await profileService.getProfile();
+        if (savedProfile) {
+          cvdType = savedProfile.cvd_type || "deuteranopia";
+          severity = savedProfile.severity !== undefined ? savedProfile.severity : 1.0;
+        }
+      } catch (err) {
+        console.log("Could not load vision profile, using default values", err);
+      }
+      
+      await mediaService.processMedia(uploadRes.job_id, { cvd_type: cvdType, severity });
       setProgress(60);
 
       // 3. Poll for status
@@ -193,21 +206,96 @@ export const DragDropUpload: React.FC = () => {
               accept="image/jpeg,image/png,image/webp,video/mp4,application/pdf"
             />
           </Box>
-          <Box w="full" mt={2}>
-            <Text fontSize="sm" color="gray.500" textAlign="center" mb={3} fontWeight="medium">
+          <Box w="full" mt={6}>
+            <Text fontSize="md" color="gray.700" textAlign="left" mb={4} fontWeight="black">
               Don't have a file? Try our sample media:
             </Text>
-            <HStack justify="center" spacing={4} flexWrap="wrap">
-              <Button size="sm" variant="outline" colorScheme="blue" borderRadius="full" onClick={() => loadSample('/sample%20img%201.png', 'sample_chart.png', 'image/png')}>
-                Sample Image
-              </Button>
-              <Button size="sm" variant="outline" colorScheme="purple" borderRadius="full" onClick={() => loadSample('/sample%20vid%202.mp4', 'sample_video.mp4', 'video/mp4')}>
-                Sample Video
-              </Button>
-              <Button size="sm" variant="outline" colorScheme="orange" borderRadius="full" onClick={() => loadSample('/sample%20pdf%201.pdf', 'sample_report.pdf', 'application/pdf')}>
-                Sample PDF
-              </Button>
-            </HStack>
+            
+            <VStack align="stretch" spacing={6} w="full">
+              {/* Images Row */}
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" color="blue.600" mb={2}>Images & Charts</Text>
+                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
+                  {[
+                    { url: '/financial_dashboard.png', name: 'financial_dashboard.png', type: 'image/png' },
+                    { url: '/apple_orchard.png', name: 'apple_orchard.png', type: 'image/png' },
+                    { url: '/transit_map.png', name: 'transit_map.png', type: 'image/png' },
+                    { url: '/area_chart_trends.png', name: 'area_chart_trends.png', type: 'image/png' },
+                    { url: '/bar_line_sales_report.png', name: 'bar_line_sales_report.png', type: 'image/png' },
+                    { url: '/multi_line_comparison.webp', name: 'multi_line_comparison.webp', type: 'image/webp' },
+                    { url: '/heatmap.webp', name: 'heatmap.webp', type: 'image/webp' },
+                    { url: '/pie_chart.png', name: 'pie_chart.png', type: 'image/png' }
+                  ].map((s, i) => (
+                    <Box 
+                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
+                      onClick={() => loadSample(s.url, s.name, s.type)}
+                    >
+                      <Box h="80px" bg="gray.100" overflow="hidden">
+                        <Image src={s.url} w="full" h="full" objectFit="cover" />
+                      </Box>
+                      <Center p={2} bg="blue.50" borderTopWidth="1px" borderColor="blue.100">
+                        <Text fontSize="2xs" fontWeight="bold" color="blue.700" isTruncated>{s.name}</Text>
+                      </Center>
+                    </Box>
+                  ))}
+                </HStack>
+              </Box>
+
+              {/* Videos Row */}
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" color="purple.600" mb={2}>Videos</Text>
+                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
+                  {[
+                    { url: '/chart_infographic.mp4', name: 'chart_infographic.mp4', type: 'video/mp4' },
+                    { url: '/medical_imaging.mp4', name: 'medical_imaging.mp4', type: 'video/mp4' },
+                    { url: '/financial_trading.mp4', name: 'financial_trading.mp4', type: 'video/mp4' },
+                    { url: '/autonomous_driving.mp4', name: 'autonomous_driving.mp4', type: 'video/mp4' },
+                    { url: '/industrial_hmi.mp4', name: 'industrial_hmi.mp4', type: 'video/mp4' },
+                    { url: '/pathology_lab.mp4', name: 'pathology_lab.mp4', type: 'video/mp4' },
+                    { url: '/sports_broadcast.mp4', name: 'sports_broadcast.mp4', type: 'video/mp4' },
+                    { url: '/jungle_gameplay.mp4', name: 'jungle_gameplay.mp4', type: 'video/mp4' },
+                    { url: '/moba_replay.mp4', name: 'moba_replay.mp4', type: 'video/mp4' }
+                  ].map((s, i) => (
+                    <Box 
+                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
+                      onClick={() => loadSample(s.url, s.name, s.type)}
+                    >
+                      <Box h="80px" bg="black" overflow="hidden">
+                        <Box as="video" src={s.url} w="full" h="full" objectFit="cover" preload="metadata" />
+                      </Box>
+                      <Center p={2} bg="purple.50" borderTopWidth="1px" borderColor="purple.100">
+                        <Text fontSize="2xs" fontWeight="bold" color="purple.700" isTruncated>{s.name}</Text>
+                      </Center>
+                    </Box>
+                  ))}
+                </HStack>
+              </Box>
+
+              {/* PDFs Row */}
+              <Box>
+                <Text fontSize="sm" fontWeight="bold" color="orange.600" mb={2}>PDF Reports</Text>
+                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
+                  {[
+                    { url: '/financial_report.pdf', name: 'financial_report.pdf', type: 'application/pdf' },
+                    { url: '/research_paper.pdf', name: 'research_paper.pdf', type: 'application/pdf' }
+                  ].map((s, i) => (
+                    <Box 
+                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
+                      onClick={() => loadSample(s.url, s.name, s.type)}
+                    >
+                      <Center h="80px" bg="gray.100">
+                        <Icon viewBox="0 0 24 24" w={8} h={8} color="orange.400">
+                          <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,13H11V18H9V13H7L10,9L13,13Z" />
+                        </Icon>
+                      </Center>
+                      <Center p={2} bg="orange.50" borderTopWidth="1px" borderColor="orange.100">
+                        <Text fontSize="2xs" fontWeight="bold" color="orange.700" isTruncated>{s.name}</Text>
+                      </Center>
+                    </Box>
+                  ))}
+                </HStack>
+              </Box>
+            </VStack>
           </Box>
           </>
         ) : (
