@@ -201,11 +201,16 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
           const m = mask.mul(tf.scalar(severity));
 
           if (cvdType === 'protanopia') {
-            finalR = r.mul(tf.scalar(1).sub(m.mul(0.5))).add(g.mul(m.mul(0.5)));
+            // Protanopia: Reduce red, boost blue to compensate for red-blindness
+            finalR = r.mul(tf.scalar(1).sub(m.mul(0.4)));
+            finalB = b.add(r.sub(g).relu().mul(m.mul(0.3)));
           } else if (cvdType === 'tritanopia') {
+            // Tritanopia: Shift blue-yellow confusion into red-green
             finalB = b.mul(tf.scalar(1).sub(m.mul(0.5))).add(g.mul(m.mul(0.5)));
           } else {
-            finalG = g.mul(tf.scalar(1).sub(m.mul(0.5))).add(r.mul(m.mul(0.5)));
+            // Deuteranopia: Reduce green, boost yellow to compensate for green-blindness
+            finalG = g.mul(tf.scalar(1).sub(m.mul(0.4)));
+            finalB = b.add(g.sub(r).relu().mul(m.mul(0.3)));
           }
 
           const stacked = tf.concat([finalR, finalG, finalB], 2);

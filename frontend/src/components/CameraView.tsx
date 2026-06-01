@@ -182,14 +182,16 @@ export const CameraView: React.FC = () => {
           const m = mask.mul(tf.scalar(severity));
 
           if (cvdType === 'protanopia') {
-            // Protanopia: Shift Red channel using Green
-            finalR = r.mul(tf.scalar(1).sub(m.mul(0.5))).add(g.mul(m.mul(0.5)));
+            // Protanopia: Reduce red, boost blue to compensate for red-blindness
+            finalR = r.mul(tf.scalar(1).sub(m.mul(0.4)));
+            finalB = b.add(r.sub(g).relu().mul(m.mul(0.3)));
           } else if (cvdType === 'tritanopia') {
-            // Tritanopia: Shift Blue channel using Green
+            // Tritanopia: Shift blue-yellow confusion into red-green
             finalB = b.mul(tf.scalar(1).sub(m.mul(0.5))).add(g.mul(m.mul(0.5)));
           } else {
-            // Deuteranopia: Shift Green channel using Red
-            finalG = g.mul(tf.scalar(1).sub(m.mul(0.5))).add(r.mul(m.mul(0.5)));
+            // Deuteranopia: Reduce green, boost yellow to compensate for green-blindness
+            finalG = g.mul(tf.scalar(1).sub(m.mul(0.4)));
+            finalB = b.add(g.sub(r).relu().mul(m.mul(0.3)));
           }
 
           // F. Stack back to RGB and clip to [0, 255]
