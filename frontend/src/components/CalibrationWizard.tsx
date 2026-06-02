@@ -657,7 +657,7 @@ export const CalibrationWizard: FC = () => {
                     </Box>
                     <Text fontWeight="bold" color="gray.800">Active Learning</Text>
                     <Text fontSize="sm" color="gray.500">
-                      Driven by Bayesian optimization and in-browser MobileSAM segmentation heuristics to dynamically choose queries without latency.
+                      Driven by Bayesian optimization to adaptively select the most informative query each round, converging on your profile in as few as 5 rounds.
                     </Text>
                   </CardBody>
                 </Card>

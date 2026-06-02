@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, VStack, Heading, Text, Button, SimpleGrid, Icon, HStack, Badge, Flex, Card, CardBody, Select, Slider, SliderTrack, SliderFilledTrack, SliderThumb } from '@chakra-ui/react';
+import { Box, VStack, Heading, Text, Button, SimpleGrid, Icon, HStack, Badge, Flex, Card, CardBody, Select, Slider, SliderTrack, SliderFilledTrack, SliderThumb, Image, Center } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { FiEye, FiZap, FiShield, FiCheckCircle, FiArrowRight, FiImage, FiVideo, FiFileText } from 'react-icons/fi';
 
@@ -11,6 +11,9 @@ export const LandingPage: React.FC = () => {
   const [intensity, setIntensity] = useState(1.0);
   const [contrast, setContrast] = useState(1.0);
   const [saturation, setSaturation] = useState(1.0);
+  
+  const [sliderPosition, setSliderPosition] = useState(50);
+  const [activeDemoImage, setActiveDemoImage] = useState('/pie_chart.png');
   
   const [matrixValues, setMatrixValues] = useState("1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0");
 
@@ -122,7 +125,7 @@ export const LandingPage: React.FC = () => {
       <Box py={16} textAlign="center" bg="gray.50" borderRadius="3xl" shadow="inner" mb={10} px={8}>
         <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
           <defs>
-            <filter id="demo-daltonize-filter">
+            <filter id="demo-daltonize-filter" colorInterpolationFilters="sRGB">
               <feColorMatrix type="matrix" values={matrixValues} />
             </filter>
           </defs>
@@ -209,26 +212,179 @@ export const LandingPage: React.FC = () => {
           </CardBody>
         </Card>
 
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8} maxW="5xl" mx="auto">
-          <VStack>
-            <Badge colorScheme="gray" mb={2}>Original Vision</Badge>
-            <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="gray.200" w="full">
-              <img src="/gen1.webp" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} />
-              {/* <img src="/sample%20img%201.png" alt="Sample Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} /> */}
-            </Box>
-          </VStack>
-          
-          <VStack>
-            <Badge colorScheme="blue" mb={2}>ChromaShift Corrected</Badge>
-            <Box borderRadius="2xl" overflow="hidden" shadow="xl" border="1px" borderColor="blue.200" position="relative" w="full">
-              <Box position="absolute" top={3} right={3} bg="blue.500" color="white" px={3} py={1} borderRadius="full" fontSize="xs" fontWeight="bold" shadow="md" zIndex={10}>
-                GPU Filter Active
-              </Box>
-              <img src="/gen1.webp" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
-              {/* <img src="/sample%20img%201.png" alt="Corrected Data Visualization" style={{ width: '100%', height: 'auto', objectFit: 'cover', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} /> */}
-            </Box>
-          </VStack>
-        </SimpleGrid>
+        {/* Interactive Image Switcher */}
+        <VStack spacing={3} mb={6}>
+          <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase" letterSpacing="wider">
+            Select Sample Visualization
+          </Text>
+          <HStack justify="center" spacing={3}>
+            <Button 
+              size="sm" 
+              colorScheme={activeDemoImage === '/pie_chart.png' ? 'blue' : 'gray'} 
+              variant={activeDemoImage === '/pie_chart.png' ? 'solid' : 'outline'}
+              onClick={() => setActiveDemoImage('/pie_chart.png')}
+              borderRadius="full"
+              px={4}
+            >
+              Pie Chart
+            </Button>
+            <Button 
+              size="sm" 
+              colorScheme={activeDemoImage === '/multi_line_comparison.webp' ? 'blue' : 'gray'} 
+              variant={activeDemoImage === '/multi_line_comparison.webp' ? 'solid' : 'outline'}
+              onClick={() => setActiveDemoImage('/multi_line_comparison.webp')}
+              borderRadius="full"
+              px={4}
+            >
+              Line Graph
+            </Button>
+            <Button 
+              size="sm" 
+              colorScheme={activeDemoImage === '/heatmap.webp' ? 'blue' : 'gray'} 
+              variant={activeDemoImage === '/heatmap.webp' ? 'solid' : 'outline'}
+              onClick={() => setActiveDemoImage('/heatmap.webp')}
+              borderRadius="full"
+              px={4}
+            >
+              Heatmap Log
+            </Button>
+          </HStack>
+        </VStack>
+
+        {/* Dynamic Before/After Split Slider */}
+        <Box 
+          position="relative" 
+          w="full" 
+          maxW="4xl" 
+          mx="auto" 
+          borderRadius="2xl" 
+          overflow="hidden" 
+          shadow="2xl" 
+          border="1px" 
+          borderColor="gray.200" 
+          height={{ base: "300px", md: "480px" }}
+          bg="white"
+        >
+          {/* Underlay / Background: Original Image */}
+          <Image 
+            src={activeDemoImage} 
+            alt="Original Data Visualization" 
+            w="full" 
+            h="full" 
+            objectFit="contain" 
+            userSelect="none"
+          />
+
+          {/* Overlay: Corrected Image with Clip Path */}
+          <Image 
+            src={activeDemoImage} 
+            alt="Corrected Data Visualization" 
+            position="absolute"
+            top={0}
+            left={0}
+            w="full" 
+            h="full" 
+            objectFit="contain" 
+            userSelect="none"
+            style={{ 
+              filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})`,
+              clipPath: `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)`
+            }}
+          />
+
+          {/* Separator Line */}
+          <Box 
+            position="absolute"
+            top={0}
+            bottom={0}
+            left={`${sliderPosition}%`}
+            width="3px"
+            bg="white"
+            shadow="lg"
+            transform="translateX(-50%)"
+            pointerEvents="none"
+            zIndex={2}
+          />
+
+          {/* Drag Handle Knob */}
+          <Center 
+            position="absolute"
+            top="50%"
+            left={`${sliderPosition}%`}
+            transform="translate(-50%, -50%)"
+            boxSize="46px"
+            borderRadius="full"
+            bg="white"
+            border="3px solid"
+            borderColor="blue.500"
+            shadow="2xl"
+            pointerEvents="none"
+            zIndex={3}
+            transition="transform 0.1s"
+            _hover={{ transform: 'translate(-50%, -50%) scale(1.05)' }}
+          >
+            <HStack spacing={0.5} justify="center" userSelect="none">
+              <Text fontSize="10px" fontWeight="black" color="blue.500">◀</Text>
+              <Text fontSize="10px" fontWeight="black" color="blue.500">▶</Text>
+            </HStack>
+          </Center>
+
+          {/* Floating HUD Labels */}
+          <Box 
+            position="absolute" 
+            left={4} 
+            top={4} 
+            bg="black/60" 
+            backdropFilter="blur(8px)" 
+            px={3} 
+            py={1.5} 
+            borderRadius="xl" 
+            pointerEvents="none" 
+            zIndex={4}
+            border="1px solid"
+            borderColor="white/10"
+          >
+            <Text fontSize="xs" color="black" fontWeight="black" letterSpacing="wide">Original</Text>
+          </Box>
+          <Box 
+            position="absolute" 
+            right={4} 
+            top={4} 
+            bg="blue.600/80" 
+            backdropFilter="blur(8px)" 
+            px={3} 
+            py={1.5} 
+            borderRadius="xl" 
+            pointerEvents="none" 
+            zIndex={4}
+            border="1px solid"
+            borderColor="white/10"
+          >
+            <HStack spacing={1.5}>
+              <Badge colorScheme="purple" fontSize="9px" px={1.5} borderRadius="full">Active</Badge>
+              <Text fontSize="xs" color="black" fontWeight="black" letterSpacing="wide">ChromaShift</Text>
+            </HStack>
+          </Box>
+
+          {/* Interactive Invisible Input Range Overlay */}
+          <input 
+            type="range"
+            min="0"
+            max="100"
+            value={sliderPosition}
+            onChange={(e) => setSliderPosition(Number(e.target.value))}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              opacity: 0,
+              cursor: 'ew-resize',
+              zIndex: 5
+            }}
+          />
+        </Box>
 
         <Box mt={12} maxW="3xl" mx="auto">
             <Text fontSize="sm" fontWeight="bold" color="gray.500" mb={4}>Works seamlessly on videos without dropped frames:</Text>
@@ -236,7 +392,7 @@ export const LandingPage: React.FC = () => {
               <Box position="absolute" top={3} right={3} bg="blue.500" color="white" px={3} py={1} borderRadius="full" fontSize="xs" fontWeight="bold" shadow="md" zIndex={10}>
                 GPU Filter Active
               </Box>
-              <video src="/sample%20vid%202.mp4" controls autoPlay loop muted playsInline style={{ width: '100%', height: 'auto', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
+              <video src="/chart_infographic.mp4" controls autoPlay loop muted playsInline style={{ width: '100%', height: 'auto', filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})` }} />
             </Box>
         </Box>
       </Box>
@@ -250,7 +406,7 @@ export const LandingPage: React.FC = () => {
           </Text>
         </VStack>
         
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={10}>
           <Card variant="unstyled" bg="transparent">
             <CardBody>
               <Box boxSize="48px" bg="blue.50" color="blue.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
@@ -258,7 +414,7 @@ export const LandingPage: React.FC = () => {
               </Box>
               <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Hardware-Accelerated Engine</Heading>
               <Text color="gray.600" lineHeight="tall">
-                Leveraging real-time WebGL and WebGPU pipelines to process high-resolution media in the browser, providing instantaneous Daltonization without server latency.
+                Leveraging YOLO26-seg (NMS-free, 43% faster CPU inference) with int8-quantised edge deployment alongside real-time WebGL and WebGPU pipelines to process high-resolution media, providing intelligent region-aware Daltonization.
               </Text>
             </CardBody>
           </Card>
@@ -266,11 +422,35 @@ export const LandingPage: React.FC = () => {
           <Card variant="unstyled" bg="transparent">
             <CardBody>
               <Box boxSize="48px" bg="purple.50" color="purple.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiVideo} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Optical Flow Video Pipelines</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Videos are exported in unified H.264 MP4 formats. We run YOLO26n-seg on keyframes and use Optical Flow tracking for temporal smoothing, ensuring zero frame drops and a flicker-free visual experience.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="orange.50" color="orange.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiFileText} boxSize={6} />
+              </Box>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Text-Preserving PDFs</Heading>
+              <Text color="gray.600" lineHeight="tall">
+                Using PyMuPDF for object-level extraction, we selectively recolor charts and images while perfectly preserving all vector text layers. Your processed documents remain 100% searchable and screen-reader accessible.
+              </Text>
+            </CardBody>
+          </Card>
+
+          <Card variant="unstyled" bg="transparent">
+            <CardBody>
+              <Box boxSize="48px" bg="pink.50" color="pink.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
                 <Icon as={FiEye} boxSize={6} />
               </Box>
-              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Physiologically Grounded</Heading>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">LAB Color Space Math</Heading>
               <Text color="gray.600" lineHeight="tall">
-                Our remapping algorithm is constrained by luminance-preserving models. We don't just shift hues randomly; we ensure the result is physically accurate and flicker-free for video playback.
+                Our algorithm operates entirely in perceptual LAB color space. We guarantee 100% preservation of Lightness (L), shifting unseen color confusion purely into visible (A/B) channels without blowing out the image.
               </Text>
             </CardBody>
           </Card>
@@ -280,17 +460,17 @@ export const LandingPage: React.FC = () => {
               <Box boxSize="48px" bg="green.50" color="green.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
                 <Icon as={FiShield} boxSize={6} />
               </Box>
-              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">WCAG 2.1 Compliance</Heading>
+              <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">WCAG 2.1 Auto-Loop</Heading>
               <Text color="gray.600" lineHeight="tall">
-                Integrated automated compliance checker evaluating outputs against WCAG SC 1.4.1 (Use of Color) and SC 1.4.3 (Contrast Minimum) to generate actionable accessibility reports.
+                Our backend uses an automated iterative loop that recursively increments correction severity until mathematical WCAG AA contrast compliance (SC 1.4.1, 1.4.3) is achieved.
               </Text>
             </CardBody>
           </Card>
 
           <Card variant="unstyled" bg="transparent">
             <CardBody>
-              <Box boxSize="48px" bg="orange.50" color="orange.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
-                <Icon as={FiFileText} boxSize={6} />
+              <Box boxSize="48px" bg="teal.50" color="teal.600" borderRadius="xl" display="flex" alignItems="center" justifyContent="center" mb={6}>
+                <Icon as={FiCheckCircle} boxSize={6} />
               </Box>
               <Heading fontSize="xl" fontWeight="bold" mb={3} color="gray.800">Accessibility Reports</Heading>
               <Text color="gray.600" lineHeight="tall">

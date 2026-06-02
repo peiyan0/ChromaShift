@@ -26,6 +26,7 @@ import { mediaService, type MediaStatusResponse } from '../services/media';
 import { complianceService, type ComplianceReportResponse } from '../services/compliance';
 import { profileService, type VisionProfile } from '../services/profile';
 import api from '../services/api';
+import { aiPreviewService } from '../services/ai_preview';
 
 // Custom SVG Icons
 const BackIcon = (props: any) => (
@@ -88,24 +89,39 @@ export const WorkspaceStudio: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
+  const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<'side-by-side' | 'toggle'>('side-by-side');
   const [toggleActive, setToggleActive] = useState<'original' | 'processed'>('processed');
 
   // Dynamic Filtering State
   const [profile, setProfile] = useState<VisionProfile | null>(null);
   const [intensity, setIntensity] = useState<number>(1.0);
-  const [svgMatrixValues, setSvgMatrixValues] = useState<string>("1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0");
+
+  const [isDirty, setIsDirty] = useState<boolean>(false);
 
   // Video Synced References
   const originalVideoRef = useRef<HTMLVideoElement>(null);
   const processedVideoRef = useRef<HTMLVideoElement>(null);
   const isSyncing = useRef<boolean>(false);
+  const [aiMaskStatus, setAiMaskStatus] = useState<string>('pending');
 
   useEffect(() => {
     if (jobId) {
       loadWorkspace();
     }
   }, [jobId]);
+
+  useEffect(() => {
+    let intervalId: any;
+    if (status?.status === 'processing' || status?.status === 'uploaded') {
+      intervalId = setInterval(() => {
+        loadWorkspace(true);
+      }, 2000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [status?.status, jobId]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -125,40 +141,40 @@ export const WorkspaceStudio: React.FC = () => {
     loadProfile();
   }, []);
 
-  useEffect(() => {
-    if (profile) {
-      const type = profile.cvd_type || 'deuteranopia';
-      const s = intensity;
-      
-      const mat = [
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0]
-      ];
-      
-      if (type === 'protanopia') {
-        mat[0][0] = 1.0 - 0.5 * s;
-        mat[0][1] = 0.5 * s;
-      } else if (type === 'deuteranopia') {
-        mat[1][0] = 0.5 * s;
-        mat[1][1] = 1.0 - 0.5 * s;
-      } else if (type === 'tritanopia') {
-        mat[2][1] = 0.5 * s;
-        mat[2][2] = 1.0 - 0.5 * s;
-      }
-      
-      const valuesStr = `${mat[0][0]} ${mat[0][1]} ${mat[0][2]} 0 0  ${mat[1][0]} ${mat[1][1]} ${mat[1][2]} 0 0  ${mat[2][0]} ${mat[2][1]} ${mat[2][2]} 0 0  0 0 0 1 0`;
-      setSvgMatrixValues(valuesStr);
-    }
-  }, [profile, intensity]);
 
-  const loadWorkspace = async () => {
+
+  const loadWorkspace = async (isPolling = false) => {
     if (!jobId) return;
-    setIsLoading(true);
+    if (!isPolling) setIsLoading(true);
     try {
       // 1. Fetch Job status & S3 presigned URLs
       const statusRes = await mediaService.getMediaStatus(jobId);
       setStatus(statusRes);
+      
+      // Kick off AI semantic mask generation in background
+      if (statusRes.download_url_original) {
+        setAiMaskStatus('generating');
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = async () => {
+          try {
+            // Create a small canvas to extract ImageData for AI
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              await aiPreviewService.getSemanticMask(imgData);
+              setAiMaskStatus('complete');
+            }
+          } catch (e) {
+            setAiMaskStatus('fallback');
+          }
+        };
+        img.src = statusRes.download_url_original;
+      }
       
       // Determine file type from file extension
       const ext = statusRes.download_url?.split('?')[0].split('.').pop()?.toLowerCase() || '';
@@ -202,7 +218,7 @@ export const WorkspaceStudio: React.FC = () => {
       });
       navigate('/');
     } finally {
-      setIsLoading(false);
+      if (!isPolling) setIsLoading(false);
     }
   };
 
@@ -217,6 +233,23 @@ export const WorkspaceStudio: React.FC = () => {
       toast({ title: "Accessibility Audit Failed", description: "Could not run automated WCAG check.", status: "error", duration: 4000 });
     } finally {
       setIsAuditing(false);
+    }
+  };
+
+  const handleReprocess = async () => {
+    if (!jobId) return;
+    setIsReprocessing(true);
+    try {
+      const cvdType = profile?.cvd_type || (profile as any)?.type || 'deuteranopia';
+      await mediaService.processMedia(jobId, { severity: intensity, cvd_type: cvdType });
+      toast({ title: "Processing Started", description: "Your file is being re-rendered by the AI on the server.", status: "info", duration: 3000 });
+      // Reload workspace to trigger the processing/loading UI
+      setIsDirty(false);
+      await loadWorkspace();
+    } catch (error) {
+      toast({ title: "Reprocessing Failed", description: "Could not start the background task.", status: "error", duration: 4000 });
+    } finally {
+      setIsReprocessing(false);
     }
   };
 
@@ -308,7 +341,7 @@ export const WorkspaceStudio: React.FC = () => {
         <Text color="gray.500" textAlign="center" maxW="md" mb={6}>
           Our semantic AI pipeline is analyzing and remapping your colors for maximum WCAG compliance. This will take just a moment.
         </Text>
-        <Button leftIcon={<RefreshIcon w={4} h={4} />} onClick={loadWorkspace} colorScheme="blue" variant="outline" borderRadius="xl">
+        <Button leftIcon={<RefreshIcon w={4} h={4} />} onClick={() => loadWorkspace()} colorScheme="blue" variant="outline" borderRadius="xl">
           Refresh Status
         </Button>
       </Center>
@@ -332,13 +365,6 @@ export const WorkspaceStudio: React.FC = () => {
 
   return (
     <Box w="full" px={1} py={4}>
-      <svg width="0" height="0" style={{ position: 'absolute', zIndex: -100, pointerEvents: 'none' }}>
-        <defs>
-          <filter id="workspace-daltonize-filter">
-            <feColorMatrix type="matrix" values={svgMatrixValues} />
-          </filter>
-        </defs>
-      </svg>
       {/* Studio Header Bar */}
       <Flex justify="space-between" align="center" mb={6} bg="white" p={4} borderRadius="2xl" border="1px" borderColor="gray.100" shadow="sm">
         <HStack spacing={4}>
@@ -355,6 +381,12 @@ export const WorkspaceStudio: React.FC = () => {
               <Badge colorScheme={mediaType === 'image' ? 'purple' : mediaType === 'video' ? 'orange' : 'red'} variant="subtle">
                 {mediaType.toUpperCase()}
               </Badge>
+              {aiMaskStatus === 'complete' && (
+                <Badge colorScheme="green" variant="outline">AI Region Mask Active</Badge>
+              )}
+              {aiMaskStatus === 'fallback' && (
+                <Badge colorScheme="yellow" variant="outline">SLIC Fallback Active</Badge>
+              )}
             </HStack>
             <Text fontSize="xs" color="gray.400">Job ID: {jobId}</Text>
           </VStack>
@@ -402,7 +434,10 @@ export const WorkspaceStudio: React.FC = () => {
                 max={2}
                 step={0.1}
                 value={intensity}
-                onChange={(val) => setIntensity(val)}
+                onChange={(val) => {
+                  setIntensity(val);
+                  setIsDirty(true);
+                }}
                 colorScheme="blue"
               >
                 <SliderTrack bg="gray.300">
@@ -410,9 +445,20 @@ export const WorkspaceStudio: React.FC = () => {
                 </SliderTrack>
                 <SliderThumb boxSize={6} shadow="md" />
               </Slider>
-              <Text fontSize="xs" color="gray.500" mt={2}>
-                Adjusting this slider applies a real-time GPU filter to the original media. 
-              </Text>
+              <Flex justify="space-between" align="center" mt={3}>
+                <Text fontSize="xs" color="gray.500" maxW="70%">
+                  The slider applies a real-time frontend GPU preview. To permanently save this intensity, you must re-render the file on the server.
+                </Text>
+                <Button 
+                  size="sm" 
+                  colorScheme="blue" 
+                  isLoading={isReprocessing} 
+                  loadingText="Processing"
+                  onClick={handleReprocess}
+                >
+                  Apply & Re-Render
+                </Button>
+              </Flex>
             </Box>
           )}
 
@@ -457,30 +503,52 @@ export const WorkspaceStudio: React.FC = () => {
                     </Box>
                   </VStack>
                   <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected Image (CVD Shifted)</Text>
-                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50">
+                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">
+                      {status?.download_url && !isDirty ? "Corrected Image (AI Processed)" : "Unsaved Changes"}
+                    </Text>
+                    <Box border="1px" borderColor={isDirty ? "orange.300" : "blue.100"} borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50" position="relative">
                       <img
-                        src={status?.download_url_original || ''}
+                        src={status?.download_url ? status.download_url : (status?.download_url_original || '')}
                         alt="Corrected Accessible"
-                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain', filter: 'url(#workspace-daltonize-filter)' }}
+                        style={{ 
+                          width: '100%', 
+                          height: 'auto', 
+                          maxHeight: '75vh', 
+                          objectFit: 'contain', 
+                          opacity: isDirty ? 0.6 : 1.0
+                        }}
                       />
+                      {isDirty && (
+                        <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.300">
+                          <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
+                            Click Apply & Re-Render
+                          </Button>
+                        </Center>
+                      )}
                     </Box>
                   </VStack>
                 </SimpleGrid>
               ) : (
                 <Center minH="400px">
-                  <Box border="1px" borderColor="gray.200" borderRadius="2xl" overflow="hidden" shadow="lg" w="100%" display="flex" justifyContent="center" bg="gray.50">
+                  <Box border="1px" borderColor={isDirty ? "orange.300" : "gray.200"} borderRadius="2xl" overflow="hidden" shadow="lg" w="100%" display="flex" justifyContent="center" bg="gray.50" position="relative">
                     <img
-                      src={status?.download_url_original || ''}
+                      src={toggleActive === 'processed' ? (status?.download_url ? status.download_url : (status?.download_url_original || '')) : (status?.download_url_original || '')}
                       alt="Overlay View"
                       style={{ 
                         width: '100%', 
                         height: 'auto', 
                         maxHeight: '80vh', 
                         objectFit: 'contain',
-                        filter: toggleActive === 'processed' ? 'url(#workspace-daltonize-filter)' : 'none'
+                        opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1.0
                       }}
                     />
+                    {toggleActive === 'processed' && isDirty && (
+                      <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.300">
+                        <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
+                          Click Apply & Re-Render
+                        </Button>
+                      </Center>
+                    )}
                   </Box>
                 </Center>
               )}
@@ -508,28 +576,42 @@ export const WorkspaceStudio: React.FC = () => {
                     </Box>
                   </VStack>
                   <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected Video (Coherent Shift)</Text>
-                    <Box border="1px" borderColor="blue.100" borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex">
+                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">
+                      {status?.download_url && !isDirty ? "Corrected Video (AI Processed)" : "Unsaved Changes"}
+                    </Text>
+                    <Box border="1px" borderColor={isDirty ? "orange.300" : "blue.100"} borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex" position="relative">
                       <video
                         ref={processedVideoRef}
-                        src={status?.download_url_original || ''}
+                        src={status?.download_url ? status.download_url : (status?.download_url_original || '')}
                         controls
                         playsInline
-                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain', filter: 'url(#workspace-daltonize-filter)' }}
+                        style={{ 
+                          width: '100%', 
+                          maxHeight: '75vh', 
+                          objectFit: 'contain', 
+                          opacity: isDirty ? 0.6 : 1.0 
+                        }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
                         onSeeking={() => syncPlayback('processed')}
                         onSeeked={() => syncPlayback('processed')}
                       />
+                      {isDirty && (
+                        <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.400">
+                          <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
+                            Click Apply & Re-Render
+                          </Button>
+                        </Center>
+                      )}
                     </Box>
                   </VStack>
                 </SimpleGrid>
               ) : (
                 <Center>
-                  <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="100%" display="flex" justifyContent="center">
+                  <Box border="1px" borderColor={isDirty ? "orange.300" : "gray.200"} borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="100%" display="flex" justifyContent="center" position="relative">
                     <video
                       key={toggleActive}
-                      src={status?.download_url_original || ''}
+                      src={toggleActive === 'processed' ? (status?.download_url ? status.download_url : (status?.download_url_original || '')) : (status?.download_url_original || '')}
                       controls
                       autoPlay
                       muted
@@ -538,9 +620,16 @@ export const WorkspaceStudio: React.FC = () => {
                         width: '100%', 
                         maxHeight: '80vh', 
                         objectFit: 'contain',
-                        filter: toggleActive === 'processed' ? 'url(#workspace-daltonize-filter)' : 'none'
+                        opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1.0
                       }}
                     />
+                    {toggleActive === 'processed' && isDirty && (
+                      <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.400">
+                        <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
+                          Click Apply & Re-Render
+                        </Button>
+                      </Center>
+                    )}
                   </Box>
                 </Center>
               )}

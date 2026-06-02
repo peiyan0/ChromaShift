@@ -8,8 +8,9 @@
 
 - **🎯 Personalized Vision Calibration**: An interactive Bayesian optimization wizard that fine-tunes a unique transformation matrix for your specific color perception.
 - **🧠 Semantic Media Remapping**: 
-  - **Images**: Real-time client-side preview (MobileSAM via TensorFlow.js) and high-fidelity server-side processing (MobileViT-S + YOLOv8n Cascade).
-  - **Videos**: Flicker-free temporal coherence processing using Optical Flow.
+  - **Images & Static Docs**: High-fidelity server-side processing (YOLO26-seg cascade, NMS-free).
+  - **Videos**: Flicker-free temporal coherence with Optical Flow and keyframe-based YOLO26n-seg segmentation.
+  - **Live Camera & Local Video**: Real-time client-side semantic masking via YOLO26n-seg ONNX (every 15–20 frames, held between keyframes) with K-Means SLIC fallback — replacing the previous Laplacian edge approach.
   - **Documents**: Structural PDF parsing and chart-aware recoloring.
 - **🛡️ WCAG 2.1 Audit & Accessibility Report**: Automated accessibility checks (SC 1.4.1, 1.4.3, 1.4.11) with actionable remediation feedback. Generate and export a detailed **Accessibility Report (JSON)** containing specific failing color pairs and calculated WCAG-compliant alternatives.
 - **🔐 Privacy & Security**: Strict data minimization and a 7-day auto-expiry policy. For full details on our security practices, please read [SECURITY.md](SECURITY.md).
@@ -21,7 +22,7 @@
 ### Frontend
 - **Framework**: React 18 + TypeScript
 - **Styling**: Chakra UI + Tailwind CSS + Framer Motion
-- **AI Runtime**: TensorFlow.js + WebGPU acceleration
+- **AI Runtime**: TensorFlow.js (WebGL daltonization) + ONNX Runtime Web (YOLO26n-seg segmentation)
 
 ### Backend
 - **Framework**: Python FastAPI (Async)
@@ -65,7 +66,7 @@
 ## 🏗️ Architecture
 
 The platform uses a **three-tier hybrid architecture**:
-1.  **Frontend**: Handles real-time previews using MobileSAM ONNX models (with SLIC fallback) via TensorFlow.js to provide instant feedback (< 3s).
+1.  **Frontend**: Handles real-time previews using YOLO26n-seg ONNX (with K-Means SLIC fallback) via ONNX Runtime Web and TF.js WebGL daltonization to provide instant feedback (< 3s).
 2.  **Backend API**: Orchestrates heavy-duty AI processing, compliance audits, and storage management.
 3.  **Storage Layer**: Maintains user profiles and media with strict lifecycle policies.
 

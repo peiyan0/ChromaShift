@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Box, Text, VStack, Icon, Progress, useToast, Button, HStack, Tabs, TabList, TabPanels, Tab, TabPanel, Card, CardBody, Badge, SimpleGrid, Image, Center } from '@chakra-ui/react';
+import { Box, Text, VStack, Icon, Progress, useToast, Button, HStack, Tabs, TabList, TabPanels, Tab, TabPanel, Card, CardBody, Badge, Image, Center } from '@chakra-ui/react';
 import { mediaService } from '../services/media';
 import { profileService } from '../services/profile';
 import { useNavigate } from 'react-router-dom';
@@ -155,6 +155,8 @@ export const DragDropUpload: React.FC = () => {
   };
 
   const isVideo = file && file.type.startsWith('video/');
+  const isPdf = file && file.type === 'application/pdf';
+  const isImage = file && file.type.startsWith('image/');
 
   // If a video is selected and Client GPU remapping is active, render processor instead
   if (isVideo && activeTab === 1) {
@@ -357,7 +359,11 @@ export const DragDropUpload: React.FC = () => {
               <Card variant="outline" size="sm" borderRadius="xl" w="full">
                 <CardBody p={4}>
                   <Text fontSize="xs" color="gray.500">
-                    Your file will be uploaded to securely hosted S3 storage. Our backend fine-tuned Daltonization pipelines will apply CVD accessibility corrections.
+                    {isPdf 
+                      ? "Your PDF will be uploaded to securely hosted S3 storage. Our PyMuPDF pipeline will semantically recolor charts and diagrams while perfectly preserving all vector text layers for screen-reader accessibility."
+                      : isImage
+                      ? "Your image will be uploaded to securely hosted S3 storage. Our YOLO26n-seg pipeline will apply precise semantic Daltonization while ensuring 100% perceptual lightness preservation."
+                      : "Your file will be uploaded to securely hosted S3 storage. Our backend fine-tuned Daltonization pipelines will apply CVD accessibility corrections."}
                   </Text>
                 </CardBody>
               </Card>

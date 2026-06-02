@@ -36,7 +36,6 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
-  Select,
   Slider,
   SliderTrack,
   SliderFilledTrack,
@@ -265,8 +264,8 @@ export const DashboardHistory: FC = () => {
   });
 
   const sortedHistory = [...filteredHistory].sort((a, b) => {
-    let valA = a[sortField];
-    let valB = b[sortField];
+    let valA: any = a[sortField];
+    let valB: any = b[sortField];
     
     if (sortField === 'created_at') {
       valA = new Date(valA).getTime();
