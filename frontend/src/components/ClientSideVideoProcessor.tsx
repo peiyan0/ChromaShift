@@ -36,6 +36,9 @@ import {
 } from 'react-icons/fi';
 import * as tf from '@tensorflow/tfjs';
 import { profileService, type VisionProfile } from '../services/profile';
+import { aiPreviewService } from '../services/ai_preview';
+
+const KEYFRAME_INTERVAL = 20;
 
 interface ClientSideVideoProcessorProps {
   file: File;
@@ -68,7 +71,11 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const animationFrameIdRef = useRef<number | null>(null);
-  const laplacianKernelRef = useRef<tf.Tensor4D | null>(null);
+
+  // Refs for keyframe-based YOLO semantic mask
+  const segMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  const maskFrameCountRef = useRef<number>(0);
+  const maskPendingRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Synchronize states to refs
@@ -97,13 +104,6 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     const initProcessor = async () => {
       try {
         await setupTF();
-
-        // Pre-allocate 3x3 Laplacian Edge-detection Kernel for high-pass boundary mask
-        laplacianKernelRef.current = tf.tensor4d([
-          0,  1, 0,
-          1, -4, 1,
-          0,  1, 0
-        ], [3, 3, 1, 1]);
 
         try {
           const savedProfile = await profileService.getProfile();
@@ -137,9 +137,6 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
-      if (laplacianKernelRef.current) {
-        laplacianKernelRef.current.dispose();
-      }
     };
   }, [file]);
 
@@ -152,9 +149,8 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     const render = () => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const laplacianKernel = laplacianKernelRef.current;
 
-      if (!video || !canvas || !laplacianKernel) {
+      if (!video || !canvas) {
         animationFrameIdRef.current = requestAnimationFrame(render);
         return;
       }
@@ -177,7 +173,26 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
         // Draw raw video directly
         ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
       } else {
-        // Run GPU accelerated Daltonization frame remapping
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Fire YOLO keyframe segmentation non-blocking every KEYFRAME_INTERVAL frames
+        maskFrameCountRef.current++;
+        if (maskFrameCountRef.current % KEYFRAME_INTERVAL === 0 && !maskPendingRef.current) {
+          maskPendingRef.current = true;
+          const offscreen = new OffscreenCanvas(w, h);
+          const octx = offscreen.getContext('2d')!;
+          octx.drawImage(video, 0, 0, w, h);
+          const imageData = octx.getImageData(0, 0, w, h);
+          aiPreviewService.getSemanticMask(imageData).then(data => {
+            segMaskRef.current = { data, w, h };
+            maskPendingRef.current = false;
+          }).catch(() => {
+            maskPendingRef.current = false;
+          });
+        }
+
+        // GPU accelerated Daltonization with YOLO semantic mask
         tf.tidy(() => {
           const inputTensor = tf.browser.fromPixels(video);
           const imgFloat = tf.cast(inputTensor, 'float32');
@@ -186,19 +201,18 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
           const g = imgFloat.slice([0, 0, 1], [-1, -1, 1]);
           const b = imgFloat.slice([0, 0, 2], [-1, -1, 1]);
 
-          const lum = tf.add(
-            tf.add(r.mul(0.2126), g.mul(0.7152)),
-            b.mul(0.0722)
-          );
+          // Use held YOLO semantic mask; fall back to uniform if not yet computed
+          const stored = segMaskRef.current;
+          const maskData = (stored && stored.w === w && stored.h === h)
+            ? stored.data
+            : new Float32Array(w * h).fill(1.0);
+          const maskTensor = tf.tensor3d(maskData, [h, w, 1]);
 
-          const edges = tf.abs(tf.conv2d(lum as tf.Tensor3D, laplacianKernel, 1, 'same'));
-          const mask = tf.sigmoid(edges.sub(12).mul(0.2));
+          const m = maskTensor.mul(tf.scalar(severity));
 
           let finalR = r;
           let finalG = g;
           let finalB = b;
-
-          const m = mask.mul(tf.scalar(severity));
 
           if (cvdType === 'protanopia') {
             // Protanopia: Reduce red, boost blue to compensate for red-blindness

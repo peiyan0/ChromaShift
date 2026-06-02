@@ -25,6 +25,9 @@ import {
 } from '@chakra-ui/react';
 import * as tf from '@tensorflow/tfjs';
 import { profileService, type VisionProfile } from '../services/profile';
+import { aiPreviewService } from '../services/ai_preview';
+
+const KEYFRAME_INTERVAL = 15;
 
 export const CameraView: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -43,6 +46,11 @@ export const CameraView: React.FC = () => {
     severity: 1.0,
     isActive: true
   });
+
+  // Refs for keyframe-based YOLO semantic mask
+  const segMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  const maskFrameCountRef = useRef<number>(0);
+  const maskPendingRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Sync React state to refs for the render loop
@@ -119,13 +127,6 @@ export const CameraView: React.FC = () => {
       }
     };
 
-    // Pre-allocated 3x3 Laplacian Edge-detection Kernel for high-pass boundary mask
-    const laplacianKernel = tf.tensor4d([
-      0,  1, 0,
-      1, -4, 1,
-      0,  1, 0
-    ], [3, 3, 1, 1]);
-
     const renderLoop = () => {
       if (!active || !videoRef.current || !canvasRef.current) return;
 
@@ -150,7 +151,26 @@ export const CameraView: React.FC = () => {
         // Draw original video frame directly with zero processing overhead
         ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
       } else {
-        // 100% Client-Side WebGL-accelerated Tensor Remapping Pipeline
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Fire YOLO keyframe segmentation non-blocking every KEYFRAME_INTERVAL frames
+        maskFrameCountRef.current++;
+        if (maskFrameCountRef.current % KEYFRAME_INTERVAL === 0 && !maskPendingRef.current) {
+          maskPendingRef.current = true;
+          const offscreen = new OffscreenCanvas(w, h);
+          const octx = offscreen.getContext('2d')!;
+          octx.drawImage(video, 0, 0, w, h);
+          const imageData = octx.getImageData(0, 0, w, h);
+          aiPreviewService.getSemanticMask(imageData).then(data => {
+            segMaskRef.current = { data, w, h };
+            maskPendingRef.current = false;
+          }).catch(() => {
+            maskPendingRef.current = false;
+          });
+        }
+
+        // Client-Side WebGL-accelerated Tensor Remapping Pipeline
         tf.tidy(() => {
           // A. Load camera pixels to 3D float tensor
           const inputTensor = tf.browser.fromPixels(video);
@@ -161,25 +181,19 @@ export const CameraView: React.FC = () => {
           const g = imgFloat.slice([0, 0, 1], [-1, -1, 1]);
           const b = imgFloat.slice([0, 0, 2], [-1, -1, 1]);
 
-          // C. Calculate Luminance (standard WCAG relative weights)
-          const lum = tf.add(
-            tf.add(r.mul(0.2126), g.mul(0.7152)),
-            b.mul(0.0722)
-          );
+          // C. Use held YOLO semantic mask; fall back to uniform if not yet computed
+          const stored = segMaskRef.current;
+          const maskData = (stored && stored.w === w && stored.h === h)
+            ? stored.data
+            : new Float32Array(w * h).fill(1.0);
+          const maskTensor = tf.tensor3d(maskData, [h, w, 1]);
 
-          // D. Dynamic Edge contrast/attention map using 2D convolution
-          // Laplacian filter highlights sharp boundaries (text, icons, borders)
-          const edges = tf.abs(tf.conv2d(lum as tf.Tensor3D, laplacianKernel, 1, 'same'));
-          
-          // Smooth boundary mask mapping values to [0, 1] using standard sigmoid
-          const mask = tf.sigmoid(edges.sub(12).mul(0.2));
+          // D. Math Shifting Logic (RGB)
+          const m = maskTensor.mul(tf.scalar(severity));
 
-          // E. Math Shifting Logic (RGB)
           let finalR = r;
           let finalG = g;
           let finalB = b;
-
-          const m = mask.mul(tf.scalar(severity));
 
           if (cvdType === 'protanopia') {
             // Protanopia: Reduce red, boost blue to compensate for red-blindness
@@ -194,12 +208,12 @@ export const CameraView: React.FC = () => {
             finalB = b.add(g.sub(r).relu().mul(m.mul(0.3)));
           }
 
-          // F. Stack back to RGB and clip to [0, 255]
+          // E. Stack back to RGB and clip to [0, 255]
           const stacked = tf.concat([finalR, finalG, finalB], 2);
           const clipped = tf.clipByValue(stacked, 0, 255);
           const outputTensor = tf.cast(clipped, 'int32');
 
-          // G. Draw output tensor directly onto WebGL canvas
+          // F. Draw output tensor directly onto WebGL canvas
           tf.browser.toPixels(outputTensor as tf.Tensor3D, canvas);
         });
       }
@@ -221,7 +235,6 @@ export const CameraView: React.FC = () => {
     return () => {
       active = false;
       cancelAnimationFrame(animationId);
-      laplacianKernel.dispose();
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
