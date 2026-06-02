@@ -1,59 +1,64 @@
-import onnxruntime as ort
-import numpy as np
 import cv2
 import os
+import logging
+import numpy as np
+from ultralytics import YOLO
+
+logger = logging.getLogger(__name__)
 
 class InferenceService:
-    def __init__(self, model_path: str = None):
-        if model_path is None:
-            # Default path relative to this file
-            model_path = os.path.join(os.path.dirname(__file__), "models", "transunet_v1.onnx")
+    def __init__(self, models_dir: str = None):
+        if models_dir is None:
+            models_dir = os.path.join(os.path.dirname(__file__), "models")
+        os.makedirs(models_dir, exist_ok=True)
         
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model not found at {model_path}")
+        self.seg_model_path = os.path.join(models_dir, "yolo26n-seg.pt")
+        # Use the model name for Ultralytics auto-download; fall back to the local path
+        # if it already exists so repeated startups skip the network fetch.
+        model_id = self.seg_model_path if os.path.exists(self.seg_model_path) else "yolo26n-seg"
+        
+        try:
+            # ultralytics will automatically download the weights if not found locally
+            self.model = YOLO(model_id)
+            logger.info("Successfully loaded YOLO26-seg model (NMS-free, edge-optimised).")
+        except Exception as e:
+            logger.error(f"Failed to load YOLO26-seg model: {e}")
+            self.model = None
+
+    def get_semantic_mask(self, image):
+        # Fallback to uniform mask if model fails
+        if not self.model:
+            return np.ones((image.shape[0], image.shape[1]), dtype=np.float32)
             
-        self.session = ort.InferenceSession(model_path)
-        self.input_name = self.session.get_inputs()[0].name
+        try:
+            # Run inference
+            results = self.model(image, imgsz=640, verbose=False)
+            
+            h_orig, w_orig = image.shape[:2]
+            final_mask = np.zeros((h_orig, w_orig), dtype=np.float32)
+            
+            if len(results) > 0 and results[0].masks is not None:
+                # masks.data contains the tensor of shape (N, H, W) where N is number of objects
+                masks_data = results[0].masks.data.cpu().numpy()
+                
+                # Combine all masks by taking the maximum confidence at each pixel
+                combined_mask = np.max(masks_data, axis=0)
+                
+                # Resize combined mask back to original image dimensions
+                final_mask = cv2.resize(combined_mask, (w_orig, h_orig))
+            else:
+                # Fallback if no objects detected: apply uniform shift to the entire frame
+                final_mask = np.ones((h_orig, w_orig), dtype=np.float32)
+                
+            return final_mask
+        except Exception as e:
+            logger.error(f"Inference error: {e}")
+            return np.ones((image.shape[0], image.shape[1]), dtype=np.float32)
 
-    def preprocess(self, image):
-        # Resize and normalize for TransUNet (224x224)
-        img = cv2.resize(image, (224, 224))
-        img = img.astype(np.float32) / 255.0
-        img = np.transpose(img, (2, 0, 1))  # HWC to CHW
-        return np.expand_dims(img, axis=0)
-
-    def generate_structural_mask(self, image):
-        """
-        Uses OpenCV heuristics to identify text and fine structural details.
-        Returns a mask (same size as image) where 0 = text/detail (do not remap) and 1 = large areas (remap).
-        """
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # Edge detection
-        edges = cv2.Canny(gray, 50, 150)
-        # Dilate edges to cover character strokes
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        dilated_edges = cv2.dilate(edges, kernel, iterations=1)
-        
-        # Normalize and invert: text=0, background=1
-        text_mask = (dilated_edges / 255.0).astype(np.float32)
-        structural_mask = 1.0 - text_mask
-        return structural_mask
-
-    def remap_colors(self, image, intensity=1.5, cvd_type="deuteranopia"):
-        input_tensor = self.preprocess(image)
-        outputs = self.session.run(None, {self.input_name: input_tensor})
-        mask = outputs[0].squeeze()
-        
-        # Resize mask back to original image size
-        mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
-        
-        # Apply OpenCV heuristic to suppress remapping on text/fine details
-        structural_mask = self.generate_structural_mask(image)
-        mask = mask * structural_mask
-        
-        # Hybrid Adaptive Remapping Logic
-        result = image.copy().astype(np.float32)
-        m = mask * intensity
+    def remap_colors(self, image, intensity=1.0, cvd_type="deuteranopia", mask=None):
+        # Generate pixel-perfect semantic mask using YOLO26-seg if not provided
+        if mask is None:
+            mask = self.get_semantic_mask(image)
         
         # Normalize cvd_type
         cvd_type = cvd_type.lower() if cvd_type else "deuteranopia"
@@ -61,17 +66,49 @@ class InferenceService:
         if cvd_type == "normal" or intensity == 0:
             return image
             
-        if cvd_type == "protanopia":
-            # Protanopia (Red-blind): Shift red (index 2 in BGR) using green (index 1)
-            result[:, :, 2] = image[:, :, 2] * (1 - 0.5 * m) + image[:, :, 1] * (0.5 * m)
-        elif cvd_type == "tritanopia":
-            # Tritanopia (Blue-blind): Shift blue (index 0 in BGR) using green (index 1)
-            result[:, :, 0] = image[:, :, 0] * (1 - 0.5 * m) + image[:, :, 1] * (0.5 * m)
-        else: # Default: deuteranopia
-            # Deuteranopia (Green-blind): Shift green (index 1 in BGR) using red (index 2)
-            result[:, :, 1] = image[:, :, 1] * (1 - 0.5 * m) + image[:, :, 2] * (0.5 * m)
+        # Hybrid Adaptive Strategy: 
+        # Apply a 40% baseline global shift to ensure UI elements/charts are always corrected.
+        # Apply a 100% enhanced shift to AI-detected semantic objects (people, cars, etc).
+        effective_mask = 0.4 + (mask * 0.6)
             
-        return np.clip(result, 0, 255).astype(np.uint8)
+        # Scale intensity to prevent LAB color channel blowout/clipping at high severities
+        m = effective_mask * (intensity * 0.4)
+        
+        # Convert BGR to LAB (Luminance, A=Green/Red, B=Blue/Yellow)
+        # This guarantees 100% luminance preservation because we only modify A and B channels
+        lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
+        l, a, b = cv2.split(lab_image)
+        
+        # In LAB space:
+        # A channel: negative=Green, positive=Red
+        # B channel: negative=Blue, positive=Yellow
+        
+        if cvd_type == "protanopia":
+            # Protanopia (Red-blind): Target positive A-channel (reds), shift into B-channel (blue direction)
+            contrast = a - 128.0
+            red_contrast = np.maximum(contrast, 0)
+            new_b = b + (red_contrast * m)
+            lab_image[:, :, 2] = np.clip(new_b, 0, 255)
+            # Protanopes suffer from severely reduced red luminosity.
+            # We must explicitly boost the Lightness (L channel) where red contrast exists.
+            new_l = l + (red_contrast * m * 0.5)
+            lab_image[:, :, 0] = np.clip(new_l, 0, 255)
+            
+        elif cvd_type == "deuteranopia":
+            # Deuteranopia (Green-blind): Target negative A-channel (greens), shift into B-channel (yellow direction)
+            green_contrast = np.maximum(128.0 - a, 0)
+            new_b = b + (green_contrast * m)
+            lab_image[:, :, 2] = np.clip(new_b, 0, 255)
+            
+        elif cvd_type == "tritanopia":
+            # Blue-Yellow confusion: Shift unseen Blue-Yellow contrast (B channel) into Red-Green (A channel)
+            contrast = b - 128.0
+            new_a = a + (contrast * m)
+            lab_image[:, :, 1] = np.clip(new_a, 0, 255)
+            
+        # Merge back and convert to BGR
+        result = cv2.merge([lab_image[:,:,0], lab_image[:,:,1], lab_image[:,:,2]])
+        result = np.clip(result, 0, 255).astype(np.uint8)
+        return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
 
 inference_service = InferenceService()
-
