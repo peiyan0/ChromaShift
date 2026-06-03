@@ -61,14 +61,26 @@ async def run_compliance_check(
     # Setup temporary paths
     file_ext = os.path.splitext(job.s3_key_processed)[1] if job.s3_key_processed else ".jpg"
     local_path = f"/tmp/{job_id}_compliance{file_ext}"
+    local_orig_path = f"/tmp/{job_id}_compliance_orig{file_ext}"
     os.makedirs("/tmp", exist_ok=True)
 
     try:
-        # Download the processed file from storage
+        # Download both original and processed files from storage
         storage_service.download_file(job.s3_key_processed, local_path)
+        storage_service.download_file(job.s3_key_original, local_orig_path)
         
-        # Analyze real visual compliance of the media
+        # Analyze real visual compliance of both media versions
         result = analyze_media_compliance(local_path, job.media_type, cvd_type)
+        orig_result = analyze_media_compliance(local_orig_path, job.media_type, cvd_type)
+        
+        # Calculate differential improvement and add it to issues
+        improvement = round(result["score"] - orig_result["score"], 1)
+        result["issues"].append({
+            "sc_id": "Improvement",
+            "severity": "Info",
+            "description": f"Original Contrast Score: {orig_result['score']} -> Processed Contrast Score: {result['score']}.",
+            "suggestion": f"Accessibility enhancement achieved: +{improvement} points contrast improvement."
+        })
         
     except Exception as e:
         raise HTTPException(
@@ -79,6 +91,8 @@ async def run_compliance_check(
         # Cleanup temporary files
         if os.path.exists(local_path):
             os.remove(local_path)
+        if os.path.exists(local_orig_path):
+            os.remove(local_orig_path)
 
     new_report = ComplianceReport(
         media_job_id=job.id,
@@ -144,14 +158,18 @@ async def get_accessibility_report(
     
     file_ext = os.path.splitext(job.s3_key_processed)[1] if job.s3_key_processed else ".jpg"
     local_path = f"/tmp/{job_id}_report{file_ext}"
+    local_orig_path = f"/tmp/{job_id}_report_orig{file_ext}"
     os.makedirs("/tmp", exist_ok=True)
     
     try:
         storage_service.download_file(job.s3_key_processed, local_path)
-        report = generate_accessibility_report(local_path, job.media_type, cvd_type)
+        storage_service.download_file(job.s3_key_original, local_orig_path)
+        report = generate_accessibility_report(local_path, job.media_type, cvd_type, local_orig_path=local_orig_path)
         return report
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if os.path.exists(local_path):
             os.remove(local_path)
+        if os.path.exists(local_orig_path):
+            os.remove(local_orig_path)
