@@ -184,15 +184,93 @@ async def upload_media(
             detail="Unsupported file format"
         )
         
-    try:
-        s3_key = storage_service.upload_file(file)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Storage upload failed")
-        
+    # 1. Size Check using seek/tell (no memory bloat)
+    file.file.seek(0, os.SEEK_END)
+    file_size = file.file.tell()
+    file.file.seek(0, 0)
+    
+    # 2. Magic byte / signature check
+    header = file.file.read(262)
+    file.file.seek(0, 0)
+    
+    is_valid_sig = False
+    if file.content_type in ["image/jpeg", "image/jpg"] and header.startswith(b"\xff\xd8"):
+        is_valid_sig = True
+        if file_size > 50 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
+    elif file.content_type == "image/png" and header.startswith(b"\x89PNG\r\n\x1a\n"):
+        is_valid_sig = True
+        if file_size > 50 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
+    elif file.content_type == "image/webp" and b"WEBP" in header[8:16]:
+        is_valid_sig = True
+        if file_size > 50 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
+    elif file.content_type == "application/pdf" and header.startswith(b"%PDF"):
+        is_valid_sig = True
+        if file_size > 100 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PDF size exceeds 100MB limit")
+    elif file.content_type == "video/mp4" and (b"ftyp" in header[4:12] or b"ftyp" in header[0:20]):
+        is_valid_sig = True
+        if file_size > 500 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Video size exceeds 500MB limit")
+    elif file.content_type == "video/webm" and header.startswith(b"\x1a\x45\xdf\xa3"):
+        is_valid_sig = True
+        if file_size > 500 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Video size exceeds 500MB limit")
+
+    if not is_valid_sig:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File signature verification failed"
+        )
+
     # Determine type
     media_type = "image"
     if "video" in file.content_type: media_type = "video"
     if "pdf" in file.content_type: media_type = "pdf"
+
+    # 3. Video Duration Check
+    if media_type == "video":
+        import tempfile
+        import cv2
+        fd, temp_path = tempfile.mkstemp(suffix=os.path.splitext(file.filename)[1])
+        try:
+            with os.fdopen(fd, 'wb') as tmp:
+                shutil_file = file.file
+                shutil_file.seek(0)
+                # chunked copy to avoid RAM blowup
+                while True:
+                    chunk = shutil_file.read(8192)
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+            
+            # reset uploaded file position for subsequent S3 upload
+            file.file.seek(0)
+            
+            cap = cv2.VideoCapture(temp_path)
+            if not cap.isOpened():
+                raise HTTPException(status_code=400, detail="Cannot parse video file structure")
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            cap.release()
+            
+            if fps > 0 and frames > 0:
+                duration = frames / fps
+                if duration > 600: # 10 minutes
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Video duration exceeds 10 minutes limit"
+                    )
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        
+    try:
+        s3_key = storage_service.upload_file(file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Storage upload failed")
         
     job_id = str(uuid.uuid4())
     new_job = MediaJob(
