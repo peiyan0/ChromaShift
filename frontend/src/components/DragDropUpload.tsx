@@ -22,6 +22,24 @@ export const DragDropUpload: React.FC = () => {
   const toast = useToast();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const cachedPending = localStorage.getItem('chromashift_pending_file');
+    if (cachedPending) {
+      try {
+        const parsed = JSON.parse(cachedPending);
+        toast({
+          title: "Interrupted Session Detected",
+          description: `We found a pending upload for "${parsed.name}" (${(parsed.size / 1024 / 1024).toFixed(2)} MB). Please re-select the file to resume.`,
+          status: "info",
+          duration: 7000,
+          isClosable: true,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [toast]);
+
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -65,6 +83,14 @@ export const DragDropUpload: React.FC = () => {
     setFile(selectedFile);
     // Reset to Server-Side tab by default
     setActiveTab(0);
+
+    // Save pending state to localStorage for NFR-3.2 recovery
+    localStorage.setItem('chromashift_pending_file', JSON.stringify({
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+      activeTab: 0
+    }));
   };
 
   const loadSample = async (url: string, filename: string, type: string) => {
@@ -89,6 +115,9 @@ export const DragDropUpload: React.FC = () => {
     if (!file) return;
     setIsUploading(true);
     setProgress(10);
+    
+    // Clear pending session state once upload actively starts
+    localStorage.removeItem('chromashift_pending_file');
     
     try {
       // 1. Upload to S3
@@ -312,7 +341,7 @@ export const DragDropUpload: React.FC = () => {
                   {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
                 </Text>
               </VStack>
-              <Button size="xs" colorScheme="red" variant="ghost" onClick={() => setFile(null)}>
+              <Button size="xs" colorScheme="red" variant="ghost" onClick={() => { setFile(null); localStorage.removeItem('chromashift_pending_file'); }}>
                 Change File
               </Button>
             </HStack>
