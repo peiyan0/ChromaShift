@@ -48,6 +48,8 @@ class MediaJob(Base):
     media_type = Column(String, nullable=False) # 'image', 'video', 'pdf'
     status = Column(String, default="uploaded") # uploaded, processing, completed, failed
     
+    is_saved_permanently = Column(Boolean, default=False)
+    
     # Storage references
     s3_key_original = Column(String, nullable=True)
     s3_key_processed = Column(String, nullable=True)

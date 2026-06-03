@@ -45,3 +45,42 @@ def cleanup_guest_accounts(db: Session, max_age_hours: int = 24) -> int:
         db.commit()
         
     return cleaned_count
+
+def cleanup_expired_media(db: Session, max_age_days: int = 7) -> int:
+    """
+    Finds MediaJobs older than max_age_days where is_saved_permanently is False.
+    Deletes their physical files in S3 and prunes the DB records.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    
+    jobs = db.query(models.MediaJob).filter(
+        models.MediaJob.is_saved_permanently == False
+    ).all()
+    
+    cleaned_count = 0
+    for job in jobs:
+        created_at = job.created_at
+        if created_at is not None:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            
+            if created_at < cutoff:
+                # Delete files
+                if job.s3_key_original:
+                    try:
+                        storage_service.delete_file(job.s3_key_original)
+                    except Exception as e:
+                        print(f"Could not delete expired original key {job.s3_key_original}: {e}")
+                if job.s3_key_processed:
+                    try:
+                        storage_service.delete_file(job.s3_key_processed)
+                    except Exception as e:
+                        print(f"Could not delete expired processed key {job.s3_key_processed}: {e}")
+                        
+                db.delete(job)
+                cleaned_count += 1
+                
+    if cleaned_count > 0:
+        db.commit()
+        
+    return cleaned_count

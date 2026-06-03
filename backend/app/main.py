@@ -24,6 +24,12 @@ try:
 except Exception as e:
     pass
 
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE media_jobs ADD COLUMN is_saved_permanently BOOLEAN DEFAULT FALSE"))
+except Exception as e:
+    pass
+
 app = FastAPI(
     title=settings.PROJECT_NAME, 
     version=settings.VERSION,
