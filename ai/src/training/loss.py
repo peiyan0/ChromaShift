@@ -27,26 +27,3 @@ class DiceBCELoss(nn.Module):
         
         return bce + dice
 
-class MultiObjectiveCVDLoss(nn.Module):
-    """
-    Multi-objective loss function for the end-to-end framework (Phase 2).
-    Includes semantic priority, color discrimination, and perceptual constraints.
-    (Stub for full end-to-end training)
-    """
-    def __init__(self, alpha=1.0, beta=0.5, gamma=0.5):
-        super().__init__()
-        self.alpha = alpha  # Semantic loss weight
-        self.beta = beta    # Perceptual loss weight
-        self.gamma = gamma  # Color discrimination weight
-        self.bce_dice = DiceBCELoss()
-
-    def forward(self, pred_mask, target_mask, pred_img=None, target_img=None):
-        # 1. Semantic Loss (Mask accuracy)
-        semantic_loss = self.bce_dice(pred_mask, target_mask)
-        
-        total_loss = self.alpha * semantic_loss
-        
-        # 2. Perceptual/Color loss would be added here if training the full end-to-end
-        # image transformation network simultaneously.
-        
-        return total_loss

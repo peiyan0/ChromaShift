@@ -1,4 +1,4 @@
-# usage: python quantize_models.py mobile_sam_encoder.onnx mobilevit-small.onnx transunet_v1.onnx yolov8n.onnx
+# usage: python quantize_models.py yolo26n-seg.onnx
 
 import onnx
 from onnxruntime.quantization import quantize_dynamic, QuantType
