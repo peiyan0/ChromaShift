@@ -57,7 +57,7 @@ const CalibrationIcon = () => (
 
 // Mathematical Hypothesis Space definitions
 const CVD_TYPES = ['protanopia', 'deuteranopia', 'tritanopia'];
-const SEVERITY_LEVELS = [0.2, 0.5, 0.8, 1.1, 1.4];
+const SEVERITY_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0];
 
 interface Hypothesis {
   type: string;
@@ -968,7 +968,7 @@ export const CalibrationWizard: FC = () => {
                         </HStack>
                         <Slider
                           min={0.1}
-                          max={1.5}
+                          max={2.0}
                           step={0.05}
                           value={customSeverity}
                           onChange={(v) => setCustomSeverity(v)}
