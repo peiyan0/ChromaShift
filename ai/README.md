@@ -33,8 +33,7 @@ pip install .
 
 ## Key Dependencies
 - **PyTorch**: Primary training framework.
-- **Transformers**: For ViT and Document Image Transformers (DiT).
-- **Ultralytics**: For RT-DETR and YOLO-based modules.
+- **Ultralytics**: For YOLO26-seg and YOLO-based modules.
 - **OpenCV**: Media processing and confusion line implementation.
 - **Albumentations**: CVD-specific data augmentation.
 - **ONNX**: Model serialization for cross-platform inference.
