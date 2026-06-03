@@ -17,7 +17,7 @@ class MediaProcessor:
         1. Read image (OpenCV)
         2. Run YOLO26-seg for semantic mask
         3. Apply Hybrid Adaptive Color Remapping
-        4. Save and return path
+        4. Save and return path with preserved EXIF and accessibility tagging
         """
         image = cv2.imread(input_path)
         if image is None:
@@ -31,6 +31,30 @@ class MediaProcessor:
         
         # Save processed image
         cv2.imwrite(output_path, processed_img)
+
+        # Preserve metadata
+        try:
+            from PIL import Image as PILImage
+            from PIL import PngImagePlugin
+            
+            orig_img = PILImage.open(input_path)
+            processed_pil = PILImage.open(output_path)
+            
+            # Copy EXIF if present
+            exif_data = orig_img.info.get("exif")
+            
+            meta = PngImagePlugin.PngInfo() if orig_img.format == 'PNG' else None
+            if meta:
+                meta.add_text("ChromaShift-Accessibility-Transformation", f"{cvd_type} (severity: {severity})")
+                processed_pil.save(output_path, format=orig_img.format, pnginfo=meta)
+            else:
+                if exif_data:
+                    processed_pil.save(output_path, format=orig_img.format, exif=exif_data)
+                else:
+                    processed_pil.save(output_path, format=orig_img.format)
+        except Exception as e:
+            print(f"Error preserving image metadata: {e}")
+            
         return output_path
 
     def process_video(self, input_path: str, output_path: str, cvd_type: str, severity: float):
@@ -74,6 +98,8 @@ class MediaProcessor:
             '-c:a', 'aac',
             '-movflags', '+faststart',
             '-shortest',
+            '-map_metadata', '1',
+            '-metadata', f'comment=ChromaShift-Accessibility-Transformation: {cvd_type} (severity {severity})',
             output_path,
         ]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -160,6 +186,16 @@ class MediaProcessor:
                     except Exception as e:
                         print(f"Skipping image xref={xref}: {e}")
                         continue
+
+            # Preserve metadata and append accessibility keyword
+            try:
+                metadata = doc.metadata
+                if metadata:
+                    metadata["keywords"] = (metadata.get("keywords", "") + f" ChromaShift-Accessibility-Transformation: {cvd_type}").strip()
+                    metadata["subject"] = (metadata.get("subject", "") + f" Processed with ChromaShift for {cvd_type} (severity {severity})").strip()
+                    doc.set_metadata(metadata)
+            except Exception as e:
+                print(f"Error copying PDF metadata: {e}")
 
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             doc.save(output_path, garbage=4, deflate=True)
