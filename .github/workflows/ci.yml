@@ -34,6 +34,11 @@ jobs:
           cd frontend
           npm run lint
 
+      - name: Frontend Dependency Audit
+        run: |
+          cd frontend
+          npm audit --audit-level=high
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
@@ -72,13 +77,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Run TruffleHog OSS Secrets Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          head: ""
+          extra_args: --debug --only-verified
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
