@@ -1,42 +1,15 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Heading,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Radio,
-  RadioGroup,
-  Stack,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  Textarea,
-  SimpleGrid,
-  Divider,
-  Progress,
-  Badge,
-  useToast,
-  Card,
-  CardBody
-} from '@chakra-ui/react';
 import api from '../services/api';
 
 // SVG Icons
 const StudyIcon = () => (
-  <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-blue-500">
+  <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ color: 'var(--primary)' }}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
   </svg>
 );
 
 const SuccessIcon = () => (
-  <svg width="60" height="60" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-green-500">
+  <svg width="60" height="60" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ color: 'var(--color-success)' }}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
@@ -50,7 +23,7 @@ interface SurveyWizardProps {
 export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, onComplete, onBackToApp }) => {
   const [step, setStep] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const toast = useToast();
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // 1. Demographics States
   const [age, setAge] = useState<string>('');
@@ -94,6 +67,11 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
   const totalSteps = 6;
   const progressPercent = (step / totalSteps) * 100;
+
+  const triggerNotification = (type: 'success' | 'error', text: string) => {
+    setNotification({ type, text });
+    setTimeout(() => setNotification(null), 4000);
+  };
 
   const handleSusChange = (question: string, val: number) => {
     setSus(prev => ({ ...prev, [question]: val }));
@@ -157,22 +135,14 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
     };
 
     try {
-      // Direct call to research submit
       const res = await api.post('research/submit', payload);
       const participantUuid = res.data.participant_uuid;
-      toast({
-        title: "Session Submitted!",
-        description: "Your survey and test results have been registered securely.",
-        status: "success",
-        duration: 4000
-      });
-      onComplete(participantUuid);
+      triggerNotification('success', 'Session Submitted! Your study data has been registered.');
+      setTimeout(() => {
+        onComplete(participantUuid);
+      }, 1500);
     } catch (e) {
-      toast({
-        title: "Submission Error",
-        description: "Failed to upload study metrics to the central research database.",
-        status: "error"
-      });
+      triggerNotification('error', 'Submission Error: Failed to upload study metrics.');
     } finally {
       setIsSubmitting(false);
     }
@@ -182,7 +152,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
   const prevStep = () => setStep(prev => Math.max(prev - 1, 0));
 
   const susQuestions = [
-    { key: "q1", label: "I would use ChomaShift frequently." },
+    { key: "q1", label: "I would use ChromaShift frequently." },
     { key: "q2", label: "I found the platform easy to use." },
     { key: "q3", label: "I was able to learn how to use the platform quickly." },
     { key: "q4", label: "The functions were well integrated." },
@@ -195,608 +165,822 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
   ];
 
   return (
-    <Box className="w-full max-w-4xl mx-auto p-1 bg-gradient-to-tr from-blue-600 via-purple-600 to-indigo-700 rounded-3xl shadow-2xl mt-4">
-      <Box className="w-full h-full p-8 bg-white/95 backdrop-blur-xl rounded-[22px] border border-white/50">
-        
+    <div
+      style={{
+        width: '100%',
+        maxWidth: '900px',
+        margin: 'var(--space-4) auto',
+        padding: '1px',
+        background: 'var(--primary-gradient)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-xl)',
+        position: 'relative'
+      }}
+    >
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          className={`badge badge-${notification.type === 'error' ? 'error' : 'success'}`}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            padding: '10px 20px',
+            borderRadius: 'var(--radius-full)',
+            boxShadow: 'var(--shadow-lg)',
+            border: 'none',
+            textTransform: 'none',
+            fontWeight: 'bold'
+          }}
+        >
+          {notification.text}
+        </div>
+      )}
+
+      <div
+        style={{
+          padding: 'var(--space-8)',
+          backgroundColor: 'var(--bg-primary)',
+          borderRadius: '23px',
+          border: '1px solid var(--border-primary)'
+        }}
+        className="vstack gap-6"
+      >
         {/* Navigation Step Header */}
         {step > 0 && (
-          <Box mb={6}>
-            <HStack justify="space-between" mb={2}>
-              <Badge colorScheme="blue" borderRadius="lg" px={3} py={1} fontSize="xs" fontWeight="bold">
+          <div className="vstack gap-2" style={{ width: '100%', marginBottom: 'var(--space-4)' }}>
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%' }}>
+              <span className="badge badge-primary">
                 Step {step} of {totalSteps}
-              </Badge>
-              <Text fontSize="xs" fontWeight="bold" color="gray.400">
+              </span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
                 {step === 1 && "Demographics Intake"}
                 {step === 2 && "System Usability Scale (SUS)"}
                 {step === 3 && "NASA Task Load Index"}
                 {step === 4 && "Visual Comfort Scale"}
                 {step === 5 && "Open-Ended Interview Logs"}
                 {step === 6 && "Summary & Verification"}
-              </Text>
-            </HStack>
-            <Progress value={progressPercent} size="xs" colorScheme="blue" borderRadius="full" />
-          </Box>
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div
+              style={{
+                height: '4px',
+                width: '100%',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden'
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${progressPercent}%`,
+                  backgroundColor: 'var(--primary)',
+                  borderRadius: 'var(--radius-full)',
+                  transition: 'width var(--transition-normal)'
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Step 0: Welcome and Consent */}
         {step === 0 && (
-          <VStack spacing={8} py={6} align="center" textAlign="center">
+          <div className="vstack gap-6" style={{ alignItems: 'center', textAlign: 'center', padding: 'var(--space-4) 0' }}>
             <StudyIcon />
-            <VStack spacing={3}>
-              <Heading fontSize="3xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text">
-                ChomaShift Usability & Research Study
-              </Heading>
-              <Text fontSize="md" color="gray.600" maxW="2xl">
+            <div className="vstack gap-2">
+              <h2
+                style={{
+                  fontSize: '1.75rem',
+                  fontWeight: '900',
+                  background: 'var(--primary-gradient)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                ChromaShift Usability & Research Study
+              </h2>
+              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
                 Thank you for participating! This study evaluates how real-time Daltonization remap filters affect visual strain, accuracy, and task-load speeds for users with Color Vision Deficiency (CVD).
-              </Text>
-            </VStack>
+              </p>
+            </div>
 
-            <Card variant="outline" w="full" maxW="2xl" borderRadius="2xl" bg="gray.50/50">
-              <CardBody className="text-left space-y-4 p-6" fontSize="sm" color="gray.600">
-                <Text fontWeight="bold" color="gray.800">Research & Data Policy:</Text>
-                <Text>• Your demographic profile, test stopwatch times, and questionnaire answers are saved to a secured database.</Text>
-                <Text>• **Privacy First**: All survey outputs are strictly isolated. No regular users (including yourself) can read or query these logs. They are reserved entirely for administrator analysis.</Text>
-                <Text>• It takes about 8–10 minutes to complete the official guided research session.</Text>
-              </CardBody>
-            </Card>
+            <div 
+              className="card-solid" 
+              style={{ 
+                width: '100%', 
+                maxWidth: '650px', 
+                textAlign: 'left', 
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                padding: 'var(--space-6)',
+                fontSize: '0.875rem',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              <h4 style={{ fontWeight: '700', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>Research & Data Policy:</h4>
+              <ul style={{ listStyleType: 'none', paddingLeft: '0', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <li>• Your demographic profile, test stopwatch times, and questionnaire answers are saved to a secured database.</li>
+                <li>• <strong>Privacy First</strong>: All survey outputs are strictly isolated. No regular users can read or query these logs. They are reserved entirely for administrator analysis.</li>
+                <li>• It takes about 8–10 minutes to complete the official guided research session.</li>
+              </ul>
+            </div>
 
-            <HStack spacing={4}>
+            <div className="hstack gap-4" style={{ marginTop: 'var(--space-4)' }}>
               {onBackToApp && (
-                <Button variant="outline" size="lg" borderRadius="xl" onClick={onBackToApp}>
+                <button className="btn btn-outline btn-lg" onClick={onBackToApp}>
                   Return to Dashboard
-                </Button>
+                </button>
               )}
-              <Button
-                size="lg"
-                px={10}
-                colorScheme="blue"
-                bgGradient="linear(to-r, blue.500, purple.600)"
-                _hover={{ bgGradient: "linear(to-r, blue.600, purple.700)" }}
-                borderRadius="xl"
+              <button
+                className="btn btn-primary btn-lg"
                 onClick={nextStep}
-                shadow="lg"
+                style={{
+                  background: 'var(--primary-gradient)',
+                  boxShadow: 'var(--shadow-lg)'
+                }}
               >
                 Accept & Begin Study Session
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 1: Pre-Task Demographics & self-report */}
         {step === 1 && (
-          <VStack spacing={6} align="stretch">
-            <Box>
-              <Heading fontSize="xl" fontWeight="black" color="gray.800">
+          <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
                 Pre-Task Demographics Intake
-              </Heading>
-              <Text fontSize="sm" color="gray.500">
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Provide brief baseline parameters before starting active vision tasks.
-              </Text>
-            </Box>
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: '0' }} />
 
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="bold">Age (years)</FormLabel>
-                <Input
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gap: 'var(--space-6)',
+                width: '100%'
+              }}
+            >
+              <div className="form-group">
+                <label className="label" htmlFor="age">Age (years) <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                <input
+                  id="age"
                   type="number"
+                  required
                   placeholder="e.g. 25"
+                  className="input"
                   value={age}
                   onChange={e => setAge(e.target.value)}
-                  borderRadius="xl"
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Gender</FormLabel>
-                <Select value={gender} onChange={e => setGender(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="gender">Gender</label>
+                <select id="gender" className="select" value={gender} onChange={e => setGender(e.target.value)}>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Non-binary">Non-binary</option>
                   <option value="Prefer not to say">Prefer not to say</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="bold">Occupation / Field of Study</FormLabel>
-                <Input
+              <div className="form-group">
+                <label className="label" htmlFor="occupation">Occupation / Field of Study <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                <input
+                  id="occupation"
+                  type="text"
+                  required
                   placeholder="e.g. Design, Bio, Finance"
+                  className="input"
                   value={occupation}
                   onChange={e => setOccupation(e.target.value)}
-                  borderRadius="xl"
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Education Level</FormLabel>
-                <Select value={education} onChange={e => setEducation(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="education">Education Level</label>
+                <select id="education" className="select" value={education} onChange={e => setEducation(e.target.value)}>
                   <option value="High School">High School</option>
                   <option value="Bachelor's">Bachelor's</option>
                   <option value="Master's">Master's</option>
                   <option value="PhD">PhD</option>
                   <option value="Other">Other</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Color Blindness (CVD) Type</FormLabel>
-                <Select value={cvdType} onChange={e => setCvdType(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="cvdType">Color Blindness (CVD) Type</label>
+                <select id="cvdType" className="select" value={cvdType} onChange={e => setCvdType(e.target.value)}>
                   <option value="Deuteran">Green-weak (Deuteran / Deuteranomaly)</option>
                   <option value="Protan">Red-weak (Protan / Protanopia)</option>
                   <option value="Tritan">Blue-weak (Tritan / Tritanopia)</option>
                   <option value="Unsure">Unsure / Not diagnosed</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Is this Formally Diagnosed?</FormLabel>
-                <Select value={diagnosed} onChange={e => setDiagnosed(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="diagnosed">Is this Formally Diagnosed?</label>
+                <select id="diagnosed" className="select" value={diagnosed} onChange={e => setDiagnosed(e.target.value)}>
                   <option value="Yes">Yes (By eye professional)</option>
                   <option value="No">No</option>
                   <option value="Strong Suspicion">Strong Suspicion / Family history</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Prior CVD Correction Tool Usage</FormLabel>
-                <Select value={priorTools} onChange={e => setPriorTools(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="priorTools">Prior CVD Correction Tool Usage</label>
+                <select id="priorTools" className="select" value={priorTools} onChange={e => setPriorTools(e.target.value)}>
                   <option value="None">None</option>
                   <option value="EnChroma">EnChroma Glasses</option>
                   <option value="Pilestone">Pilestone Glasses</option>
                   <option value="Other">Other digital filters / apps</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Do you regularly wear color glasses?</FormLabel>
-                <Select value={glassesFreq} onChange={e => setGlassesFreq(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="glassesFreq">Do you regularly wear color glasses?</label>
+                <select id="glassesFreq" className="select" value={glassesFreq} onChange={e => setGlassesFreq(e.target.value)}>
                   <option value="Never">Never</option>
                   <option value="Occasionally">Occasionally</option>
                   <option value="Regularly">Regularly / Every day</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Web Application Comfort Level</FormLabel>
-                <Select value={appComfort} onChange={e => setAppComfort(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="appComfort">Web Application Comfort Level</label>
+                <select id="appComfort" className="select" value={appComfort} onChange={e => setAppComfort(e.target.value)}>
                   <option value="Very Uncomf.">Very Uncomfortable</option>
                   <option value="Uncomf.">Uncomfortable</option>
                   <option value="Neutral">Neutral</option>
                   <option value="Comf.">Comfortable</option>
                   <option value="Very Comf.">Very Comfortable</option>
-                </Select>
-              </FormControl>
+                </select>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">Weekly Computer / Screen Use</FormLabel>
-                <Select value={deviceFreq} onChange={e => setDeviceFreq(e.target.value)} borderRadius="xl">
+              <div className="form-group">
+                <label className="label" htmlFor="deviceFreq">Weekly Computer / Screen Use</label>
+                <select id="deviceFreq" className="select" value={deviceFreq} onChange={e => setDeviceFreq(e.target.value)}>
                   <option value="<5 hrs/week">&lt; 5 hours/week</option>
                   <option value="5-15 hrs">5–15 hours/week</option>
                   <option value="15-30 hrs">15–30 hours/week</option>
                   <option value=">30 hrs">&gt; 30 hours/week</option>
-                </Select>
-              </FormControl>
-            </SimpleGrid>
+                </select>
+              </div>
+            </div>
 
-            <HStack justify="end" pt={6} spacing={4}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+            <div className="hstack" style={{ justifyContent: 'flex-end', gap: 'var(--space-4)', width: '100%', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Back
-              </Button>
-              <Button
-                colorScheme="blue"
-                size="lg"
-                borderRadius="xl"
+              </button>
+              <button
+                className="btn btn-primary btn-lg"
                 onClick={nextStep}
-                isDisabled={!age || !occupation}
+                disabled={!age || !occupation}
               >
                 Proceed to Usability Scale
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 2: System Usability Scale (SUS) */}
         {step === 2 && (
-          <VStack spacing={6} align="stretch">
-            <Box>
-              <Heading fontSize="xl" fontWeight="black" color="gray.800">
+          <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
                 System Usability Scale (SUS)
-              </Heading>
-              <Text fontSize="sm" color="gray.500">
-                Rate your agreement with each statement. 1 = Strongly Disagree, 5 = Strongly Agree.
-              </Text>
-            </Box>
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Rate your agreement with each statement from 1 (Strongly Disagree) to 5 (Strongly Agree).
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: '0' }} />
 
-            <VStack spacing={5} align="stretch" maxH="450px" overflowY="auto" pr={2}>
+            <div
+              className="vstack gap-5"
+              style={{
+                maxHeight: '450px',
+                overflowY: 'auto',
+                paddingRight: 'var(--space-2)'
+              }}
+            >
               {susQuestions.map((q, idx) => (
-                <Box key={q.key} className="p-4 bg-gray-50/50 border border-gray-100 rounded-xl">
-                  <Text fontSize="sm" fontWeight="bold" color="gray.700" mb={3}>
+                <div 
+                  key={q.key} 
+                  className="vstack gap-3" 
+                  style={{ 
+                    padding: 'var(--space-4)', 
+                    backgroundColor: 'var(--bg-secondary)', 
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-primary)' 
+                  }}
+                >
+                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                     {idx + 1}. {q.label}
-                  </Text>
-                  <RadioGroup 
-                    value={sus[q.key].toString()} 
-                    onChange={v => handleSusChange(q.key, parseInt(v, 10))}
-                  >
-                    <Stack direction="row" spacing={{ base: 4, sm: 8 }} justify="center">
-                      <Radio value="1" colorScheme="blue"><Text fontSize="xs">1 (Strongly Disagree)</Text></Radio>
-                      <Radio value="2" colorScheme="blue"><Text fontSize="xs">2</Text></Radio>
-                      <Radio value="3" colorScheme="blue"><Text fontSize="xs">3</Text></Radio>
-                      <Radio value="4" colorScheme="blue"><Text fontSize="xs">4</Text></Radio>
-                      <Radio value="5" colorScheme="blue"><Text fontSize="xs">5 (Strongly Agree)</Text></Radio>
-                    </Stack>
-                  </RadioGroup>
-                </Box>
-              ))}
-            </VStack>
+                  </span>
 
-            <HStack justify="space-between" pt={6}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+                  <div className="vstack gap-2">
+                    <div className="hstack gap-3" style={{ justifyContent: 'center' }}>
+                      {[1, 2, 3, 4, 5].map(val => {
+                        const isSelected = sus[q.key] === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-outline'}`}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: 'var(--radius-full)',
+                              padding: '0'
+                            }}
+                            onClick={() => handleSusChange(q.key, val)}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <span>Strongly Disagree</span>
+                      <span>Strongly Agree</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Back
-              </Button>
-              <Button colorScheme="blue" size="lg" borderRadius="xl" onClick={nextStep}>
+              </button>
+              <button className="btn btn-primary btn-lg" onClick={nextStep}>
                 Proceed to Task Load Index
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 3: NASA Task Load Index */}
         {step === 3 && (
-          <VStack spacing={6} align="stretch">
-            <Box>
-              <Heading fontSize="xl" fontWeight="black" color="gray.800">
+          <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
                 NASA Task Load Index (Workload Metrics)
-              </Heading>
-              <Text fontSize="sm" color="gray.500">
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 For each dimension, rate your experience from 0 (Very Low) to 20 (Very High).
-              </Text>
-            </Box>
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: '0' }} />
 
-            <VStack spacing={6} align="stretch">
+            <div className="vstack gap-6" style={{ width: '100%' }}>
               {/* Mental Demand */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Mental Demand</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaMental} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Mental Demand</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaMental} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How mentally demanding were the tasks? (e.g. complex thinking, color problem-solving, legend mapping)
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaMental} onChange={setNasaMental} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaMental}
+                    onChange={e => setNasaMental(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Physical Demand */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Physical Demand (Eye Strain)</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaPhysical} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Physical Demand (Eye Strain)</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaPhysical} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How physically demanding were the tasks? (specifically squinting, focusing effort, headache development)
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaPhysical} onChange={setNasaPhysical} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaPhysical}
+                    onChange={e => setNasaPhysical(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Temporal Demand */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Temporal Demand</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaTemporal} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Temporal Demand</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaTemporal} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How hurried or rushed did you feel while performing the tasks under the stopwatch?
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaTemporal} onChange={setNasaTemporal} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaTemporal}
+                    onChange={e => setNasaTemporal(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Performance */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Successful Performance</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaPerformance} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Successful Performance</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaPerformance} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How successful do you think you were in completing the tasks? (accuracy of legend identification and tracking)
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaPerformance} onChange={setNasaPerformance} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaPerformance}
+                    onChange={e => setNasaPerformance(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Effort */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Overall Effort</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaEffort} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Overall Effort</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaEffort} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How hard did you have to work (both mentally and physically) to achieve your level of performance?
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaEffort} onChange={setNasaEffort} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaEffort}
+                    onChange={e => setNasaEffort(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Frustration */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontWeight="bold" fontSize="sm" color="gray.700">Frustration Level</Text>
-                  <Text fontWeight="black" color="blue.600">{nasaFrustration} / 20</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.400" mb={2}>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Frustration Level</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaFrustration} / 20</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How insecure, discouraged, irritated, or annoyed did you feel during the tasks?
-                </Text>
-                <Slider min={0} max={20} step={1} value={nasaFrustration} onChange={setNasaFrustration} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
-            </VStack>
+                </p>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={nasaFrustration}
+                    onChange={e => setNasaFrustration(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
+            </div>
 
-            <HStack justify="space-between" pt={6}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Back
-              </Button>
-              <Button colorScheme="blue" size="lg" borderRadius="xl" onClick={nextStep}>
+              </button>
+              <button className="btn btn-primary btn-lg" onClick={nextStep}>
                 Proceed to Comfort Scale
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 4: Custom Visual Comfort Scale */}
         {step === 4 && (
-          <VStack spacing={6} align="stretch">
-            <Box>
-              <Heading fontSize="xl" fontWeight="black" color="gray.800">
+          <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
                 Visual Comfort Assessment
-              </Heading>
-              <Text fontSize="sm" color="gray.500">
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Rate your agreement with each statement from 1 (Strongly Disagree) to 5 (Strongly Agree).
-              </Text>
-            </Box>
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: '0' }} />
 
-            <VStack spacing={6}>
+            <div className="vstack gap-6" style={{ width: '100%' }}>
               {/* Comfort Q1 */}
-              <Box w="full">
-                <HStack justify="space-between" mb={1} fontSize="sm">
-                  <Text fontWeight="bold" color="gray.700">My eyes felt comfortable throughout the session.</Text>
-                  <Text fontWeight="black" color="blue.600">{comfortQ1} / 5</Text>
-                </HStack>
-                <Slider min={1} max={5} step={1} value={comfortQ1} onChange={setComfortQ1} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>My eyes felt comfortable throughout the session.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ1} / 5</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={comfortQ1}
+                    onChange={e => setComfortQ1(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Comfort Q2 */}
-              <Box w="full">
-                <HStack justify="space-between" mb={1} fontSize="sm">
-                  <Text fontWeight="bold" color="gray.700">I experienced eye strain, dry eyes, or ocular fatigue.</Text>
-                  <Text fontWeight="black" color="blue.600">{comfortQ2} / 5</Text>
-                </HStack>
-                <Slider min={1} max={5} step={1} value={comfortQ2} onChange={setComfortQ2} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I experienced eye strain, dry eyes, or ocular fatigue.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ2} / 5</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={comfortQ2}
+                    onChange={e => setComfortQ2(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Comfort Q3 */}
-              <Box w="full">
-                <HStack justify="space-between" mb={1} fontSize="sm">
-                  <Text fontWeight="bold" color="gray.700">I developed a headache during or after the comparative rounds.</Text>
-                  <Text fontWeight="black" color="blue.600">{comfortQ3} / 5</Text>
-                </HStack>
-                <Slider min={1} max={5} step={1} value={comfortQ3} onChange={setComfortQ3} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I developed a headache during or after the comparative rounds.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ3} / 5</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={comfortQ3}
+                    onChange={e => setComfortQ3(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Comfort Q4 */}
-              <Box w="full">
-                <HStack justify="space-between" mb={1} fontSize="sm">
-                  <Text fontWeight="bold" color="gray.700">The remapped media (Daltonized view) looked more comfortable to view than the original.</Text>
-                  <Text fontWeight="black" color="blue.600">{comfortQ4} / 5</Text>
-                </HStack>
-                <Slider min={1} max={5} step={1} value={comfortQ4} onChange={setComfortQ4} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>The remapped media (Daltonized view) looked more comfortable to view than the original.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ4} / 5</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={comfortQ4}
+                    onChange={e => setComfortQ4(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
 
               {/* Comfort Q5 */}
-              <Box w="full">
-                <HStack justify="space-between" mb={1} fontSize="sm">
-                  <Text fontWeight="bold" color="gray.700">I would use these active remapping settings for long screen/reading sessions.</Text>
-                  <Text fontWeight="black" color="blue.600">{comfortQ5} / 5</Text>
-                </HStack>
-                <Slider min={1} max={5} step={1} value={comfortQ5} onChange={setComfortQ5} colorScheme="blue">
-                  <SliderTrack><SliderFilledTrack /></SliderTrack>
-                  <SliderThumb boxSize={5} />
-                </Slider>
-              </Box>
-            </VStack>
+              <div className="vstack gap-2">
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I would use these active remapping settings for long screen/reading sessions.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ5} / 5</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    className="slider"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={comfortQ5}
+                    onChange={e => setComfortQ5(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </div>
+            </div>
 
-            <HStack justify="space-between" pt={6}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Back
-              </Button>
-              <Button colorScheme="blue" size="lg" borderRadius="xl" onClick={nextStep}>
+              </button>
+              <button className="btn btn-primary btn-lg" onClick={nextStep}>
                 Proceed to Interview Notes
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 5: Qualitative Interview notes */}
         {step === 5 && (
-          <VStack spacing={6} align="stretch">
-            <Box>
-              <Heading fontSize="xl" fontWeight="black" color="gray.800">
+          <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
                 Self-Reported Interview & Feedback Logs
-              </Heading>
-              <Text fontSize="sm" color="gray.500">
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Help us capture qualitative observations on transition delays, visual artifacts, or general utility.
-              </Text>
-            </Box>
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: '0' }} />
 
-            <VStack spacing={5} align="stretch" maxH="450px" overflowY="auto" pr={2}>
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
+            <div
+              className="vstack gap-5"
+              style={{
+                maxHeight: '450px',
+                overflowY: 'auto',
+                paddingRight: 'var(--space-2)'
+              }}
+            >
+              <div className="form-group">
+                <label className="label" htmlFor="visualTransitions">
                   1. Did you experience any flickering, lag, or visual latency during transitions?
-                </FormLabel>
-                <Textarea
+                </label>
+                <textarea
+                  id="visualTransitions"
+                  className="textarea"
                   placeholder="Describe transition smooth/abrupt triggers"
                   value={visualTransitions}
                   onChange={e => setVisualTransitions(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
+              <div className="form-group">
+                <label className="label" htmlFor="naturalness">
                   2. Was the remapped color contrast correction natural, wrong, or oversaturated?
-                </FormLabel>
-                <Textarea
+                </label>
+                <textarea
+                  id="naturalness"
+                  className="textarea"
                   placeholder="e.g. natural, looks weird, shifts are realistic"
                   value={naturalness}
                   onChange={e => setNaturalness(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
+              <div className="form-group">
+                <label className="label" htmlFor="onboardingWizard">
                   3. Was the 5-round Anomaloscope Calibration Wizard easy to understand?
-                </FormLabel>
-                <Textarea
+                </label>
+                <textarea
+                  id="onboardingWizard"
+                  className="textarea"
                   placeholder="Wizard feedback, length in rounds, complexity"
                   value={onboardingWizard}
                   onChange={e => setOnboardingWizard(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
-                  4. What was the most frustrating part of using the ChomaShift platform?
-                </FormLabel>
-                <Textarea
+              <div className="form-group">
+                <label className="label" htmlFor="frustratingAspects">
+                  4. What was the most frustrating part of using the ChromaShift platform?
+                </label>
+                <textarea
+                  id="frustratingAspects"
+                  className="textarea"
                   placeholder="Aspects that caused friction or confusion"
                   value={frustratingAspects}
                   onChange={e => setFrustratingAspects(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
+              <div className="form-group">
+                <label className="label" htmlFor="helpfulAspects">
                   5. What was the most helpful or surprising feature you discovered?
-                </FormLabel>
-                <Textarea
+                </label>
+                <textarea
+                  id="helpfulAspects"
+                  className="textarea"
                   placeholder="Vibrant colors, line tracking speed improvement"
                   value={helpfulAspects}
                   onChange={e => setHelpfulAspects(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontSize="sm" fontWeight="bold">
+              <div className="form-group">
+                <label className="label" htmlFor="openFeedback">
                   6. Open-Ended Comments / Recommendations
-                </FormLabel>
-                <Textarea
+                </label>
+                <textarea
+                  id="openFeedback"
+                  className="textarea"
                   placeholder="Suggestions for features, options, or changes"
                   value={openFeedback}
                   onChange={e => setOpenFeedback(e.target.value)}
-                  borderRadius="xl"
-                  rows={2}
                 />
-              </FormControl>
-            </VStack>
+              </div>
+            </div>
 
-            <HStack justify="space-between" pt={6}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Back
-              </Button>
-              <Button colorScheme="blue" size="lg" borderRadius="xl" onClick={nextStep}>
+              </button>
+              <button className="btn btn-primary btn-lg" onClick={nextStep}>
                 Proceed to Verification
-              </Button>
-            </HStack>
-          </VStack>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 6: Summary & Verification */}
         {step === 6 && (
-          <VStack spacing={8} py={6} align="center" textAlign="center">
+          <div className="vstack gap-6" style={{ alignItems: 'center', textAlign: 'center', padding: 'var(--space-4) 0' }}>
             <SuccessIcon />
-            <VStack spacing={3}>
-              <Heading fontSize="3xl" fontWeight="black" color="green.600">
+            <div className="vstack gap-2">
+              <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--color-success)' }}>
                 Ready to Complete Study!
-              </Heading>
-              <Text fontSize="md" color="gray.600" maxW="2xl">
+              </h2>
+              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
                 All demographic fields, comparative performance stopwatch logs, and workload surveys have been successfully assembled.
-              </Text>
-            </VStack>
+              </p>
+            </div>
 
-            <Divider />
+            <div className="divider" style={{ margin: 'var(--space-2) 0' }} />
 
-            <VStack spacing={3} align="start" w="full" maxW="md" className="p-5 bg-gray-50 border border-gray-100 rounded-2xl text-left">
-              <Text fontSize="sm" color="gray.600">**Age**: {age}</Text>
-              <Text fontSize="sm" color="gray.600">**CVD Type**: {cvdType}</Text>
-              <Text fontSize="sm" color="gray.600">**Formally Diagnosed**: {diagnosed}</Text>
-              <Text fontSize="sm" color="gray.600">**Average SUS Confidence**: Rating registered</Text>
-              <Text fontSize="sm" color="gray.600">**NASA Workload Score**: Rating registered</Text>
-            </VStack>
+            <div 
+              className="card-solid vstack gap-3"
+              style={{
+                width: '100%',
+                maxWidth: '450px',
+                textAlign: 'left',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                padding: 'var(--space-5)',
+                fontSize: '0.875rem',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <div><strong>Age</strong>: {age}</div>
+              <div><strong>CVD Type</strong>: {cvdType}</div>
+              <div><strong>Formally Diagnosed</strong>: {diagnosed}</div>
+              <div><strong>Average SUS Confidence</strong>: Rating registered</div>
+              <div><strong>NASA Workload Score</strong>: Rating registered</div>
+            </div>
 
-            <HStack spacing={4}>
-              <Button variant="outline" size="lg" borderRadius="xl" onClick={prevStep}>
+            <div className="hstack gap-4" style={{ marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-outline btn-lg" onClick={prevStep}>
                 Verify Answers
-              </Button>
-              <Button
-                size="lg"
-                px={10}
-                colorScheme="green"
-                bgGradient="linear(to-r, green.500, teal.600)"
-                _hover={{ bgGradient: "linear(to-r, green.600, teal.700)" }}
-                borderRadius="xl"
+              </button>
+              <button
+                className="btn btn-primary btn-lg"
                 onClick={handleSubmit}
-                isLoading={isSubmitting}
-                shadow="lg"
+                disabled={isSubmitting}
+                style={{
+                  background: 'var(--primary-gradient)',
+                  boxShadow: 'var(--shadow-lg)'
+                }}
               >
-                Submit Survey Results to Admin DB
-              </Button>
-            </HStack>
-          </VStack>
+                {isSubmitting ? 'Submitting...' : 'Submit Survey Results to Admin DB'}
+              </button>
+            </div>
+          </div>
         )}
 
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };

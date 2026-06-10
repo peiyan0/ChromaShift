@@ -1,86 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Flex,
-  HStack,
-  VStack,
-  Text,
-  Badge,
-  Button,
-  IconButton,
-  Icon,
-  Spinner,
-  Center,
-  useToast,
-  Divider,
-  SimpleGrid,
-  CircularProgress,
-  CircularProgressLabel,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb
-} from '@chakra-ui/react';
 import { mediaService, type MediaStatusResponse } from '../services/media';
 import { complianceService, type ComplianceReportResponse } from '../services/compliance';
 import { profileService, type VisionProfile } from '../services/profile';
 import api from '../services/api';
 import { aiPreviewService } from '../services/ai_preview';
-
-// Custom SVG Icons
-const BackIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" />
-  </Icon>
-);
-
-const SideBySideIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M2,18H10V6H2V18M1,5H11A1,1 0 0,1 12,6V18A1,1 0 0,1 11,19H1A1,1 0 0,1 0,18V6A1,1 0 0,1 1,5M14,18H22V6H14V18M13,5H23A1,1 0 0,1 24,6V18A1,1 0 0,1 23,19H13A1,1 0 0,1 12,18V6A1,1 0 0,1 13,5Z" />
-  </Icon>
-);
-
-const ToggleViewIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20V4Z" />
-  </Icon>
-);
-
-const DownloadIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" />
-  </Icon>
-);
-
-const ShareIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M18,16.08C17.24,16.08 16.56,16.38 16.04,16.85L8.91,12.7C8.96,12.47 9,12.24 9,12C9,11.76 8.96,11.53 8.91,11.3L15.96,7.19C16.5,7.69 17.21,8 18,8A3,3 0 0,0 21,5A3,3 0 0,0 18,2A3,3 0 0,0 15,5C15,5.24 15.04,5.47 15.09,5.7L8.04,9.81C7.5,9.31 6.79,9 6,9A3,3 0 0,0 3,12A3,3 0 0,0 6,15C6.79,15 7.5,14.69 8.04,14.19L15.16,18.34C15.11,18.55 15.08,18.77 15.08,19C15.08,20.61 16.39,21.92 18,21.92C19.61,21.92 20.92,20.61 20.92,19C20.92,17.39 19.61,16.08 18,16.08Z" />
-  </Icon>
-);
-
-const RefreshIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />
-  </Icon>
-);
-
-const WarningIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M12,2L1,21H23M12,6L19.53,19H4.47M11,10V14H13V10M11,16V18H13V16" />
-  </Icon>
-);
-
-const ErrorIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M15.59,7L12,10.59L8.41,7L7,8.41L10.59,12L7,15.59L8.41,17L12,13.41L15.59,17L17,15.59L13.41,12L17,8.41L15.59,7Z" />
-  </Icon>
-);
+import { 
+  FiArrowLeft, FiColumns, FiMaximize2, FiDownload, FiShare2, 
+  FiRefreshCw, FiAlertTriangle, FiAlertCircle 
+} from 'react-icons/fi';
 
 export const WorkspaceStudio: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
-  const toast = useToast();
 
   const [status, setStatus] = useState<MediaStatusResponse | null>(null);
   const [report, setReport] = useState<ComplianceReportResponse | null>(null);
@@ -96,8 +28,10 @@ export const WorkspaceStudio: React.FC = () => {
   // Dynamic Filtering State
   const [profile, setProfile] = useState<VisionProfile | null>(null);
   const [intensity, setIntensity] = useState<number>(1.0);
+  const [selectedPreviewCvd, setSelectedPreviewCvd] = useState<'profile' | 'deuteranopia' | 'protanopia' | 'tritanopia'>('profile');
 
   const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   // Video Synced References
   const originalVideoRef = useRef<HTMLVideoElement>(null);
@@ -112,14 +46,28 @@ export const WorkspaceStudio: React.FC = () => {
   }, [jobId]);
 
   useEffect(() => {
-    let intervalId: any;
+    let timeoutId: any;
+    let delay = 2000;
+    
+    const tick = async () => {
+      if (status?.status === 'processing' || status?.status === 'uploaded') {
+        try {
+          await loadWorkspace(true);
+          delay = Math.min(delay + 1000, 6000);
+        } catch (err) {
+          console.error("Workspace status polling failed:", err);
+          delay = Math.min(delay * 1.5, 10000);
+        }
+        timeoutId = setTimeout(tick, delay);
+      }
+    };
+
     if (status?.status === 'processing' || status?.status === 'uploaded') {
-      intervalId = setInterval(() => {
-        loadWorkspace(true);
-      }, 2000);
+      timeoutId = setTimeout(tick, delay);
     }
+
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [status?.status, jobId]);
 
@@ -141,24 +89,24 @@ export const WorkspaceStudio: React.FC = () => {
     loadProfile();
   }, []);
 
-
+  const triggerNotification = (type: 'success' | 'error' | 'info', text: string) => {
+    setNotification({ type, text });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   const loadWorkspace = async (isPolling = false) => {
     if (!jobId) return;
     if (!isPolling) setIsLoading(true);
     try {
-      // 1. Fetch Job status & S3 presigned URLs
       const statusRes = await mediaService.getMediaStatus(jobId);
       setStatus(statusRes);
       
-      // Kick off AI semantic mask generation in background
       if (statusRes.download_url_original) {
         setAiMaskStatus('generating');
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = async () => {
           try {
-            // Create a small canvas to extract ImageData for AI
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
@@ -176,7 +124,6 @@ export const WorkspaceStudio: React.FC = () => {
         img.src = statusRes.download_url_original;
       }
       
-      // Determine file type from file extension
       const ext = statusRes.download_url?.split('?')[0].split('.').pop()?.toLowerCase() || '';
       if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'm4v'].includes(ext)) {
         setMediaType('video');
@@ -186,7 +133,6 @@ export const WorkspaceStudio: React.FC = () => {
         setMediaType('image');
       }
 
-      // Try to deduce filename from history list
       try {
         const history = await mediaService.getHistory();
         const job = history.find(j => j.job_id === jobId);
@@ -198,28 +144,22 @@ export const WorkspaceStudio: React.FC = () => {
         console.error("Failed to deduce filename from history", err);
       }
 
-      // 2. Fetch WCAG Compliance Report
       try {
         const reportRes = await complianceService.getReport(jobId);
         setReport(reportRes);
       } catch (error: any) {
         if (error.response?.status === 404) {
-          setReport(null); // No report generated yet
+          setReport(null);
         }
       }
 
     } catch (error) {
-      toast({
-        title: "Workspace Load Failed",
-        description: "Could not fetch media info from the server.",
-        status: "error",
-        duration: 5000,
-        isClosable: true
-      });
-      navigate('/');
-    } finally {
+      triggerNotification('error', 'Workspace load failed. Could not fetch media info.');
+      navigate('/hub');
+    } const finallyBlock = () => {
       if (!isPolling) setIsLoading(false);
-    }
+    };
+    finallyBlock();
   };
 
   const handleRunAudit = async () => {
@@ -228,9 +168,9 @@ export const WorkspaceStudio: React.FC = () => {
     try {
       const reportRes = await complianceService.runCheck(jobId);
       setReport(reportRes);
-      toast({ title: "Accessibility Audit Complete", status: "success", duration: 3000 });
+      triggerNotification('success', 'Accessibility Audit Complete');
     } catch (error) {
-      toast({ title: "Accessibility Audit Failed", description: "Could not run automated WCAG check.", status: "error", duration: 4000 });
+      triggerNotification('error', 'Accessibility Audit Failed');
     } finally {
       setIsAuditing(false);
     }
@@ -242,12 +182,11 @@ export const WorkspaceStudio: React.FC = () => {
     try {
       const cvdType = profile?.cvd_type || (profile as any)?.type || 'deuteranopia';
       await mediaService.processMedia(jobId, { severity: intensity, cvd_type: cvdType });
-      toast({ title: "Processing Started", description: "Your file is being re-rendered by the AI on the server.", status: "info", duration: 3000 });
-      // Reload workspace to trigger the processing/loading UI
+      triggerNotification('info', 'Re-rendering started on the server.');
       setIsDirty(false);
       await loadWorkspace();
     } catch (error) {
-      toast({ title: "Reprocessing Failed", description: "Could not start the background task.", status: "error", duration: 4000 });
+      triggerNotification('error', 'Reprocessing failed.');
     } finally {
       setIsReprocessing(false);
     }
@@ -264,9 +203,9 @@ export const WorkspaceStudio: React.FC = () => {
     try {
       const data = await mediaService.shareMedia(jobId);
       await navigator.clipboard.writeText(data.share_url);
-      toast({ title: "Share link copied", description: "The accessible link has been copied to your clipboard.", status: "success", duration: 3000 });
+      triggerNotification('success', 'Accessible share link copied!');
     } catch (error) {
-      toast({ title: "Share Link Generation Failed", status: "error", duration: 3000 });
+      triggerNotification('error', 'Share Link Generation Failed');
     }
   };
 
@@ -286,11 +225,10 @@ export const WorkspaceStudio: React.FC = () => {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      toast({ title: "Export Failed", status: "error" });
+      triggerNotification('error', 'Export Failed');
     }
   };
 
-  // Video Synchronizer Logic
   const syncPlayback = (source: 'processed' | 'original') => {
     if (isSyncing.current) return;
     isSyncing.current = true;
@@ -299,13 +237,11 @@ export const WorkspaceStudio: React.FC = () => {
     const targetVideo = source === 'processed' ? originalVideoRef.current : processedVideoRef.current;
 
     if (sourceVideo && targetVideo) {
-      // Synchronize play state
       if (sourceVideo.paused && !targetVideo.paused) {
         targetVideo.pause();
       } else if (!sourceVideo.paused && targetVideo.paused) {
         targetVideo.play().catch(() => {});
       }
-      // Synchronize timestamp (allow tiny deviation threshold of 0.05s)
       if (Math.abs(targetVideo.currentTime - sourceVideo.currentTime) > 0.05) {
         targetVideo.currentTime = sourceVideo.currentTime;
       }
@@ -316,520 +252,604 @@ export const WorkspaceStudio: React.FC = () => {
     }, 15);
   };
 
-  const getSeverityIcon = (severity: string) => {
-    if (severity === 'Error') return <ErrorIcon color="red.500" w={5} h={5} />;
-    if (severity === 'Warning') return <WarningIcon color="orange.500" w={5} h={5} />;
-    return null;
-  };
-
   if (isLoading) {
     return (
-      <Center h="70vh" flexDir="column">
-        <Spinner size="xl" color="blue.500" mb={4} thickness="4px" />
-        <Text color="gray.600" fontWeight="medium">Loading Workspace Studio...</Text>
-      </Center>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '16px' }}>
+        <div className="skeleton" style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
+        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Loading Workspace Studio...</span>
+      </div>
     );
   }
 
   if (status?.status === 'processing' || status?.status === 'uploaded') {
     return (
-      <Center h="70vh" flexDir="column" p={6}>
-        <CircularProgress isIndeterminate color="blue.500" size="80px" thickness="8px" mb={6}>
-          <CircularProgressLabel color="blue.500" fontSize="xs" fontWeight="bold">AI</CircularProgressLabel>
-        </CircularProgress>
-        <Text fontSize="xl" fontWeight="black" color="gray.800" mb={2}>Processing Your File...</Text>
-        <Text color="gray.500" textAlign="center" maxW="md" mb={6}>
-          Our semantic AI pipeline is analyzing and remapping your colors for maximum WCAG compliance. This will take just a moment.
-        </Text>
-        <Button leftIcon={<RefreshIcon w={4} h={4} />} onClick={() => loadWorkspace()} colorScheme="blue" variant="outline" borderRadius="xl">
-          Refresh Status
-        </Button>
-      </Center>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '24px', gap: '16px', maxWidth: '460px', margin: '0 auto' }}>
+        <div className="skeleton animate-pulse-border" style={{ width: '64px', height: '64px', borderRadius: '50%' }} />
+        <h3 style={{ fontFamily: 'var(--font-heading)' }}>AI Re-rendering File...</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+          Our server-side pipeline is applying semantic corrections for your vision deficiency. This will complete in a moment.
+        </p>
+        <button onClick={() => loadWorkspace()} className="btn btn-outline">
+          <FiRefreshCw size={14} />
+          <span>Check Status</span>
+        </button>
+      </div>
     );
   }
 
   if (status?.status === 'failed') {
     return (
-      <Center h="70vh" flexDir="column" p={6}>
-        <Icon as={WarningIcon} w={16} h={16} color="red.500" mb={6} />
-        <Text fontSize="xl" fontWeight="black" color="gray.800" mb={2}>Processing Failed</Text>
-        <Text color="gray.500" textAlign="center" maxW="md" mb={6}>
-          An error occurred in our AI processing pipeline while attempting to remap colors for this file.
-        </Text>
-        <Button onClick={() => navigate('/')} colorScheme="blue" borderRadius="xl">
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '24px', gap: '16px', maxWidth: '400px', margin: '0 auto' }}>
+        <FiAlertCircle size={48} style={{ color: 'var(--color-error)' }} />
+        <h3 style={{ fontFamily: 'var(--font-heading)' }}>AI Processing Failed</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          An error occurred in our server pipeline while trying to Daltonize this asset.
+        </p>
+        <button onClick={() => navigate('/hub')} className="btn btn-primary">
           Back to Dashboard
-        </Button>
-      </Center>
+        </button>
+      </div>
     );
   }
 
   return (
-    <Box w="full" px={1} py={4}>
-      {/* Studio Header Bar */}
-      <Flex justify="space-between" align="center" mb={6} bg="white" p={4} borderRadius="2xl" border="1px" borderColor="gray.100" shadow="sm">
-        <HStack spacing={4}>
-          <IconButton
-            aria-label="Back to Dashboard"
-            icon={<BackIcon w={5} h={5} />}
-            variant="ghost"
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', position: 'relative' }}>
+      
+      {/* Local Notification Alerts */}
+      {notification && (
+        <div className={`badge badge-${notification.type}`} style={{
+          position: 'absolute',
+          top: '0px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          padding: '10px 20px',
+          borderRadius: 'var(--radius-full)',
+          boxShadow: 'var(--shadow-lg)',
+          border: 'none',
+          textTransform: 'none',
+          fontWeight: 'bold',
+          animation: 'slide-up 0.2s ease-out'
+        }}>
+          {notification.text}
+        </div>
+      )}
+
+      {/* Hidden simulator SVG filters */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true" focusable="false">
+        <defs>
+          <filter id="sim-deuteranopia">
+            <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0" />
+          </filter>
+          <filter id="sim-protanopia">
+            <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0" />
+          </filter>
+          <filter id="sim-tritanopia">
+            <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0" />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* Studio Header Card */}
+      <div 
+        className="card-solid hstack" 
+        style={{
+          justifyContent: 'space-between',
+          padding: '16px 24px',
+          boxShadow: 'var(--shadow-sm)',
+          border: '1px solid var(--border-primary)',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}
+      >
+        <div className="hstack gap-4">
+          <button 
             onClick={() => navigate('/hub')}
-            borderRadius="full"
-          />
-          <VStack align="flex-start" spacing={0}>
-            <HStack>
-              <Text fontSize="lg" fontWeight="bold" color="gray.800">{fileName}</Text>
-              <Badge colorScheme={mediaType === 'image' ? 'purple' : mediaType === 'video' ? 'orange' : 'red'} variant="subtle">
-                {mediaType.toUpperCase()}
-              </Badge>
-              {aiMaskStatus === 'complete' && (
-                <Badge colorScheme="green" variant="outline">AI Region Mask Active</Badge>
-              )}
-              {aiMaskStatus === 'fallback' && (
-                <Badge colorScheme="yellow" variant="outline">SLIC Fallback Active</Badge>
-              )}
-            </HStack>
-            <Text fontSize="xs" color="gray.400">Job ID: {jobId}</Text>
-          </VStack>
-        </HStack>
+            className="btn btn-ghost"
+            style={{ padding: '8px', borderRadius: '50%', width: '36px', height: '36px', minWidth: '36px' }}
+            aria-label="Back to dashboard"
+          >
+            <FiArrowLeft size={18} />
+          </button>
+          
+          <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
+            <div className="hstack gap-2">
+              <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{fileName}</strong>
+              <span className="badge badge-primary">{mediaType.toUpperCase()}</span>
+              {aiMaskStatus === 'complete' && <span className="badge badge-success" style={{ fontSize: '0.6rem' }}>AI Mask Active</span>}
+              {aiMaskStatus === 'fallback' && <span className="badge badge-warning" style={{ fontSize: '0.6rem' }}>SLIC Fallback Active</span>}
+            </div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Job ID: {jobId}</span>
+          </div>
+        </div>
 
-        {/* Comparison Layout Selectors */}
-        <HStack spacing={3} bg="gray.100" p={1} borderRadius="xl">
-          <Button
-            leftIcon={<SideBySideIcon w={4} h={4} />}
-            size="sm"
-            variant={displayMode === 'side-by-side' ? 'solid' : 'ghost'}
-            colorScheme={displayMode === 'side-by-side' ? 'blue' : 'gray'}
+        {/* View Mode Toggle Buttons */}
+        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+          <button
             onClick={() => setDisplayMode('side-by-side')}
-            borderRadius="lg"
+            className="btn btn-sm"
+            style={{
+              backgroundColor: displayMode === 'side-by-side' ? 'var(--bg-primary)' : 'transparent',
+              border: displayMode === 'side-by-side' ? '1px solid var(--border-primary)' : 'none',
+              color: 'var(--text-primary)',
+              boxShadow: displayMode === 'side-by-side' ? 'var(--shadow-sm)' : 'none'
+            }}
           >
-            Side-by-Side
-          </Button>
-          <Button
-            leftIcon={<ToggleViewIcon w={4} h={4} />}
-            size="sm"
-            variant={displayMode === 'toggle' ? 'solid' : 'ghost'}
-            colorScheme={displayMode === 'toggle' ? 'blue' : 'gray'}
+            <FiColumns size={14} />
+            <span>Side-by-Side</span>
+          </button>
+          <button
             onClick={() => setDisplayMode('toggle')}
-            borderRadius="lg"
+            className="btn btn-sm"
+            style={{
+              backgroundColor: displayMode === 'toggle' ? 'var(--bg-primary)' : 'transparent',
+              border: displayMode === 'toggle' ? '1px solid var(--border-primary)' : 'none',
+              color: 'var(--text-primary)',
+              boxShadow: displayMode === 'toggle' ? 'var(--shadow-sm)' : 'none'
+            }}
           >
-            Overlay Toggle
-          </Button>
-        </HStack>
-      </Flex>
+            <FiMaximize2 size={14} />
+            <span>Overlay Toggle</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Main Grid: Left Media Workspace, Right/Bottom WCAG Sidebar */}
-      <SimpleGrid columns={{ base: 1, lg: 12 }} spacing={6}>
-        {/* MEDIA VIEWPORT PANEL */}
-        <Box gridColumn={{ lg: displayMode === 'side-by-side' ? "span 12" : "span 8" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" overflow="hidden" p={6}>
-          {/* Intensity Slider */}
-          {(mediaType === 'image' || mediaType === 'video') && (
-            <Box mb={6} p={4} bg="gray.50" borderRadius="xl" border="1px" borderColor="gray.200">
-              <Flex justify="space-between" mb={2}>
-                <Text fontSize="sm" fontWeight="bold" color="gray.700">Live Correction Intensity (Severity)</Text>
-                <Text fontSize="sm" fontWeight="bold" color="blue.600">{Math.round(intensity * 100)}%</Text>
-              </Flex>
-              <Slider
-                aria-label="intensity-slider"
-                min={0}
-                max={2}
-                step={0.1}
-                value={intensity}
-                onChange={(val) => {
-                  setIntensity(val);
-                  setIsDirty(true);
-                }}
-                colorScheme="blue"
+      {/* Main Studio Area */}
+      <div className="grid gap-6" style={{
+        gridTemplateColumns: 'repeat(12, 1fr)',
+        alignItems: 'start',
+        width: '100%'
+      }}>
+        
+        {/* Left Side Media Render Container */}
+        <div 
+          className="card-solid"
+          style={{
+            gridColumn: displayMode === 'side-by-side' ? 'span 12' : 'span 8',
+            padding: '24px',
+            border: '1px solid var(--border-primary)',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}
+          className-mobile-col="span 12"
+        >
+          {/* Top simulated filter switcher */}
+          <div 
+            className="hstack" 
+            style={{
+              justifyContent: 'space-between',
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 'var(--radius-md)',
+              padding: '6px 16px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Simulate deficiency:</span>
+            <div className="hstack gap-2" style={{ flexWrap: 'wrap' }}>
+              <button 
+                onClick={() => setSelectedPreviewCvd('profile')}
+                className={`btn btn-xs ${selectedPreviewCvd === 'profile' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.65rem' }}
               >
-                <SliderTrack bg="gray.300">
-                  <SliderFilledTrack />
-                </SliderTrack>
-                <SliderThumb boxSize={6} shadow="md" />
-              </Slider>
-              <Flex justify="space-between" align="center" mt={3}>
-                <Text fontSize="xs" color="gray.500" maxW="70%">
-                  The slider applies a real-time frontend GPU preview. To permanently save this intensity, you must re-render the file on the server.
-                </Text>
-                <Button 
-                  size="sm" 
-                  colorScheme="blue" 
-                  isLoading={isReprocessing} 
-                  loadingText="Processing"
+                Corrected View
+              </button>
+              <button 
+                onClick={() => setSelectedPreviewCvd('deuteranopia')}
+                className={`btn btn-xs ${selectedPreviewCvd === 'deuteranopia' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.65rem' }}
+              >
+                Deuteranopia
+              </button>
+              <button 
+                onClick={() => setSelectedPreviewCvd('protanopia')}
+                className={`btn btn-xs ${selectedPreviewCvd === 'protanopia' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.65rem' }}
+              >
+                Protanopia
+              </button>
+              <button 
+                onClick={() => setSelectedPreviewCvd('tritanopia')}
+                className={`btn btn-xs ${selectedPreviewCvd === 'tritanopia' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.65rem' }}
+              >
+                Tritanopia
+              </button>
+            </div>
+          </div>
+
+          {/* Severity Adjuster Panel */}
+          {(mediaType === 'image' || mediaType === 'video') && (
+            <div className="card-solid vstack gap-3" style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
+              <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                <strong style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Live Correction Severity</strong>
+                <span className="text-mono" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{Math.round(intensity * 100)}%</span>
+              </div>
+              
+              <div className="slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={intensity}
+                  onChange={e => { setIntensity(parseFloat(e.target.value)); setIsDirty(true); }}
+                  className="slider"
+                />
+              </div>
+
+              <div className="hstack" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginTop: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '70%' }}>
+                  Slider modifies dynamic preview instantly. Click Re-Render to save parameters.
+                </span>
+                <button 
                   onClick={handleReprocess}
+                  disabled={isReprocessing}
+                  className="btn btn-sm btn-primary"
                 >
-                  Apply & Re-Render
-                </Button>
-              </Flex>
-            </Box>
+                  {isReprocessing ? 'Processing...' : 'Apply & Re-Render'}
+                </button>
+              </div>
+            </div>
           )}
 
+          {/* Toggle buttons for overlay display mode */}
           {displayMode === 'toggle' && (
-            <Flex justify="center" mb={4}>
-              <HStack spacing={1} bg="gray.100" p={1} borderRadius="lg">
-                <Button
-                  size="xs"
-                  variant={toggleActive === 'original' ? 'solid' : 'ghost'}
-                  colorScheme={toggleActive === 'original' ? 'teal' : 'gray'}
+            <div className="hstack" style={{ justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+                <button
                   onClick={() => setToggleActive('original')}
-                  borderRadius="md"
+                  className={`btn btn-sm ${toggleActive === 'original' ? 'btn-secondary' : 'btn-ghost'}`}
+                  style={{ fontSize: '0.75rem', padding: '4px 12px' }}
                 >
                   Original File
-                </Button>
-                <Button
-                  size="xs"
-                  variant={toggleActive === 'processed' ? 'solid' : 'ghost'}
-                  colorScheme={toggleActive === 'processed' ? 'teal' : 'gray'}
+                </button>
+                <button
                   onClick={() => setToggleActive('processed')}
-                  borderRadius="md"
+                  className={`btn btn-sm ${toggleActive === 'processed' ? 'btn-secondary' : 'btn-ghost'}`}
+                  style={{ fontSize: '0.75rem', padding: '4px 12px' }}
                 >
                   Corrected View
-                </Button>
-              </HStack>
-            </Flex>
+                </button>
+              </div>
+            </div>
           )}
 
-          {/* Dynamic Media Renderer */}
-          {mediaType === 'image' && (
-            <Box>
-              {displayMode === 'side-by-side' ? (
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="gray.500" mb={1} textAlign="center">Original Image</Text>
-                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50">
-                      <img
-                        src={status?.download_url_original || ''}
-                        alt="Original Upload"
-                        style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain' }}
-                      />
-                    </Box>
-                  </VStack>
-                  <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">
-                      {status?.download_url && !isDirty ? "Corrected Image (AI Processed)" : "Unsaved Changes"}
-                    </Text>
-                    <Box border="1px" borderColor={isDirty ? "orange.300" : "blue.100"} borderRadius="xl" overflow="hidden" shadow="inner" maxH="75vh" display="flex" justifyContent="center" bg="gray.50" position="relative">
-                      <img
-                        src={status?.download_url ? status.download_url : (status?.download_url_original || '')}
-                        alt="Corrected Accessible"
-                        style={{ 
-                          width: '100%', 
-                          height: 'auto', 
-                          maxHeight: '75vh', 
-                          objectFit: 'contain', 
-                          opacity: isDirty ? 0.6 : 1.0
-                        }}
-                      />
+          {/* Media Viewport */}
+          <div style={{ filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none', width: '100%' }}>
+            
+            {/* Image renderer */}
+            {mediaType === 'image' && (
+              displayMode === 'side-by-side' ? (
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Original</span>
+                    <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={status?.download_url_original || ''} alt="Original uploaded file" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    </div>
+                  </div>
+                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                      {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
+                    </span>
+                    <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                      <img src={status?.download_url || (status?.download_url_original || '')} alt="Corrected remapped file" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isDirty ? 0.6 : 1 }} />
                       {isDirty && (
-                        <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.300">
-                          <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
-                            Click Apply & Re-Render
-                          </Button>
-                        </Center>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                            Apply Changes
+                          </button>
+                        </div>
                       )}
-                    </Box>
-                  </VStack>
-                </SimpleGrid>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <Center minH="400px">
-                  <Box border="1px" borderColor={isDirty ? "orange.300" : "gray.200"} borderRadius="2xl" overflow="hidden" shadow="lg" w="100%" display="flex" justifyContent="center" bg="gray.50" position="relative">
-                    <img
-                      src={toggleActive === 'processed' ? (status?.download_url ? status.download_url : (status?.download_url_original || '')) : (status?.download_url_original || '')}
-                      alt="Overlay View"
-                      style={{ 
-                        width: '100%', 
-                        height: 'auto', 
-                        maxHeight: '80vh', 
-                        objectFit: 'contain',
-                        opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1.0
-                      }}
-                    />
-                    {toggleActive === 'processed' && isDirty && (
-                      <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.300">
-                        <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
-                          Click Apply & Re-Render
-                        </Button>
-                      </Center>
-                    )}
-                  </Box>
-                </Center>
-              )}
-            </Box>
-          )}
+                <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <img
+                    src={toggleActive === 'processed' ? (status?.download_url || (status?.download_url_original || '')) : (status?.download_url_original || '')}
+                    alt="Single viewport view"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1 }}
+                  />
+                  {toggleActive === 'processed' && isDirty && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                        Apply Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
 
-          {mediaType === 'video' && (
-            <Box>
-              {displayMode === 'side-by-side' ? (
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="gray.500" mb={1} textAlign="center">Original Video</Text>
-                    <Box border="1px" borderColor="gray.200" borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex">
+            {/* Video renderer */}
+            {mediaType === 'video' && (
+              displayMode === 'side-by-side' ? (
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Original</span>
+                    <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'black', width: '100%', height: '320px', display: 'flex' }}>
                       <video
                         ref={originalVideoRef}
                         src={status?.download_url_original || ''}
                         controls
                         playsInline
-                        style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         onPlay={() => syncPlayback('original')}
                         onPause={() => syncPlayback('original')}
                         onSeeking={() => syncPlayback('original')}
                         onSeeked={() => syncPlayback('original')}
                       />
-                    </Box>
-                  </VStack>
-                  <VStack align="stretch">
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">
-                      {status?.download_url && !isDirty ? "Corrected Video (AI Processed)" : "Unsaved Changes"}
-                    </Text>
-                    <Box border="1px" borderColor={isDirty ? "orange.300" : "blue.100"} borderRadius="xl" overflow="hidden" bg="black" shadow="lg" maxH="75vh" display="flex" position="relative">
+                    </div>
+                  </div>
+                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                      {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
+                    </span>
+                    <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'black', width: '100%', height: '320px', display: 'flex', position: 'relative' }}>
                       <video
                         ref={processedVideoRef}
-                        src={status?.download_url ? status.download_url : (status?.download_url_original || '')}
+                        src={status?.download_url || (status?.download_url_original || '')}
                         controls
                         playsInline
-                        style={{ 
-                          width: '100%', 
-                          maxHeight: '75vh', 
-                          objectFit: 'contain', 
-                          opacity: isDirty ? 0.6 : 1.0 
-                        }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isDirty ? 0.6 : 1 }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
                         onSeeking={() => syncPlayback('processed')}
                         onSeeked={() => syncPlayback('processed')}
                       />
                       {isDirty && (
-                        <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.400">
-                          <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
-                            Click Apply & Re-Render
-                          </Button>
-                        </Center>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                          <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                            Apply Changes
+                          </button>
+                        </div>
                       )}
-                    </Box>
-                  </VStack>
-                </SimpleGrid>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <Center>
-                  <Box border="1px" borderColor={isDirty ? "orange.300" : "gray.200"} borderRadius="xl" overflow="hidden" bg="black" shadow="2xl" w="100%" display="flex" justifyContent="center" position="relative">
-                    <video
-                      key={toggleActive}
-                      src={toggleActive === 'processed' ? (status?.download_url ? status.download_url : (status?.download_url_original || '')) : (status?.download_url_original || '')}
-                      controls
-                      autoPlay
-                      muted
-                      playsInline
-                      style={{ 
-                        width: '100%', 
-                        maxHeight: '80vh', 
-                        objectFit: 'contain',
-                        opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1.0
-                      }}
-                    />
-                    {toggleActive === 'processed' && isDirty && (
-                      <Center position="absolute" top={0} left={0} right={0} bottom={0} bg="blackAlpha.400">
-                        <Button colorScheme="orange" size="lg" shadow="2xl" onClick={handleReprocess} isLoading={isReprocessing}>
-                          Click Apply & Re-Render
-                        </Button>
-                      </Center>
-                    )}
-                  </Box>
-                </Center>
-              )}
-              <Text fontSize="xs" color="gray.400" mt={3} textAlign="center">
-                * Playback controls are fully synchronized in Side-by-Side layout to compare details in real-time.
-              </Text>
-            </Box>
-          )}
+                <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: 'black', width: '100%', height: '400px', display: 'flex', justifyContent: 'center', position: 'relative' }}>
+                  <video
+                    key={toggleActive}
+                    src={toggleActive === 'processed' ? (status?.download_url || (status?.download_url_original || '')) : (status?.download_url_original || '')}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1 }}
+                  />
+                  {toggleActive === 'processed' && isDirty && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                      <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                        Apply Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
 
-          {mediaType === 'pdf' && (
-            <Box>
-              {displayMode === 'side-by-side' ? (
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <VStack align="stretch" h="650px">
-                    <Text fontWeight="bold" fontSize="sm" color="gray.500" mb={1} textAlign="center">Original PDF Document</Text>
+            {/* PDF renderer */}
+            {mediaType === 'pdf' && (
+              displayMode === 'side-by-side' ? (
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                  <div className="vstack gap-2" style={{ height: '580px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)', textAlign: 'center' }}>Original</span>
                     <iframe
                       src={`${status?.download_url_original}#toolbar=0`}
                       width="100%"
                       height="100%"
-                      style={{ border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}
+                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white' }}
                       title="Original PDF"
                     />
-                  </VStack>
-                  <VStack align="stretch" h="650px">
-                    <Text fontWeight="bold" fontSize="sm" color="blue.500" mb={1} textAlign="center">Corrected PDF Document</Text>
+                  </div>
+                  <div className="vstack gap-2" style={{ height: '580px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)', textAlign: 'center' }}>Calibrated PDF</span>
                     <iframe
                       src={`${status?.download_url}#toolbar=0`}
                       width="100%"
                       height="100%"
-                      style={{ border: '1px solid #BEE3F8', borderRadius: '12px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}
+                      style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white' }}
                       title="Processed PDF"
                     />
-                  </VStack>
-                </SimpleGrid>
+                  </div>
+                </div>
               ) : (
-                <Box h="650px" w="100%">
+                <div style={{ height: '580px', width: '100%' }}>
                   <iframe
                     key={toggleActive}
                     src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                     width="100%"
                     height="100%"
-                    style={{ border: '1px solid #E2E8F0', borderRadius: '16px' }}
+                    style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white' }}
                     title="PDF Toggle Viewer"
                   />
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
+                </div>
+              )
+            )}
 
-        {/* WCAG COMPLIANCE SIDEBAR */}
-        <Box gridColumn={{ lg: displayMode === 'side-by-side' ? "span 12" : "span 4" }} bg="white" border="1px" borderColor="gray.100" shadow="md" borderRadius="2xl" p={6}>
+          </div>
+        </div>
+
+        {/* Right Side Compliance Sidebar Panel */}
+        <div 
+          className="card-solid"
+          style={{
+            gridColumn: displayMode === 'side-by-side' ? 'span 12' : 'span 4',
+            padding: '24px',
+            border: '1px solid var(--border-primary)',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            alignSelf: 'stretch'
+          }}
+          className-mobile-col="span 12"
+        >
           {!report ? (
-            <Center py={12} flexDir="column" h="100%">
-              <Text mb={4} color="gray.600" textAlign="center" fontWeight="medium">
-                No compliance report exists for this file.
-              </Text>
-              <Button
-                colorScheme="blue"
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', textAlign: 'center', gap: '16px', height: '100%' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No compliance report exists for this file.</p>
+              <button 
                 onClick={handleRunAudit}
-                isLoading={isAuditing}
-                loadingText="Running Real WCAG Audit..."
-                size="md"
-                shadow="sm"
-                borderRadius="xl"
+                disabled={isAuditing}
+                className="btn btn-primary"
               >
-                Run Compliance Check
-              </Button>
-            </Center>
+                {isAuditing ? 'Auditing...' : 'Run Compliance Check'}
+              </button>
+            </div>
           ) : (
-            <VStack spacing={6} align="stretch">
-              {/* Scorecard Widget */}
-              <Box bg="slate.50" border="1px" borderColor="gray.100" p={5} borderRadius="2xl" shadow="sm">
-                <Text fontSize="md" fontWeight="bold" color="gray.700" mb={4}>Accessibility Audit</Text>
-                <HStack justify="space-around" align="center" spacing={4}>
-                  <CircularProgress
-                    value={report.score}
-                    size="90px"
-                    thickness="12px"
-                    color={report.score >= 90 ? 'green.400' : report.score >= 70 ? 'orange.400' : 'red.400'}
-                  >
-                    <CircularProgressLabel fontSize="lg" fontWeight="black" color="gray.700">
-                      {Math.round(report.score)}%
-                    </CircularProgressLabel>
-                  </CircularProgress>
+            <div className="vstack gap-6" style={{ alignItems: 'stretch' }}>
+              
+              {/* Score Arc */}
+              <div 
+                className="vstack"
+                style={{
+                  alignItems: 'center',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  padding: '20px',
+                  borderRadius: 'var(--radius-lg)',
+                  gap: '16px'
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Accessibility Score</span>
+                
+                <div style={{ position: 'relative', width: '90px', height: '90px' }}>
+                  {/* SVG circular arc progress */}
+                  <svg width="90" height="90" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="var(--border-primary)"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke={report.score >= 90 ? 'var(--color-success)' : report.score >= 70 ? 'var(--color-warning)' : 'var(--color-error)'}
+                      strokeWidth="3"
+                      strokeDasharray={`${report.score}, 100`}
+                      style={{ transition: 'stroke-dasharray 0.5s ease-out' }}
+                    />
+                  </svg>
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '1.2rem',
+                    fontWeight: 'bold',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {Math.round(report.score)}%
+                  </div>
+                </div>
 
-                  <VStack align="flex-start" spacing={1}>
-                    <Text fontSize="xs" color="gray.400" fontWeight="bold" textTransform="uppercase">Status</Text>
-                    <Badge
-                      colorScheme={report.status === 'pass' ? 'green' : report.status === 'fail' ? 'red' : 'yellow'}
-                      fontSize="md"
-                      px={3}
-                      py={1}
-                      borderRadius="lg"
-                    >
-                      {report.status.toUpperCase()}
-                    </Badge>
-                  </VStack>
-                </HStack>
-              </Box>
+                <div className="vstack gap-1" style={{ alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</span>
+                  <span className={`badge badge-${report.status === 'pass' ? 'success' : report.status === 'fail' ? 'error' : 'warning'}`} style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+                    {report.status === 'pass' ? '✓ PASS' : report.status === 'fail' ? '✗ FAIL' : '~ PARTIAL'}
+                  </span>
+                </div>
+              </div>
 
-              {/* Operations Control Panel */}
-              <Box>
-                <Text fontSize="xs" color="gray.400" fontWeight="bold" textTransform="uppercase" mb={3}>Actions</Text>
-                <SimpleGrid columns={2} spacing={3}>
-                  <Button
-                    leftIcon={<DownloadIcon w={4} h={4} />}
-                    size="sm"
-                    colorScheme="blue"
-                    onClick={handleDownload}
-                    borderRadius="xl"
-                  >
-                    Download File
-                  </Button>
-                  <Button
-                    leftIcon={<ShareIcon w={4} h={4} />}
-                    size="sm"
-                    variant="outline"
-                    colorScheme="blue"
-                    onClick={handleShare}
-                    borderRadius="xl"
-                  >
-                    Copy Link
-                  </Button>
-                </SimpleGrid>
-                <Button
-                  leftIcon={<DownloadIcon w={4} h={4} />}
-                  w="full"
-                  mt={3}
-                  size="sm"
-                  colorScheme="purple"
-                  onClick={handleExportReport}
-                  borderRadius="xl"
-                >
-                  Export Audit Report (JSON)
-                </Button>
-                <Button
-                  leftIcon={<RefreshIcon w={4} h={4} />}
-                  w="full"
-                  mt={3}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="gray"
+              {/* Actions panel */}
+              <div className="vstack gap-3" style={{ alignItems: 'stretch' }}>
+                <strong style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Operations</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button onClick={handleDownload} className="btn btn-sm btn-primary">
+                    <FiDownload size={14} />
+                    <span>Download</span>
+                  </button>
+                  <button onClick={handleShare} className="btn btn-sm btn-outline">
+                    <FiShare2 size={14} />
+                    <span>Share</span>
+                  </button>
+                </div>
+                <button onClick={handleExportReport} className="btn btn-sm btn-secondary" style={{ width: '100%' }}>
+                  Export JSON Report
+                </button>
+                <button 
                   onClick={handleRunAudit}
-                  isLoading={isAuditing}
-                  borderRadius="xl"
+                  disabled={isAuditing}
+                  className="btn btn-sm btn-ghost" 
+                  style={{ width: '100%', color: 'var(--text-secondary)' }}
                 >
-                  Re-run Core Audit
-                </Button>
-              </Box>
+                  <FiRefreshCw size={12} />
+                  <span>Re-run Audit</span>
+                </button>
+              </div>
 
-              <Divider />
+              <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
-              {/* Identified Issues checklist */}
-              <Box maxH="400px" overflowY="auto" pr={1}>
-                <Text fontSize="sm" fontWeight="bold" color="gray.800" mb={4}>
-                  Identified Violations ({report.issues.length})
-                </Text>
-
-                {report.issues.length === 0 ? (
-                  <Box p={4} bg="green.50" color="green.800" borderRadius="xl" border="1px" borderColor="green.100">
-                    <Text fontSize="sm" fontWeight="medium">Excellent! Pixel contrast ratios pass WCAG 2.1 AAA/AA targets.</Text>
-                  </Box>
-                ) : (
-                  <VStack spacing={4} align="stretch">
-                    {report.issues.map((issue, idx) => (
-                      <Box
+              {/* Identified Issues */}
+              <div className="vstack gap-3" style={{ alignItems: 'stretch' }}>
+                <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Identified Violations ({report.issues.length})</strong>
+                
+                <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+                  {report.issues.length === 0 ? (
+                    <div className="badge badge-success" style={{ padding: '12px', textTransform: 'none', display: 'block', borderRadius: 'var(--radius-md)' }}>
+                      Excellent! Contrast ratios pass all target checks.
+                    </div>
+                  ) : (
+                    report.issues.map((issue, idx) => (
+                      <div 
                         key={idx}
-                        p={4}
-                        borderRadius="xl"
-                        borderLeft="4px"
-                        borderLeftColor={issue.severity === 'Error' ? 'red.400' : 'orange.400'}
-                        bg="gray.50"
-                        borderWidth="1px"
-                        borderColor="gray.100"
+                        className="card-solid"
+                        style={{
+                          borderLeft: `4px solid ${issue.severity === 'Error' ? 'var(--color-error)' : 'var(--color-warning)'}`,
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          backgroundColor: 'var(--bg-secondary)',
+                          borderTop: 'none',
+                          borderRight: 'none',
+                          borderBottom: 'none',
+                          borderRadius: '0 var(--radius-sm) var(--radius-sm) 0'
+                        }}
                       >
-                        <HStack justify="space-between" mb={2}>
-                          <HStack>
-                            {getSeverityIcon(issue.severity)}
-                            <Text fontWeight="black" fontSize="xs" color="gray.800">SC {issue.sc_id}</Text>
-                          </HStack>
-                          <Badge size="sm" colorScheme={issue.severity === 'Error' ? 'red' : 'orange'} borderRadius="md">
+                        <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                          <div className="hstack gap-1.5" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            {issue.severity === 'Error' ? <FiAlertCircle size={14} style={{ color: 'var(--color-error)' }} /> : <FiAlertTriangle size={14} style={{ color: 'var(--color-warning)' }} />}
+                            <span>Criterion {issue.sc_id}</span>
+                          </div>
+                          <span className={`badge badge-${issue.severity === 'Error' ? 'error' : 'warning'}`} style={{ fontSize: '0.55rem', padding: '1px 6px' }}>
                             {issue.severity}
-                          </Badge>
-                        </HStack>
-                        <Text fontSize="xs" color="gray.600" mb={3} lineHeight="tall">{issue.description}</Text>
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{issue.description}</p>
                         
-                        <Box bg="blue.50" p={3} borderRadius="lg">
-                          <Text fontSize="10px" fontWeight="black" color="blue.600" textTransform="uppercase" mb={1}>Recommendation</Text>
-                          <Text fontSize="xs" color="blue.800" fontWeight="medium">{issue.suggestion}</Text>
-                        </Box>
-                      </Box>
-                    ))}
-                  </VStack>
-                )}
-              </Box>
-            </VStack>
+                        <div style={{ backgroundColor: 'var(--primary-light)', padding: '8px 10px', borderRadius: 'var(--radius-xs)', border: '1px solid rgba(79, 70, 229, 0.1)' }}>
+                          <strong style={{ fontSize: '0.55rem', color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Recommendation</strong>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-primary)' }}>{issue.suggestion}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
           )}
-        </Box>
-      </SimpleGrid>
-    </Box>
+
+        </div>
+
+      </div>
+
+      {/* Responsive layout fix for mobile sidebar */}
+      <style>{`
+        @media (max-width: 991px) {
+          [className-mobile-col~="span"] {
+            grid-column: span 12 !important;
+          }
+        }
+      `}</style>
+    </div>
   );
 };

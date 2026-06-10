@@ -1,15 +1,14 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Box, Text, VStack, Icon, Progress, useToast, Button, HStack, Tabs, TabList, TabPanels, Tab, TabPanel, Card, CardBody, Badge, Image, Center } from '@chakra-ui/react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { mediaService } from '../services/media';
 import { profileService } from '../services/profile';
 import { useNavigate } from 'react-router-dom';
 import { ClientSideVideoProcessor } from './ClientSideVideoProcessor';
-import { FiCloud, FiCpu } from 'react-icons/fi';
+import { FiCloud, FiCpu, FiAlertCircle, FiFileText } from 'react-icons/fi';
 
 const UploadIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path fill="currentColor" d="M14,13V17H10V13H7L12,8L17,13H14M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" />
-  </Icon>
+  <svg viewBox="0 0 24 24" width={props.size || 24} height={props.size || 24} fill="currentColor" {...props}>
+    <path d="M14,13V17H10V13H7L12,8L17,13H14M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" />
+  </svg>
 );
 
 export const DragDropUpload: React.FC = () => {
@@ -18,27 +17,35 @@ export const DragDropUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeTab, setActiveTab] = useState(0); // 0 = Server, 1 = Client GPU
+  const [alertMessage, setAlertMessage] = useState<{ type: 'info' | 'error' | 'success'; title: string; desc: string } | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toast = useToast();
   const navigate = useNavigate();
+  const pollIntervalRef = useRef<any>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearTimeout(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const cachedPending = localStorage.getItem('chromashift_pending_file');
     if (cachedPending) {
       try {
         const parsed = JSON.parse(cachedPending);
-        toast({
-          title: "Interrupted Session Detected",
-          description: `We found a pending upload for "${parsed.name}" (${(parsed.size / 1024 / 1024).toFixed(2)} MB). Please re-select the file to resume.`,
-          status: "info",
-          duration: 7000,
-          isClosable: true,
+        setAlertMessage({
+          type: 'info',
+          title: 'Interrupted Session Detected',
+          desc: `We found a pending upload for "${parsed.name}" (${(parsed.size / 1024 / 1024).toFixed(2)} MB). Please re-select the file to resume.`,
         });
       } catch (e) {
         console.error(e);
       }
     }
-  }, [toast]);
+  }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -71,20 +78,18 @@ export const DragDropUpload: React.FC = () => {
   const validateAndSetFile = (selectedFile: File) => {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'application/pdf'];
     if (!validTypes.includes(selectedFile.type)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image, MP4 video, or PDF.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
+      setAlertMessage({
+        type: 'error',
+        title: 'Invalid file type',
+        desc: 'Please upload a JPEG, PNG, WEBP image, MP4 video, or PDF.',
       });
       return;
     }
     setFile(selectedFile);
-    // Reset to Server-Side tab by default
     setActiveTab(0);
+    setAlertMessage(null);
 
-    // Save pending state to localStorage for NFR-3.2 recovery
+    // Save pending state to localStorage for recovery
     localStorage.setItem('chromashift_pending_file', JSON.stringify({
       name: selectedFile.name,
       size: selectedFile.size,
@@ -99,15 +104,17 @@ export const DragDropUpload: React.FC = () => {
       const blob = await res.blob();
       const sampleFile = new File([blob], filename, { type });
       validateAndSetFile(sampleFile);
-      toast({
-        title: "Sample Loaded",
-        description: `Loaded ${filename} successfully.`,
-        status: "info",
-        duration: 2000,
-        isClosable: true,
+      setAlertMessage({
+        type: 'success',
+        title: 'Sample Loaded',
+        desc: `Loaded ${filename} successfully.`,
       });
     } catch (e) {
-      toast({ title: 'Failed to load sample', status: 'error' });
+      setAlertMessage({
+        type: 'error',
+        title: 'Load Failed',
+        desc: 'Failed to load the sample file.',
+      });
     }
   };
 
@@ -115,6 +122,7 @@ export const DragDropUpload: React.FC = () => {
     if (!file) return;
     setIsUploading(true);
     setProgress(10);
+    setAlertMessage(null);
     
     // Clear pending session state once upload actively starts
     localStorage.removeItem('chromashift_pending_file');
@@ -140,45 +148,66 @@ export const DragDropUpload: React.FC = () => {
       await mediaService.processMedia(uploadRes.job_id, { cvd_type: cvdType, severity });
       setProgress(60);
 
-      // 3. Poll for status
-      const pollInterval = setInterval(async () => {
-        const statusRes = await mediaService.getMediaStatus(uploadRes.job_id);
-        setProgress(60 + (statusRes.progress * 0.4)); // Scale progress to remaining 40%
+      // 3. Poll for status with progressive backoff
+      let delay = 2000;
+      let consecutiveErrors = 0;
 
-        if (statusRes.status === 'completed') {
-          clearInterval(pollInterval);
-          setProgress(100);
-          setIsUploading(false);
+      const pollStatus = async () => {
+        try {
+          const statusRes = await mediaService.getMediaStatus(uploadRes.job_id);
+          consecutiveErrors = 0; // Reset error counter
+          setProgress(60 + (statusRes.progress * 0.4)); // Scale progress to remaining 40%
+
+          if (statusRes.status === 'completed') {
+            setProgress(100);
+            setIsUploading(false);
+            setAlertMessage({
+              type: 'success',
+              title: 'Processing Complete',
+              desc: 'Your accessible file is ready.',
+            });
+            setTimeout(() => navigate('/hub'), 1500);
+            return;
+          }
           
-          toast({
-            title: "Processing complete",
-            description: "Your accessible file is ready.",
-            status: "success",
-            duration: 3000,
-          });
+          if (statusRes.status === 'failed') {
+            setIsUploading(false);
+            setAlertMessage({
+              type: 'error',
+              title: 'Processing Failed',
+              desc: 'There was an error processing your file.',
+            });
+            return;
+          }
 
-          // Redirect to dashboard to see the result
-          setTimeout(() => navigate('/hub'), 1500);
-        } else if (statusRes.status === 'failed') {
-          clearInterval(pollInterval);
-          setIsUploading(false);
-          toast({
-            title: "Processing failed",
-            description: "There was an error processing your file.",
-            status: "error",
-            duration: 5000,
-          });
+          delay = Math.min(delay + 1000, 6000);
+        } catch (pollErr) {
+          consecutiveErrors++;
+          console.error("Poll status check error:", pollErr);
+          if (consecutiveErrors >= 5) {
+            setIsUploading(false);
+            setAlertMessage({
+              type: 'error',
+              title: 'Polling Interrupted',
+              desc: 'Lost connection to the backend server.',
+            });
+            return;
+          }
+          delay = Math.min(delay * 1.5, 8000);
         }
-      }, 2000);
+
+        pollIntervalRef.current = setTimeout(pollStatus, delay);
+      };
+
+      pollIntervalRef.current = setTimeout(pollStatus, delay);
 
     } catch (error) {
       console.error(error);
       setIsUploading(false);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during upload.",
-        status: "error",
-        duration: 3000,
+      setAlertMessage({
+        type: 'error',
+        title: 'Error',
+        desc: 'An unexpected error occurred during upload.',
       });
     }
   };
@@ -187,245 +216,350 @@ export const DragDropUpload: React.FC = () => {
   const isPdf = file && file.type === 'application/pdf';
   const isImage = file && file.type.startsWith('image/');
 
-  // If a video is selected and Client GPU remapping is active, render processor instead
   if (isVideo && activeTab === 1) {
     return <ClientSideVideoProcessor file={file} onCancel={() => setFile(null)} />;
   }
 
   return (
-    <Box 
-      className="w-full max-w-2xl mx-auto mt-10 p-6 rounded-2xl shadow-xl bg-white border border-gray-100"
+    <div 
+      className="card-solid"
+      style={{
+        width: '100%',
+        maxWidth: '850px',
+        margin: '0 auto',
+        padding: 0,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
+        border: '1px solid var(--border-primary)'
+      }}
     >
-      <VStack spacing={6}>
-        <Text fontSize="2xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text">
-          Upload & Remap Media
-        </Text>
-        <Text color="gray.500" textAlign="center" fontSize="sm">
-          Upload images, videos, or PDF manuals to apply hardware-accelerated Daltonization.
-        </Text>
+      {/* Top accent bar */}
+      <div style={{ height: '3px', background: 'var(--primary-gradient)' }} />
+
+      <div style={{ padding: '32px' }} className="vstack gap-6">
+        
+        {/* Header Title */}
+        <div className="vstack gap-1" style={{ alignItems: 'center', textAlign: 'center' }}>
+          <h2 className="text-gradient">Upload & Remap Media</h2>
+          <p style={{ fontSize: '0.875rem' }}>
+            Images, videos, or PDFs — hardware-accelerated Daltonization applied instantly.
+          </p>
+        </div>
+
+        {/* Local Notification Alert banner */}
+        {alertMessage && (
+          <div 
+            className={`badge badge-${alertMessage.type}`} 
+            style={{ 
+              width: '100%', 
+              padding: '16px', 
+              borderRadius: 'var(--radius-md)', 
+              textTransform: 'none',
+              fontWeight: 'var(--fw-medium)',
+              lineHeight: '1.5',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
+            }}
+          >
+            <FiAlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div className="vstack" style={{ alignItems: 'flex-start' }}>
+              <strong style={{ fontSize: '0.85rem' }}>{alertMessage.title}</strong>
+              <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>{alertMessage.desc}</span>
+            </div>
+          </div>
+        )}
 
         {!file ? (
           <>
-            <Box
-            w="full"
-            p={12}
-            border="2px dashed"
-            borderColor={isDragging ? "blue.400" : "gray.300"}
-            borderRadius="2xl"
-            bg={isDragging ? "blue.50" : "gray.50"}
-            transition="all 0.25s"
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            cursor="pointer"
-            _hover={{ bg: "gray.100" }}
-          >
-            <VStack spacing={4}>
-              <UploadIcon w={16} h={16} color={isDragging ? "blue.500" : "gray.400"} />
-              <Text fontWeight="bold" color="gray.600" fontSize="sm">
-                Drag & drop files here, or click to browse
-              </Text>
-              <Text fontSize="xs" color="gray.400">Supports JPG, PNG, WEBP, MP4, PDF (max 100MB)</Text>
-            </VStack>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-              accept="image/jpeg,image/png,image/webp,video/mp4,application/pdf"
-            />
-          </Box>
-          <Box w="full" mt={6}>
-            <Text fontSize="md" color="gray.700" textAlign="left" mb={4} fontWeight="black">
-              Don't have a file? Try our sample media:
-            </Text>
-            
-            <VStack align="stretch" spacing={6} w="full">
-              {/* Images Row */}
-              <Box>
-                <Text fontSize="sm" fontWeight="bold" color="blue.600" mb={2}>Images & Charts</Text>
-                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
-                  {[
-                    { url: '/financial_dashboard.png', name: 'financial_dashboard.png', type: 'image/png' },
-                    { url: '/apple_orchard.png', name: 'apple_orchard.png', type: 'image/png' },
-                    { url: '/transit_map.png', name: 'transit_map.png', type: 'image/png' },
-                    { url: '/area_chart_trends.png', name: 'area_chart_trends.png', type: 'image/png' },
-                    { url: '/bar_line_sales_report.png', name: 'bar_line_sales_report.png', type: 'image/png' },
-                    { url: '/multi_line_comparison.webp', name: 'multi_line_comparison.webp', type: 'image/webp' },
-                    { url: '/heatmap.webp', name: 'heatmap.webp', type: 'image/webp' },
-                    { url: '/pie_chart.png', name: 'pie_chart.png', type: 'image/png' }
-                  ].map((s, i) => (
-                    <Box 
-                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
-                      onClick={() => loadSample(s.url, s.name, s.type)}
-                    >
-                      <Box h="80px" bg="gray.100" overflow="hidden">
-                        <Image src={s.url} w="full" h="full" objectFit="cover" />
-                      </Box>
-                      <Center p={2} bg="blue.50" borderTopWidth="1px" borderColor="blue.100">
-                        <Text fontSize="2xs" fontWeight="bold" color="blue.700" isTruncated>{s.name}</Text>
-                      </Center>
-                    </Box>
-                  ))}
-                </HStack>
-              </Box>
+            {/* Drag Zone */}
+            <div
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={isDragging ? 'animate-pulse-border' : ''}
+              style={{
+                width: '100%',
+                padding: '48px 24px',
+                border: isDragging ? '2px solid var(--primary)' : '2px dashed var(--border-secondary)',
+                borderRadius: 'var(--radius-lg)',
+                backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-secondary)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s ease-in-out',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '16px'
+              }}
+            >
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-primary)',
+                border: '1px solid var(--border-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isDragging ? 'var(--primary)' : 'var(--text-muted)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <UploadIcon size={32} />
+              </div>
+              <div className="vstack gap-1">
+                <strong style={{ fontSize: '0.9rem', color: isDragging ? 'var(--primary)' : 'var(--text-primary)' }}>
+                  {isDragging ? 'Drop to upload' : 'Drag & drop, or click to browse'}
+                </strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  JPEG · PNG · WEBP · MP4 · PDF  |  Max 100 MB
+                </span>
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+                accept="image/jpeg,image/png,image/webp,video/mp4,application/pdf"
+              />
+            </div>
 
-              {/* Videos Row */}
-              <Box>
-                <Text fontSize="sm" fontWeight="bold" color="purple.600" mb={2}>Videos</Text>
-                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
-                  {[
-                    { url: '/chart_infographic.mp4', name: 'chart_infographic.mp4', type: 'video/mp4' },
-                    { url: '/medical_imaging.mp4', name: 'medical_imaging.mp4', type: 'video/mp4' },
-                    { url: '/financial_trading.mp4', name: 'financial_trading.mp4', type: 'video/mp4' },
-                    { url: '/autonomous_driving.mp4', name: 'autonomous_driving.mp4', type: 'video/mp4' },
-                    { url: '/industrial_hmi.mp4', name: 'industrial_hmi.mp4', type: 'video/mp4' },
-                    { url: '/pathology_lab.mp4', name: 'pathology_lab.mp4', type: 'video/mp4' },
-                    { url: '/sports_broadcast.mp4', name: 'sports_broadcast.mp4', type: 'video/mp4' },
-                    { url: '/jungle_gameplay.mp4', name: 'jungle_gameplay.mp4', type: 'video/mp4' },
-                    { url: '/moba_replay.mp4', name: 'moba_replay.mp4', type: 'video/mp4' }
-                  ].map((s, i) => (
-                    <Box 
-                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
-                      onClick={() => loadSample(s.url, s.name, s.type)}
-                    >
-                      <Box h="80px" bg="black" overflow="hidden">
-                        <Box as="video" src={s.url} w="full" h="full" objectFit="cover" preload="metadata" />
-                      </Box>
-                      <Center p={2} bg="purple.50" borderTopWidth="1px" borderColor="purple.100">
-                        <Text fontSize="2xs" fontWeight="bold" color="purple.700" isTruncated>{s.name}</Text>
-                      </Center>
-                    </Box>
-                  ))}
-                </HStack>
-              </Box>
+            {/* Sample Loader */}
+            <div style={{ width: '100%' }} className="vstack gap-4">
+              <strong style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No file? Try a sample:</strong>
+              
+              <div className="vstack gap-4">
+                {/* Images */}
+                <div className="vstack gap-2">
+                  <div className="hstack">
+                    <span className="badge badge-primary" style={{ fontSize: '0.6rem', padding: '4px 8px' }}>Images</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {[
+                      { url: '/financial_dashboard.png', name: 'dashboard.png', type: 'image/png' },
+                      { url: '/apple_orchard.png', name: 'orchard.png', type: 'image/png' },
+                      { url: '/transit_map.png', name: 'transit_map.png', type: 'image/png' },
+                      { url: '/area_chart_trends.png', name: 'area_chart.png', type: 'image/png' },
+                      { url: '/bar_line_sales_report.png', name: 'bar_line.png', type: 'image/png' },
+                      { url: '/multi_line_comparison.webp', name: 'multi_line.webp', type: 'image/webp' },
+                      { url: '/heatmap.webp', name: 'heatmap.webp', type: 'image/webp' },
+                      { url: '/pie_chart.png', name: 'pie_chart.png', type: 'image/png' }
+                    ].map((s, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => loadSample(s.url, s.name, s.type)}
+                        style={{
+                          minWidth: '110px',
+                          width: '110px',
+                          border: '1px solid var(--border-primary)',
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          backgroundColor: 'var(--bg-primary)'
+                        }}
+                      >
+                        <div style={{ height: '60px', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)' }}>
+                          <img src={s.url} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ padding: '6px', fontSize: '0.65rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          {s.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              {/* PDFs Row */}
-              <Box>
-                <Text fontSize="sm" fontWeight="bold" color="orange.600" mb={2}>PDF Reports</Text>
-                <HStack overflowX="auto" pb={4} spacing={4} sx={{ '&::-webkit-scrollbar': { height: '8px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.300', borderRadius: 'full' } }}>
-                  {[
-                    { url: '/financial_report.pdf', name: 'financial_report.pdf', type: 'application/pdf' },
-                    { url: '/research_paper.pdf', name: 'research_paper.pdf', type: 'application/pdf' }
-                  ].map((s, i) => (
-                    <Box 
-                      key={i} minW="130px" w="130px" borderWidth="1px" borderRadius="xl" overflow="hidden" cursor="pointer" shadow="sm" transition="all 0.2s" _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
-                      onClick={() => loadSample(s.url, s.name, s.type)}
-                    >
-                      <Center h="80px" bg="gray.100">
-                        <Icon viewBox="0 0 24 24" w={8} h={8} color="orange.400">
-                          <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,13H11V18H9V13H7L10,9L13,13Z" />
-                        </Icon>
-                      </Center>
-                      <Center p={2} bg="orange.50" borderTopWidth="1px" borderColor="orange.100">
-                        <Text fontSize="2xs" fontWeight="bold" color="orange.700" isTruncated>{s.name}</Text>
-                      </Center>
-                    </Box>
-                  ))}
-                </HStack>
-              </Box>
-            </VStack>
-          </Box>
+                {/* Videos */}
+                <div className="vstack gap-2">
+                  <div className="hstack">
+                    <span className="badge badge-primary" style={{ fontSize: '0.6rem', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)', padding: '4px 8px' }}>Videos</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {[
+                      { url: '/chart_infographic.mp4', name: 'infographic.mp4', type: 'video/mp4' },
+                      { url: '/medical_imaging.mp4', name: 'medical.mp4', type: 'video/mp4' },
+                      { url: '/financial_trading.mp4', name: 'trading.mp4', type: 'video/mp4' },
+                      { url: '/autonomous_driving.mp4', name: 'driving.mp4', type: 'video/mp4' },
+                      { url: '/industrial_hmi.mp4', name: 'industrial.mp4', type: 'video/mp4' },
+                      { url: '/pathology_lab.mp4', name: 'pathology.mp4', type: 'video/mp4' },
+                      { url: '/sports_broadcast.mp4', name: 'sports.mp4', type: 'video/mp4' },
+                      { url: '/jungle_gameplay.mp4', name: 'jungle.mp4', type: 'video/mp4' },
+                      { url: '/moba_replay.mp4', name: 'moba.mp4', type: 'video/mp4' }
+                    ].map((s, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => loadSample(s.url, s.name, s.type)}
+                        style={{
+                          minWidth: '110px',
+                          width: '110px',
+                          border: '1px solid var(--border-primary)',
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          backgroundColor: 'var(--bg-primary)'
+                        }}
+                      >
+                        <div style={{ height: '60px', overflow: 'hidden', backgroundColor: 'black', position: 'relative' }}>
+                          <video src={s.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} preload="metadata" />
+                        </div>
+                        <div style={{ padding: '6px', fontSize: '0.65rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          {s.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* PDFs */}
+                <div className="vstack gap-2">
+                  <div className="hstack">
+                    <span className="badge badge-primary" style={{ fontSize: '0.6rem', color: 'var(--color-warning)', backgroundColor: 'rgba(234, 88, 12, 0.1)', padding: '4px 8px' }}>PDF Documents</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {[
+                      { url: '/financial_report.pdf', name: 'report.pdf', type: 'application/pdf' },
+                      { url: '/research_paper.pdf', name: 'paper.pdf', type: 'application/pdf' }
+                    ].map((s, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => loadSample(s.url, s.name, s.type)}
+                        style={{
+                          minWidth: '110px',
+                          width: '110px',
+                          border: '1px solid var(--border-primary)',
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          backgroundColor: 'var(--bg-primary)'
+                        }}
+                      >
+                        <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-secondary)' }}>
+                          <FiFileText size={24} style={{ color: 'var(--color-warning)' }} />
+                        </div>
+                        <div style={{ padding: '6px', fontSize: '0.65rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          {s.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </>
         ) : (
-          <VStack spacing={5} w="full">
-            {/* Selected File Details */}
-            <HStack w="full" justify="space-between" p={4} bg="gray.50" borderRadius="xl" border="1px" borderColor="gray.100">
-              <VStack align="start" spacing={0.5}>
-                <Text fontWeight="extrabold" fontSize="sm" color="gray.700" noOfLines={1}>
-                  {file.name}
-                </Text>
-                <Text fontSize="xs" color="gray.400">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
-                </Text>
-              </VStack>
-              <Button size="xs" colorScheme="red" variant="ghost" onClick={() => { setFile(null); localStorage.removeItem('chromashift_pending_file'); }}>
-                Change File
-              </Button>
-            </HStack>
-
-            {/* If video file is selected, show Cloud vs Local GPU processing options */}
-            {isVideo && (
-              <Box w="full">
-                <Tabs isFitted variant="soft-rounded" colorScheme="blue" index={activeTab} onChange={(index) => setActiveTab(index)}>
-                  <TabList mb="1em" bg="gray.100" p={1} borderRadius="xl">
-                    <Tab borderRadius="lg" fontSize="xs" fontWeight="bold">
-                      <HStack spacing={2}>
-                        <Icon as={FiCloud} />
-                        <Text>Cloud Remap (S3)</Text>
-                      </HStack>
-                    </Tab>
-                    <Tab borderRadius="lg" fontSize="xs" fontWeight="bold">
-                      <HStack spacing={2}>
-                        <Icon as={FiCpu} />
-                        <Text>GPU Remap (Local)</Text>
-                        <Badge colorScheme="purple">Fast</Badge>
-                      </HStack>
-                    </Tab>
-                  </TabList>
-                  <TabPanels>
-                    <TabPanel p={0}>
-                      <Card variant="outline" size="sm" borderRadius="xl">
-                        <CardBody p={4}>
-                          <VStack align="start" spacing={2}>
-                            <Text fontSize="xs" color="gray.500">
-                              Upload the file to secured S3 storage and process it via fine-tuned server models. Perfect for keeping a permanent archive in your history dashboard.
-                            </Text>
-                          </VStack>
-                        </CardBody>
-                      </Card>
-                    </TabPanel>
-                    <TabPanel p={0} />
-                  </TabPanels>
-                </Tabs>
-              </Box>
-            )}
-
-            {/* Image/PDF standard layout explanation */}
-            {!isVideo && (
-              <Card variant="outline" size="sm" borderRadius="xl" w="full">
-                <CardBody p={4}>
-                  <Text fontSize="xs" color="gray.500">
-                    {isPdf 
-                      ? "Your PDF will be uploaded to securely hosted S3 storage. Our PyMuPDF pipeline will semantically recolor charts and diagrams while perfectly preserving all vector text layers for screen-reader accessibility."
-                      : isImage
-                      ? "Your image will be uploaded to securely hosted S3 storage. Our YOLO26n-seg pipeline will apply precise semantic Daltonization while ensuring 100% perceptual lightness preservation."
-                      : "Your file will be uploaded to securely hosted S3 storage. Our backend fine-tuned Daltonization pipelines will apply CVD accessibility corrections."}
-                  </Text>
-                </CardBody>
-              </Card>
-            )}
-
-            {isUploading && (
-              <Box w="full" mt={2}>
-                <HStack justify="space-between" mb={2}>
-                  <Text fontSize="xs" fontWeight="bold" color="gray.600">Processing Cloud Pipeline...</Text>
-                  <Text fontSize="xs" fontWeight="black" color="blue.600">{Math.round(progress)}%</Text>
-                </HStack>
-                <Progress value={progress} size="sm" colorScheme="blue" borderRadius="full" hasStripe isAnimated={progress < 100} />
-              </Box>
-            )}
-
-            <Button 
-              colorScheme="blue" 
-              bgGradient="linear(to-r, blue.600, purple.600)"
-              size="lg" 
-              w="full" 
-              isDisabled={isUploading}
-              onClick={handleUpload}
-              isLoading={isUploading}
-              loadingText="Uploading & Processing"
-              borderRadius="xl"
-              fontWeight="black"
-              shadow="md"
+          <div className="vstack gap-4" style={{ width: '100%' }}>
+            {/* Selected File Card */}
+            <div 
+              className="hstack" 
+              style={{
+                width: '100%',
+                justifyContent: 'space-between',
+                padding: '16px',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 'var(--radius-md)'
+              }}
             >
-              Upload & Process File
-            </Button>
-          </VStack>
+              <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{file.name}</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {(file.size / 1024 / 1024).toFixed(2)} MB 
+                  <span className="badge badge-primary" style={{ fontSize: '0.55rem', padding: '2px 6px' }}>
+                    {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                  </span>
+                </span>
+              </div>
+              <button 
+                onClick={() => { setFile(null); localStorage.removeItem('chromashift_pending_file'); }}
+                className="btn btn-sm btn-outline"
+              >
+                Change
+              </button>
+            </div>
+
+            {/* Video File Pipeline Selector */}
+            {isVideo && (
+              <div className="vstack gap-3" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+                  <button
+                    onClick={() => setActiveTab(0)}
+                    className="btn btn-sm"
+                    style={{
+                      flex: 1,
+                      backgroundColor: activeTab === 0 ? 'var(--bg-primary)' : 'transparent',
+                      border: activeTab === 0 ? '1px solid var(--border-primary)' : 'none',
+                      color: 'var(--text-primary)',
+                      boxShadow: activeTab === 0 ? 'var(--shadow-sm)' : 'none'
+                    }}
+                  >
+                    <FiCloud size={14} />
+                    <span>Cloud Remap (S3)</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab(1)}
+                    className="btn btn-sm"
+                    style={{
+                      flex: 1,
+                      backgroundColor: activeTab === 1 ? 'var(--bg-primary)' : 'transparent',
+                      border: activeTab === 1 ? '1px solid var(--border-primary)' : 'none',
+                      color: 'var(--text-primary)',
+                      boxShadow: activeTab === 1 ? 'var(--shadow-sm)' : 'none'
+                    }}
+                  >
+                    <FiCpu size={14} />
+                    <span>GPU Remap (Local)</span>
+                  </button>
+                </div>
+
+                <div className="card-solid" style={{ padding: '16px' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {activeTab === 0 
+                      ? 'Upload the file to secure S3 storage and process it via fine-tuned server models. Perfect for keeping a permanent archive in your history dashboard.'
+                      : 'Remap colors directly on your device using TensorFlow.js GPU-acceleration. Zero file uploads needed. Faster processing.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Non-Video Pipeline Information */}
+            {!isVideo && (
+              <div className="card-solid" style={{ padding: '16px', width: '100%' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {isPdf 
+                    ? 'Your PDF will be uploaded to securely hosted S3 storage. Our PyMuPDF pipeline will semantically recolor charts and diagrams while perfectly preserving all vector text layers for screen-reader accessibility.'
+                    : isImage
+                    ? 'Your image will be uploaded to securely hosted S3 storage. Our YOLO26n-seg pipeline will apply precise semantic Daltonization while ensuring 100% lightness preservation.'
+                    : 'Your file will be uploaded to securely hosted S3 storage. Our backend fine-tuned Daltonization pipelines will apply CVD accessibility corrections.'}
+                </p>
+              </div>
+            )}
+
+            {/* Progress Bar */}
+            {isUploading && (
+              <div className="vstack gap-2" style={{ width: '100%', marginTop: '16px' }}>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                  <span style={{ fontWeight: 'var(--fw-semibold)' }}>Processing Cloud Pipeline...</span>
+                  <span style={{ fontWeight: 'var(--fw-bold)', color: 'var(--primary)' }}>{Math.round(progress)}%</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                  <div style={{ width: `${progress}%`, height: '100%', background: 'var(--primary-gradient)', transition: 'width 0.2s ease-out' }} />
+                </div>
+              </div>
+            )}
+
+            <button
+              disabled={isUploading}
+              onClick={handleUpload}
+              className="btn btn-primary btn-lg"
+              style={{ width: '100%', marginTop: '16px', padding: '14px' }}
+            >
+              {isUploading ? 'Uploading & Processing...' : 'Upload & Process File'}
+            </button>
+          </div>
         )}
-      </VStack>
-    </Box>
+      </div>
+    </div>
   );
 };
