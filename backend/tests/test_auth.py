@@ -151,8 +151,25 @@ def test_guest_cleanup():
     db.add(guest_user)
     db.commit()
     
+    # Register/login admin user to get authorization
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "admin@chromashift.com", "password": "adminpassword123"}
+    )
+    admin_user = db.query(models.User).filter(models.User.email == "admin@chromashift.com").first()
+    admin_user.is_superuser = True
+    db.commit()
+    
+    admin_login_resp = client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin@chromashift.com", "password": "adminpassword123"}
+    )
+    assert admin_login_resp.status_code == 200
+    admin_token = admin_login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    
     # 3. Trigger cleanup for users older than 24 hours
-    cleanup_resp = client.post("/api/v1/auth/cleanup?max_age_hours=24")
+    cleanup_resp = client.post("/api/v1/auth/cleanup?max_age_hours=24", headers=headers)
     assert cleanup_resp.status_code == 200
     assert cleanup_resp.json()["cleaned_count"] == 1
     
@@ -162,6 +179,33 @@ def test_guest_cleanup():
         models.User.email.like("%@chromashift.guest")
     ).first()
     assert deleted_user is None
+
+def test_delete_user_account():
+    # 1. Register a test user
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "delete_me@example.com", "password": "password123"}
+    )
+    
+    # 2. Login to get token
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        data={"username": "delete_me@example.com", "password": "password123"}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # 3. Call DELETE /auth/me
+    delete_resp = client.delete("/api/v1/auth/me", headers=headers)
+    assert delete_resp.status_code == 200
+    assert delete_resp.json()["status"] == "success"
+    
+    # 4. Verify user no longer exists in DB
+    from app.db import models
+    db = next(override_get_db())
+    deleted_user = db.query(models.User).filter(models.User.email == "delete_me@example.com").first()
+    assert deleted_user is None
+
 
 
 

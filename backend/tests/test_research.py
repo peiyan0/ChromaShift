@@ -65,6 +65,12 @@ def test_research_survey_and_telemetry_flow():
     )
     assert reg_admin.status_code == 200
     
+    # Set is_superuser = True on test admin user
+    db = next(override_get_db())
+    admin_user = db.query(User).filter(User.email == "admin@chromashift.com").first()
+    admin_user.is_superuser = True
+    db.commit()
+    
     login_admin = client.post(
         "/api/v1/auth/login",
         data={"username": "admin@chromashift.com", "password": "password123"}
