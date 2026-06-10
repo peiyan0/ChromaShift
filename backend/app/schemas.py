@@ -7,7 +7,7 @@ class UserCreate(BaseModel):
     password: str
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: EmailStr
     is_active: bool
     
@@ -34,7 +34,7 @@ class VisionProfileUpdate(VisionProfileBase):
 
 class VisionProfileResponse(VisionProfileBase):
     id: int
-    user_id: int
+    user_id: str
     
     model_config = ConfigDict(from_attributes=True)
 

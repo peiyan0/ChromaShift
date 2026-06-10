@@ -9,7 +9,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
@@ -24,7 +24,7 @@ class VisionProfile(Base):
     __tablename__ = "vision_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     
     # Standard settings
     cvd_type = Column(String, nullable=False) # e.g. "protanopia", "deuteranopia", "tritanopia"
@@ -42,7 +42,7 @@ class MediaJob(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     filename = Column(String, nullable=False)
     media_type = Column(String, nullable=False) # 'image', 'video', 'pdf'
@@ -53,6 +53,7 @@ class MediaJob(Base):
     # Storage references
     s3_key_original = Column(String, nullable=True)
     s3_key_processed = Column(String, nullable=True)
+    share_id = Column(String, unique=True, index=True, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
