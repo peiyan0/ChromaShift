@@ -21,11 +21,21 @@ RUN poetry config virtualenvs.create false
 # Install dependencies
 RUN poetry install --no-interaction --no-ansi
 
-# Copy the rest of the application
-COPY . .
+# Set up a new user named "user" with UID 1000 (required for Hugging Face Spaces)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
 
-# Expose the port
-EXPOSE 8000
+# Set working directory
+WORKDIR $HOME/app
 
-# Run the application
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Copy the rest of the application and set ownership
+COPY --chown=user . $HOME/app
+
+# Expose the port used by HF Spaces
+EXPOSE 7860
+
+# Run migrations and start the server
+CMD ["sh", "-c", "alembic upgrade head || echo 'Database migrations failed, starting server anyway...'; uvicorn app.main:app --host 0.0.0.0 --port 7860"]
