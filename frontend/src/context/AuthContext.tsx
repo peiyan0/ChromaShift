@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import axios from 'axios';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase';
+
+const isSupabaseEnabled = 
+  import.meta.env.VITE_SUPABASE_URL && 
+  !import.meta.env.VITE_SUPABASE_URL.includes('your-project-ref') &&
+  !import.meta.env.VITE_SUPABASE_URL.includes('placeholder');
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -13,7 +20,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/';
+const rawBaseURL = import.meta.env.VITE_API_URL;
 const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -28,35 +35,108 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsAdmin(response.data.is_superuser === true);
-    } catch (e) {
-      console.error("Could not fetch user profile details", e);
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        console.info("User database record does not exist yet (expected for new Supabase sign-ins).");
+      } else {
+        console.error("Could not fetch user profile details", e);
+      }
       setIsAdmin(false);
     }
   };
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('token');
-      const guestFlag = localStorage.getItem('isGuest');
-      if (token) {
-        setIsAuthenticated(true);
-        setIsGuest(guestFlag === 'true');
-        await fetchUserDetails(token);
-        setIsInitializing(false);
-      } else {
-        // Automatically login as guest in background
-        try {
-          const response = await axios.post(`${baseURL}auth/guest`);
-          const guestToken = response.data.access_token;
-          localStorage.setItem('token', guestToken);
-          localStorage.setItem('isGuest', 'true');
+      // 1. If Supabase is enabled, use Supabase session listener
+      if (isSupabaseEnabled) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const token = session.access_token;
+          const userIsAnonymous = session.user?.is_anonymous ?? false;
+          localStorage.setItem('token', token);
+          localStorage.setItem('isGuest', userIsAnonymous ? 'true' : 'false');
           setIsAuthenticated(true);
-          setIsGuest(true);
-          await fetchUserDetails(guestToken);
-        } catch (e) {
-          console.error("Could not automatically authenticate guest", e);
-        } finally {
+          setIsGuest(userIsAnonymous);
+          fetchUserDetails(token);
+        } else {
+          // Auto sign-in anonymously
+          try {
+            const { data, error } = await supabase.auth.signInAnonymously();
+            if (error) throw error;
+            if (data?.session) {
+              const token = data.session.access_token;
+              localStorage.setItem('token', token);
+              localStorage.setItem('isGuest', 'true');
+              setIsAuthenticated(true);
+              setIsGuest(true);
+              fetchUserDetails(token);
+            }
+          } catch (e) {
+            console.error("Supabase anonymous sign-in failed", e);
+          }
+        }
+        setIsInitializing(false);
+
+        // Listen for authentication state shifts
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, session: Session | null) => {
+          const isCurrentlyCustomLoggedIn = localStorage.getItem('token') && localStorage.getItem('isGuest') === 'false';
+
+          if (session) {
+            const token = session.access_token;
+            const userIsAnonymous = session.user?.is_anonymous ?? false;
+            
+            // Prevent Supabase anonymous session from overwriting a custom backend logged-in session
+            if (isCurrentlyCustomLoggedIn && userIsAnonymous) {
+              return;
+            }
+
+            localStorage.setItem('token', token);
+            localStorage.setItem('isGuest', userIsAnonymous ? 'true' : 'false');
+            setIsAuthenticated(true);
+            setIsGuest(userIsAnonymous);
+            fetchUserDetails(token);
+          } else {
+            // Prevent Supabase null session from logging out a user/guest during initialization
+            // unless it's a deliberate sign out event.
+            if (_event === 'INITIAL_SESSION') {
+              return;
+            }
+            if (isCurrentlyCustomLoggedIn && _event !== 'SIGNED_OUT') {
+              return;
+            }
+
+            setIsAuthenticated(false);
+            setIsGuest(false);
+            setIsAdmin(false);
+          }
+        });
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      } else {
+        // 2. Local Fallback flow
+        const token = localStorage.getItem('token');
+        const guestFlag = localStorage.getItem('isGuest');
+        if (token) {
+          setIsAuthenticated(true);
+          setIsGuest(guestFlag === 'true');
+          fetchUserDetails(token);
           setIsInitializing(false);
+        } else {
+          try {
+            const response = await axios.post(`${baseURL}auth/guest`);
+            const guestToken = response.data.access_token;
+            localStorage.setItem('token', guestToken);
+            localStorage.setItem('isGuest', 'true');
+            setIsAuthenticated(true);
+            setIsGuest(true);
+            fetchUserDetails(guestToken);
+          } catch (e) {
+            console.error("Could not automatically authenticate guest", e);
+          } finally {
+            setIsInitializing(false);
+          }
         }
       }
     };
@@ -68,10 +148,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('isGuest', isGuestUser ? 'true' : 'false');
     setIsAuthenticated(true);
     setIsGuest(isGuestUser);
-    await fetchUserDetails(token);
+    fetchUserDetails(token);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isSupabaseEnabled) {
+      await supabase.auth.signOut();
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('isGuest');
     localStorage.removeItem('chromashift_cvd_profile');
@@ -89,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsAuthenticated(true);
     const activeToken = token || localStorage.getItem('token');
     if (activeToken) {
-      await fetchUserDetails(activeToken);
+      fetchUserDetails(activeToken);
     }
   };
 
@@ -107,4 +190,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
