@@ -1,42 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Box,
-  Flex,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Heading,
-  Select,
-  SimpleGrid,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  Switch,
-  FormControl,
-  FormLabel,
-  Spinner,
-  Center,
-  useToast,
-  Card,
-  CardBody,
-  Progress,
-  Icon,
-} from '@chakra-ui/react';
-import {
-  FiPlay,
-  FiPause,
-  FiDownload,
-  FiCpu,
-  FiCheckCircle,
-  FiX,
-  FiSliders,
-  FiInfo,
-} from 'react-icons/fi';
 import * as tf from '@tensorflow/tfjs';
 import { profileService, type VisionProfile } from '../services/profile';
 import { aiPreviewService } from '../services/ai_preview';
+import { 
+  FiPlay, FiPause, FiDownload, FiCpu, FiCheckCircle, 
+  FiSliders, FiInfo, FiAlertCircle 
+} from 'react-icons/fi';
 
 const KEYFRAME_INTERVAL = 20;
 
@@ -48,7 +17,6 @@ interface ClientSideVideoProcessorProps {
 export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> = ({ file, onCancel }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const toast = useToast();
 
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [profile, setProfile] = useState<VisionProfile>({ cvd_type: 'deuteranopia', severity: 1.0 });
@@ -58,6 +26,7 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
   const [progress, setProgress] = useState<number>(0);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [fps, setFps] = useState<number>(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Settings ref for real-time requestAnimationFrame access
   const settingsRef = useRef({
@@ -117,13 +86,7 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
 
         setIsInitializing(false);
       } catch (error) {
-        toast({
-          title: "GPU initialization failed",
-          description: "Could not initialize WebGL accelerator.",
-          status: "error",
-          duration: 5000,
-          isClosable: true
-        });
+        setErrorMsg('Could not initialize WebGL accelerator for GPU video processing.');
         setIsInitializing(false);
       }
     };
@@ -160,7 +123,6 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
         return;
       }
 
-      // Sync canvas dimensions
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -170,13 +132,11 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
       const { cvdType, severity, isLivePreview: activePreview, isProcessing: activeProcessing } = settingsRef.current;
 
       if (!activePreview && !activeProcessing) {
-        // Draw raw video directly
         ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
       } else {
         const w = canvas.width;
         const h = canvas.height;
 
-        // Fire YOLO keyframe segmentation non-blocking every KEYFRAME_INTERVAL frames
         maskFrameCountRef.current++;
         if (maskFrameCountRef.current % KEYFRAME_INTERVAL === 0 && !maskPendingRef.current) {
           maskPendingRef.current = true;
@@ -192,56 +152,137 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
           });
         }
 
-        // GPU accelerated Daltonization with YOLO semantic mask
         tf.tidy(() => {
           const inputTensor = tf.browser.fromPixels(video);
           const imgFloat = tf.cast(inputTensor, 'float32');
 
-          const r = imgFloat.slice([0, 0, 0], [-1, -1, 1]);
-          const g = imgFloat.slice([0, 0, 1], [-1, -1, 1]);
-          const b = imgFloat.slice([0, 0, 2], [-1, -1, 1]);
-
-          // Use held YOLO semantic mask; fall back to uniform if not yet computed
           const stored = segMaskRef.current;
           const maskData = (stored && stored.w === w && stored.h === h)
             ? stored.data
             : new Float32Array(w * h).fill(1.0);
           const maskTensor = tf.tensor3d(maskData, [h, w, 1]);
 
-          const m = maskTensor.mul(tf.scalar(severity));
-
-          let finalR = r;
-          let finalG = g;
-          let finalB = b;
-
+          const rgb2lms = [
+            [0.3904725,  0.54990437, 0.00890159],
+            [0.07092586, 0.96310739, 0.00135809],
+            [0.02314268, 0.12801221, 0.93605194]
+          ];
+          const lms2rgb = [
+            [ 2.85831110, -1.62870796, -0.02481870],
+            [-0.21043478,  1.15841493,  0.00032046],
+            [-0.04188950, -0.11815433,  1.06888657]
+          ];
+          
+          let cvd: number[][];
+          let err2mod: number[][];
+          
           if (cvdType === 'protanopia') {
-            // Protanopia: Reduce red, boost blue to compensate for red-blindness
-            finalR = r.mul(tf.scalar(1).sub(m.mul(0.4)));
-            finalB = b.add(r.sub(g).relu().mul(m.mul(0.3)));
+            cvd = [
+              [0.0, 0.90822864, 0.00819200],
+              [0.0, 1.0,        0.0],
+              [0.0, 0.0,        1.0]
+            ];
+            err2mod = [
+              [0.0, 0.0, 0.0],
+              [0.7, 1.0, 0.0],
+              [0.7, 0.0, 1.0]
+            ];
           } else if (cvdType === 'tritanopia') {
-            // Tritanopia: Shift blue-yellow confusion into red-green
-            finalB = b.mul(tf.scalar(1).sub(m.mul(0.5))).add(g.mul(m.mul(0.5)));
+            cvd = [
+              [1.0,         0.0,        0.0],
+              [0.0,         1.0,        0.0],
+              [-0.15773032, 1.19465634, 0.0]
+            ];
+            err2mod = [
+              [1.0, 0.0, 0.7],
+              [0.0, 1.0, 0.7],
+              [0.0, 0.0, 0.0]
+            ];
           } else {
-            // Deuteranopia: Reduce green, boost yellow to compensate for green-blindness
-            finalG = g.mul(tf.scalar(1).sub(m.mul(0.4)));
-            finalB = b.add(g.sub(r).relu().mul(m.mul(0.3)));
+            cvd = [
+              [1.0,        0.0, 0.0],
+              [1.10104433, 0.0, -0.00901975],
+              [0.0,        0.0, 1.0]
+            ];
+            err2mod = [
+              [0.0, 0.0, 0.0],
+              [0.7, 1.0, 0.0],
+              [0.7, 0.0, 1.0]
+            ];
           }
 
-          const stacked = tf.concat([finalR, finalG, finalB], 2);
-          const clipped = tf.clipByValue(stacked, 0, 255);
-          const outputTensor = tf.cast(clipped, 'int32');
+          const matMul3x3 = (A: number[][], B: number[][]) => {
+            const C = Array(3).fill(0).map(() => Array(3).fill(0));
+            for (let i = 0; i < 3; i++) {
+              for (let j = 0; j < 3; j++) {
+                let sum = 0;
+                for (let k = 0; k < 3; k++) {
+                  sum += A[i][k] * B[k][j];
+                }
+                C[i][j] = sum;
+              }
+            }
+            return C;
+          };
+          
+          const matSub3x3 = (A: number[][], B: number[][]) => {
+            const C = Array(3).fill(0).map(() => Array(3).fill(0));
+            for (let i = 0; i < 3; i++) {
+              for (let j = 0; j < 3; j++) {
+                C[i][j] = A[i][j] - B[i][j];
+              }
+            }
+            return C;
+          };
+          
+          const identity3x3 = [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+          ];
+
+          const S_mat = matMul3x3(matMul3x3(lms2rgb, cvd), rgb2lms);
+          const I_minus_S = matSub3x3(identity3x3, S_mat);
+          const M_err_remap = matMul3x3(err2mod, I_minus_S);
+          const M_err_remap_transposed = [
+            [M_err_remap[0][0], M_err_remap[1][0], M_err_remap[2][0]],
+            [M_err_remap[0][1], M_err_remap[1][1], M_err_remap[2][1]],
+            [M_err_remap[0][2], M_err_remap[1][2], M_err_remap[2][2]]
+          ];
+
+          const norm = imgFloat.div(tf.scalar(255.0));
+          const cond = norm.lessEqual(tf.scalar(0.04045));
+          const lowVals = norm.div(tf.scalar(12.92));
+          const highVals = tf.pow(norm.add(tf.scalar(0.055)).div(tf.scalar(1.055)), tf.scalar(2.4));
+          const linearized = tf.where(cond, lowVals, highVals);
+
+          const flatLinear = linearized.reshape([-1, 3]);
+          const errRemapTensor = tf.tensor2d(M_err_remap_transposed);
+          const flatCorr = tf.matMul(flatLinear, errRemapTensor);
+          const rawCorr = flatCorr.reshape([h, w, 3]);
+
+          const effectiveMask = tf.scalar(0.4).add(maskTensor.mul(tf.scalar(0.6)));
+          const m = effectiveMask.mul(tf.scalar(severity));
+
+          const correctedLinear = linearized.add(rawCorr.mul(m));
+
+          const clippedLinear = tf.clipByValue(correctedLinear, 0.0, 1.0);
+          const condSRGB = clippedLinear.lessEqual(tf.scalar(0.0031308));
+          const lowSRGB = clippedLinear.mul(tf.scalar(12.92));
+          const highSRGB = tf.scalar(1.055).mul(tf.pow(clippedLinear, tf.scalar(1 / 2.4))).sub(tf.scalar(0.055));
+          const correctedSRGB = tf.where(condSRGB, lowSRGB, highSRGB).mul(tf.scalar(255.0));
+
+          const outputTensor = tf.cast(tf.clipByValue(correctedSRGB, 0, 255), 'int32');
 
           tf.browser.toPixels(outputTensor as tf.Tensor3D, canvas);
         });
       }
 
-      // Progress reporting during export
       if (activeProcessing) {
         const curProgress = (video.currentTime / video.duration) * 100;
         setProgress(curProgress);
 
         if (video.currentTime >= video.duration - 0.1 || video.ended) {
-          // Finalize export
           stopExport();
           return;
         }
@@ -289,21 +330,17 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Reset video to start
     video.pause();
     video.currentTime = 0;
     setIsPlaying(false);
     stopRenderLoop();
 
-    // Prepare canvas dimensions
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    // Build capture stream (30 fps)
     const stream = canvas.captureStream(30);
     const combinedStream = new MediaStream([stream.getVideoTracks()[0]]);
 
-    // Capture audio if available
     try {
       const videoStream = (video as any).captureStream ? (video as any).captureStream() : (video as any).mozCaptureStream ? (video as any).mozCaptureStream() : null;
       if (videoStream) {
@@ -319,7 +356,6 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     recordedChunksRef.current = [];
     let recorder: MediaRecorder;
     
-    // Choose appropriate mimeType for maximum support
     const options = { mimeType: 'video/webm;codecs=vp8,opus' };
     try {
       recorder = new MediaRecorder(combinedStream, options);
@@ -339,20 +375,12 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
       setExportUrl(url);
       setIsProcessing(false);
       setProgress(100);
-      toast({
-        title: "Export Completed!",
-        description: "Your color-corrected video is ready for download.",
-        status: "success",
-        duration: 4000,
-        isClosable: true
-      });
     };
 
     recorderRef.current = recorder;
     setIsProcessing(true);
     setProgress(0);
 
-    // Mute video to prevent playing audio through speakers during fast export
     video.muted = true;
     
     recorder.start();
@@ -397,221 +425,283 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
   };
 
   return (
-    <Box w="full" maxW="3xl" mx="auto" mt={8}>
-      <Card borderRadius="2xl" border="1px" borderColor="gray.200" shadow="xl" overflow="hidden">
-        {/* Title / Action Header */}
-        <Flex justify="space-between" align="center" bgGradient="linear(to-r, blue.600, purple.600)" px={6} py={4} color="white">
-          <HStack spacing={3}>
-            <Icon as={FiCpu} w={6} h={6} color="yellow.300" />
-            <VStack align="start" spacing={0}>
-              <Heading size="sm">Local GPU Video Remapper</Heading>
-              <Text fontSize="xs" opacity={0.85}>Zero uploads. Processed entirely on your machine.</Text>
-            </VStack>
-          </HStack>
-          <Button size="xs" colorScheme="whiteAlpha" leftIcon={<FiX />} onClick={onCancel}>
-            Cancel
-          </Button>
-        </Flex>
+    <div 
+      className="card-solid"
+      style={{
+        width: '100%',
+        maxWidth: '750px',
+        margin: '0 auto',
+        padding: 0,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-xl)',
+        border: '1px solid var(--border-primary)'
+      }}
+    >
+      {/* Header bar */}
+      <div 
+        style={{
+          background: 'var(--primary-gradient)',
+          padding: '16px 24px',
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <div className="hstack gap-3">
+          <FiCpu size={24} style={{ color: '#fbbf24' }} />
+          <div className="vstack" style={{ alignItems: 'flex-start' }}>
+            <h3 style={{ margin: 0, color: 'white', fontFamily: 'var(--font-heading)', fontSize: '1.05rem' }}>Local GPU Video Remapper</h3>
+            <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>Zero uploads. Processed entirely on your machine.</span>
+          </div>
+        </div>
+        <button 
+          onClick={onCancel}
+          className="btn btn-sm btn-outline"
+          style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.08)' }}
+        >
+          Cancel
+        </button>
+      </div>
 
-        <CardBody p={6}>
-          {isInitializing ? (
-            <Center py={10}>
-              <VStack spacing={4}>
-                <Spinner size="xl" color="blue.500" thickness="4px" />
-                <Text color="gray.600" fontWeight="bold">Initializing GPU Pipeline & Model Parameters...</Text>
-              </VStack>
-            </Center>
-          ) : (
-            <VStack spacing={6} align="stretch">
-              {/* Info Banner */}
-              {!isProcessing && !exportUrl && (
-                <HStack bg="blue.50" border="1px" borderColor="blue.100" p={3.5} borderRadius="xl" spacing={3}>
-                  <Icon as={FiInfo} color="blue.500" w={5} h={5} />
-                  <Text fontSize="xs" color="blue.800" fontWeight="medium">
-                    Adjust CVD types and sliders to instantly see the active corrections. Play the video to preview, or click <strong>Start GPU Remap</strong> to render & save the file.
-                  </Text>
-                </HStack>
-              )}
+      <div style={{ padding: '24px' }} className="vstack gap-6">
+        
+        {errorMsg && (
+          <div className="badge badge-error" style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-sm)', textTransform: 'none', display: 'flex', gap: '8px' }}>
+            <FiAlertCircle size={16} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-              {/* Viewport Screen */}
-              <Box
-                position="relative"
-                w="full"
-                borderRadius="xl"
-                overflow="hidden"
-                bg="black"
-                aspectRatio={16/9}
-                shadow="inner"
-                border="1px"
-                borderColor="gray.800"
+        {isInitializing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', gap: '16px' }}>
+            <div className="skeleton" style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Initializing GPU Pipeline...</span>
+          </div>
+        ) : (
+          <div className="vstack gap-6" style={{ width: '100%', alignItems: 'stretch' }}>
+            
+            {/* Info Banner */}
+            {!isProcessing && !exportUrl && (
+              <div 
+                className="badge badge-primary" 
+                style={{ 
+                  padding: '14px', 
+                  borderRadius: 'var(--radius-md)', 
+                  display: 'flex', 
+                  gap: '8px', 
+                  alignItems: 'flex-start',
+                  textTransform: 'none',
+                  fontWeight: 'var(--fw-medium)',
+                  lineHeight: '1.4'
+                }}
               >
-                {/* Source video element (hidden or overlaid) */}
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  preload="auto"
-                  crossOrigin="anonymous"
-                  style={{ display: 'none' }}
-                  onEnded={() => {
-                    setIsPlaying(false);
-                    if (!isProcessing) {
-                      stopRenderLoop();
-                    }
-                  }}
-                />
+                <FiInfo size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  Adjust deficiency type and correction severity to see active shifts. Click <strong>Start GPU Remap</strong> to compile and export the video.
+                </span>
+              </div>
+            )}
 
-                {/* Canvas renderer */}
-                <canvas
-                  ref={canvasRef}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
+            {/* Video Canvas Container */}
+            <div 
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '16/9',
+                backgroundColor: 'black',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+                border: '1px solid var(--border-secondary)'
+              }}
+            >
+              {/* Native video tag */}
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                preload="auto"
+                crossOrigin="anonymous"
+                style={{ display: 'none' }}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  if (!isProcessing) stopRenderLoop();
+                }}
+              />
 
-                {/* Processing Overlay Screen */}
-                {isProcessing && (
-                  <Center position="absolute" top={0} left={0} w="full" h="full" bg="blackAlpha.700" backdropFilter="blur(4px)" zIndex={5}>
-                    <VStack spacing={4} w="80%">
-                      <Spinner size="xl" color="purple.500" thickness="4px" />
-                      <Text color="white" fontWeight="black" letterSpacing="wide" fontSize="md">
-                        RENDERING accessible video...
-                      </Text>
-                      <Progress value={progress} colorScheme="purple" size="md" w="full" borderRadius="full" hasStripe isAnimated />
-                      <HStack justify="space-between" w="full" px={1}>
-                        <Text color="gray.400" fontSize="xs">{Math.round(progress)}% done</Text>
-                        <Text color="yellow.400" fontSize="xs" fontWeight="black">{fps} FPS Speed</Text>
-                      </HStack>
-                      <Button colorScheme="red" size="sm" onClick={stopExport} mt={2}>
-                        Abort Export
-                      </Button>
-                    </VStack>
-                  </Center>
-                )}
+              {/* Display canvas */}
+              <canvas
+                ref={canvasRef}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
 
-                {/* Success Export Screen */}
-                {exportUrl && (
-                  <Center position="absolute" top={0} left={0} w="full" h="full" bg="blackAlpha.800" backdropFilter="blur(8px)" zIndex={5}>
-                    <VStack spacing={5}>
-                      <Icon as={FiCheckCircle} w={16} h={16} color="green.400" />
-                      <VStack spacing={1}>
-                        <Heading size="md" color="white" fontWeight="black">Export Completed Successfully</Heading>
-                        <Text color="gray.300" fontSize="sm">Local GPU Daltonization rendering finished.</Text>
-                      </VStack>
-                      <HStack spacing={4}>
-                        <Button colorScheme="green" size="md" leftIcon={<FiDownload />} onClick={handleDownload}>
-                          Download Remapped Video
-                        </Button>
-                        <Button colorScheme="whiteAlpha" variant="outline" size="md" onClick={handleReset}>
-                          Reset & Re-process
-                        </Button>
-                      </HStack>
-                    </VStack>
-                  </Center>
-                )}
-              </Box>
+              {/* Exporting loading layer */}
+              {isProcessing && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.85)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                  gap: '16px',
+                  zIndex: 10
+                }}>
+                  <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                  <strong style={{ color: 'white', fontSize: '0.95rem' }}>RENDERING remapped frames...</strong>
+                  
+                  <div style={{ width: '80%', height: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                    <div style={{ width: `${progress}%`, height: '100%', backgroundColor: 'var(--primary)', transition: 'width 0.1s ease-out' }} />
+                  </div>
+                  
+                  <div className="hstack" style={{ justifyContent: 'space-between', width: '80%', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    <span>{Math.round(progress)}% compiled</span>
+                    <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{fps} FPS processing</span>
+                  </div>
 
-              {/* Live Preview Play controls */}
-              {!isProcessing && !exportUrl && (
-                <HStack justify="space-between" bg="gray.50" px={4} py={3} borderRadius="xl" border="1px" borderColor="gray.100">
-                  <Button
-                    leftIcon={isPlaying ? <FiPause /> : <FiPlay />}
-                    colorScheme="blue"
-                    size="sm"
-                    onClick={handlePlayPause}
-                  >
-                    {isPlaying ? 'Pause Preview' : 'Play Live Preview'}
-                  </Button>
-                  <HStack spacing={4}>
-                    <Text fontSize="xs" color="gray.500" fontWeight="bold">
-                      WebGL Rendering: <span style={{ color: '#2B6CB0' }}>{isPlaying ? `${fps} FPS` : 'Ready'}</span>
-                    </Text>
-                    <FormControl display="flex" alignItems="center" w="auto">
-                      <FormLabel htmlFor="preview-correction" mb="0" fontSize="xs" fontWeight="bold" color="gray.600">
-                        Correction Applied
-                      </FormLabel>
-                      <Switch
-                        id="preview-correction"
-                        isChecked={isLivePreview}
-                        onChange={(e) => setIsLivePreview(e.target.checked)}
-                        colorScheme="blue"
-                        size="sm"
-                      />
-                    </FormControl>
-                  </HStack>
-                </HStack>
+                  <button onClick={stopExport} className="btn btn-sm btn-outline" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)', marginTop: '8px' }}>
+                    Abort Export
+                  </button>
+                </div>
               )}
 
-              {/* Calibration Settings Card */}
-              {!isProcessing && !exportUrl && (
-                <Box border="1px" borderColor="gray.100" p={5} borderRadius="xl" shadow="sm">
-                  <VStack spacing={5} align="stretch">
-                    <HStack>
-                      <Icon as={FiSliders} color="blue.500" />
-                      <Text fontSize="xs" fontWeight="black" color="gray.500" textTransform="uppercase" letterSpacing="wider">
-                        Color Shifting Tuning parameters
-                      </Text>
-                    </HStack>
-                    
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
-                      <FormControl>
-                        <FormLabel fontSize="xs" fontWeight="bold" color="gray.600" textTransform="uppercase">
-                          CVD Deficiency Type
-                        </FormLabel>
-                        <Select
-                          value={profile.cvd_type}
-                          onChange={(e) => setProfile(prev => ({ ...prev, cvd_type: e.target.value as any }))}
-                          borderRadius="xl"
-                          borderColor="gray.200"
-                        >
-                          <option value="deuteranopia">Green-blind (Deuteranopia) - struggle to tell green and red apart</option>
-                          <option value="protanopia">Red-blind (Protanopia) - struggle to tell red and green apart</option>
-                          <option value="tritanopia">Blue-blind (Tritanopia) - struggle to tell blue and green, yellow and pink apart</option>
-                        </Select>
-                      </FormControl>
+              {/* Success screen layer */}
+              {exportUrl && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.9)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                  gap: '20px',
+                  zIndex: 10
+                }}>
+                  <FiCheckCircle size={48} style={{ color: 'var(--color-success)' }} />
+                  <div className="vstack gap-1" style={{ textAlign: 'center' }}>
+                    <h4 style={{ color: 'white', margin: 0, fontFamily: 'var(--font-heading)' }}>Export Completed Successfully</h4>
+                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>Local GPU Daltonization rendering finished.</span>
+                  </div>
+                  <div className="hstack gap-3">
+                    <button onClick={handleDownload} className="btn btn-primary">
+                      <FiDownload size={14} />
+                      <span>Download Video</span>
+                    </button>
+                    <button onClick={handleReset} className="btn btn-outline" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-                      <FormControl>
-                        <Flex justify="space-between" align="center" mb={2}>
-                          <FormLabel fontSize="xs" fontWeight="bold" color="gray.600" textTransform="uppercase" mb={0}>
-                            Correction Strength (Severity)
-                          </FormLabel>
-                          <Text fontSize="xs" fontWeight="black" color="blue.600">
-                            {(profile.severity * 100).toFixed(0)}%
-                          </Text>
-                        </Flex>
-                        <Slider
-                          min={0.0}
-                          max={2.0}
-                          step={0.05}
-                          value={profile.severity}
-                          onChange={(val) => setProfile(prev => ({ ...prev, severity: val }))}
-                          colorScheme="blue"
-                        >
-                          <SliderTrack borderRadius="full" height="5px">
-                            <SliderFilledTrack />
-                          </SliderTrack>
-                          <SliderThumb boxSize={5} border="2px solid" borderColor="blue.500" />
-                        </Slider>
-                      </FormControl>
-                    </SimpleGrid>
+            {/* Play Preview control strip */}
+            {!isProcessing && !exportUrl && (
+              <div 
+                className="hstack" 
+                style={{
+                  justifyContent: 'space-between',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}
+              >
+                <button onClick={handlePlayPause} className="btn btn-sm btn-primary">
+                  {isPlaying ? <FiPause size={14} /> : <FiPlay size={14} />}
+                  <span>{isPlaying ? 'Pause Preview' : 'Play Live Preview'}</span>
+                </button>
 
-                    <Button
-                      colorScheme="purple"
-                      bgGradient="linear(to-r, blue.600, purple.600)"
-                      size="lg"
-                      borderRadius="xl"
-                      fontWeight="black"
-                      h={12}
-                      onClick={handleStartExport}
-                      shadow="md"
+                <div className="hstack gap-4" style={{ flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>
+                    GPU Accelerator: <span style={{ color: 'var(--primary)' }}>{isPlaying ? `${fps} FPS` : 'Online'}</span>
+                  </span>
+                  
+                  {/* Switch toggle re-styled */}
+                  <label className="hstack gap-2" style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={isLivePreview}
+                      onChange={e => setIsLivePreview(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Correction Applied</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Parameter Adjustment Panel */}
+            {!isProcessing && !exportUrl && (
+              <div className="card-solid vstack gap-4" style={{ padding: '20px', border: '1px solid var(--border-primary)' }}>
+                <div className="hstack gap-2">
+                  <FiSliders size={16} style={{ color: 'var(--primary)' }} />
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Remap Parameters
+                  </span>
+                </div>
+
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', width: '100%' }}>
+                  <div className="form-group">
+                    <label className="label" htmlFor="cvd-type-select">CVD Type</label>
+                    <select
+                      id="cvd-type-select"
+                      value={profile.cvd_type}
+                      onChange={e => setProfile(prev => ({ ...prev, cvd_type: e.target.value as any }))}
+                      className="select"
                     >
-                      Start GPU Remap & Export Video
-                    </Button>
-                  </VStack>
-                </Box>
-              )}
-            </VStack>
-          )}
-        </CardBody>
-      </Card>
-    </Box>
+                      <option value="deuteranopia">Green-Blind (Deuteranopia)</option>
+                      <option value="protanopia">Red-Blind (Protanopia)</option>
+                      <option value="tritanopia">Blue-Blind (Tritanopia)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                      <label className="label">Correction Strength</label>
+                      <span className="text-mono" style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        {Math.round(profile.severity * 100)}%
+                      </span>
+                    </div>
+                    <div className="slider-container">
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="2.0"
+                        step="0.05"
+                        value={profile.severity}
+                        onChange={e => setProfile(prev => ({ ...prev, severity: parseFloat(e.target.value) }))}
+                        className="slider"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleStartExport}
+                  className="btn btn-lg btn-primary"
+                  style={{ width: '100%', marginTop: '8px', padding: '12px' }}
+                >
+                  Start GPU Remap & Export Video
+                </button>
+              </div>
+            )}
+
+          </div>
+        )}
+      </div>
+    </div>
   );
 };

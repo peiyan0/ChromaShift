@@ -2,7 +2,7 @@ import cv2
 import os
 import logging
 import numpy as np
-from ultralytics import YOLO
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
@@ -12,22 +12,31 @@ class InferenceService:
             models_dir = os.path.join(os.path.dirname(__file__), "models")
         os.makedirs(models_dir, exist_ok=True)
         
-        self.seg_model_path = os.path.join(models_dir, "yolo26n-seg.pt")
-        # Use the model name for Ultralytics auto-download; fall back to the local path
-        # if it already exists so repeated startups skip the network fetch.
-        model_id = self.seg_model_path if os.path.exists(self.seg_model_path) else "yolo26n-seg"
+        self.model_id = os.path.join(models_dir, "yolo26n-seg_int8.onnx")
+        self.model_url = "https://huggingface.co/peiyan2/cvd-onnx-models/resolve/main/yolo26n-seg_int8.onnx"
         
-        try:
-            # ultralytics will automatically download the weights if not found locally
-            self.model = YOLO(model_id)
-            logger.info("Successfully loaded YOLO26-seg model (NMS-free, edge-optimised).")
-        except Exception as e:
-            logger.error(f"Failed to load YOLO26-seg model: {e}")
-            self.model = None
+        self.model = None
+
+    def _load_model(self):
+        if self.model is None:
+            try:
+                if not os.path.exists(self.model_id):
+                    logger.info(f"Model not found locally. Downloading from {self.model_url}...")
+                    urllib.request.urlretrieve(self.model_url, self.model_id)
+                    logger.info("Model downloaded successfully.")
+                from ultralytics import YOLO
+                self.model = YOLO(self.model_id)
+                logger.info(f"Successfully loaded YOLO model from {self.model_id}.")
+            except Exception as e:
+                logger.error(f"Failed to load YOLO model: {e}")
+                self.model = "FAILED"
 
     def get_semantic_mask(self, image):
+        if self.model is None:
+            self._load_model()
+            
         # Fallback to uniform mask if model fails
-        if not self.model:
+        if self.model == "FAILED" or not self.model:
             return np.ones((image.shape[0], image.shape[1]), dtype=np.float32)
             
         try:
@@ -71,44 +80,83 @@ class InferenceService:
         # Apply a 100% enhanced shift to AI-detected semantic objects (people, cars, etc).
         effective_mask = 0.4 + (mask * 0.6)
             
-        # Scale intensity to prevent LAB color channel blowout/clipping at high severities
-        m = effective_mask * (intensity * 0.4)
+        # Scale intensity to modulate correction strength
+        m = effective_mask * intensity
         
-        # Convert BGR to LAB (Luminance, A=Green/Red, B=Blue/Yellow)
-        # This guarantees 100% luminance preservation because we only modify A and B channels
-        lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
-        l, a, b = cv2.split(lab_image)
+        # 1. Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # In LAB space:
-        # A channel: negative=Green, positive=Red
-        # B channel: negative=Blue, positive=Yellow
+        # 2. Linearize image from sRGB to Linear RGB
+        img_float = rgb_image.astype(np.float32) / 255.0
+        linear_img = np.where(img_float <= 0.04045, img_float / 12.92, ((img_float + 0.055) / 1.055) ** 2.4)
+        
+        # 3. Setup matrices
+        M_rgb2lms = np.array([
+            [0.3904725,  0.54990437, 0.00890159],
+            [0.07092586, 0.96310739, 0.00135809],
+            [0.02314268, 0.12801221, 0.93605194]
+        ], dtype=np.float32)
+        
+        M_lms2rgb = np.array([
+            [ 2.85831110, -1.62870796, -0.02481870],
+            [-0.21043478,  1.15841493,  0.00032046],
+            [-0.04188950, -0.11815433,  1.06888657]
+        ], dtype=np.float32)
         
         if cvd_type == "protanopia":
-            # Protanopia (Red-blind): Target positive A-channel (reds), shift into B-channel (blue direction)
-            contrast = a - 128.0
-            red_contrast = np.maximum(contrast, 0)
-            new_b = b + (red_contrast * m)
-            lab_image[:, :, 2] = np.clip(new_b, 0, 255)
-            # Protanopes suffer from severely reduced red luminosity.
-            # We must explicitly boost the Lightness (L channel) where red contrast exists.
-            new_l = l + (red_contrast * m * 0.5)
-            lab_image[:, :, 0] = np.clip(new_l, 0, 255)
-            
+            M_cvd = np.array([
+                [0.0, 0.90822864, 0.00819200],
+                [0.0, 1.0,        0.0],
+                [0.0, 0.0,        1.0]
+            ], dtype=np.float32)
+            M_err2mod = np.array([
+                [0.0, 0.0, 0.0],
+                [0.7, 1.0, 0.0],
+                [0.7, 0.0, 1.0]
+            ], dtype=np.float32)
         elif cvd_type == "deuteranopia":
-            # Deuteranopia (Green-blind): Target negative A-channel (greens), shift into B-channel (yellow direction)
-            green_contrast = np.maximum(128.0 - a, 0)
-            new_b = b + (green_contrast * m)
-            lab_image[:, :, 2] = np.clip(new_b, 0, 255)
-            
+            M_cvd = np.array([
+                [1.0,        0.0, 0.0],
+                [1.10104433, 0.0, -0.00901975],
+                [0.0,        0.0, 1.0]
+            ], dtype=np.float32)
+            M_err2mod = np.array([
+                [0.0, 0.0, 0.0],
+                [0.7, 1.0, 0.0],
+                [0.7, 0.0, 1.0]
+            ], dtype=np.float32)
         elif cvd_type == "tritanopia":
-            # Blue-Yellow confusion: Shift unseen Blue-Yellow contrast (B channel) into Red-Green (A channel)
-            contrast = b - 128.0
-            new_a = a + (contrast * m)
-            lab_image[:, :, 1] = np.clip(new_a, 0, 255)
+            M_cvd = np.array([
+                [1.0,         0.0,        0.0],
+                [0.0,         1.0,        0.0],
+                [-0.15773032, 1.19465634, 0.0]
+            ], dtype=np.float32)
+            M_err2mod = np.array([
+                [1.0, 0.0, 0.7],
+                [0.0, 1.0, 0.7],
+                [0.0, 0.0, 0.0]
+            ], dtype=np.float32)
+        else:
+            return image
             
-        # Merge back and convert to BGR
-        result = cv2.merge([lab_image[:,:,0], lab_image[:,:,1], lab_image[:,:,2]])
-        result = np.clip(result, 0, 255).astype(np.uint8)
-        return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+        S_mat = M_lms2rgb @ M_cvd @ M_rgb2lms
+        M_err_remap = M_err2mod @ (np.eye(3, dtype=np.float32) - S_mat)
+        
+        # 4. Calculate raw correction vector for all pixels
+        raw_corr = linear_img @ M_err_remap.T
+        
+        # 5. Modulate by pixel-level mask weight
+        modulated_corr = raw_corr * m[:, :, np.newaxis]
+        
+        # 6. Apply correction
+        corrected_linear = linear_img + modulated_corr
+        
+        # 7. Convert back to sRGB with gamma correction
+        corrected_linear = np.maximum(corrected_linear, 0.0)
+        corrected_srgb = np.where(corrected_linear <= 0.0031308, corrected_linear * 12.92, 1.055 * (corrected_linear ** (1.0 / 2.4)) - 0.055)
+        corrected_srgb = np.clip(corrected_srgb * 255.0, 0, 255).astype(np.uint8)
+        
+        # 8. Convert RGB back to BGR
+        return cv2.cvtColor(corrected_srgb, cv2.COLOR_RGB2BGR)
 
 inference_service = InferenceService()

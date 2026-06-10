@@ -1,57 +1,22 @@
 import { useState, useEffect, useRef, type FC } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  Button,
-  Divider,
-  useToast,
-  Heading,
-  Card,
-  CardBody,
-  Progress,
-  Grid,
-  GridItem,
-  Code,
-  Badge,
-  SimpleGrid
-} from '@chakra-ui/react';
 import { profileService, type VisionProfile } from '../services/profile';
+import { FiSliders, FiCheckCircle, FiTrash2, FiPlay } from 'react-icons/fi';
 
 // SVG Icons for clean, zero-dependency rendering
-
+const SparkleIcon = () => (
+  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
+    <path d="M12 2l2.4 6.4L21 10.8l-5.4 4.8L17 22l-5-4.2-5 4.2 1.4-6.4L3 10.8l6.6-2.4z" />
+  </svg>
+);
 const CheckIcon = () => (
-  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-green-600">
+  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--color-success)' }}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
   </svg>
 );
 
 const CrossIcon = () => (
-  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-600">
+  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--color-error)' }}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
-const SparklesIcon = () => (
-  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-yellow-500 animate-pulse">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-  </svg>
-);
-
-const SuccessIcon = () => (
-  <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-green-500">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const CalibrationIcon = () => (
-  <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-blue-500">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
@@ -99,15 +64,14 @@ export const CalibrationWizard: FC = () => {
   const [customIntensity, setCustomIntensity] = useState<number>(1.0);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   
   const canvasRefA = useRef<HTMLCanvasElement>(null);
   const canvasRefB = useRef<HTMLCanvasElement>(null);
   const canvasRefPreview = useRef<HTMLCanvasElement>(null);
-  const toast = useToast();
 
   // Load existing profile on mount (for baseline defaults)
   useEffect(() => {
-    // Try local storage first for quick restore
     const cachedProfile = localStorage.getItem('chromashift_cvd_profile');
     if (cachedProfile) {
       try {
@@ -147,6 +111,11 @@ export const CalibrationWizard: FC = () => {
     }).catch(e => console.error("Could not load baseline profile", e));
   }, []);
 
+  const triggerNotification = (type: 'success' | 'error' | 'info', text: string) => {
+    setNotification({ type, text });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   // 1. Pack circles inside a container dynamically
   const packCircles = (width: number, height: number, symbol: string): Circle[] => {
     const packedCircles: Circle[] = [];
@@ -159,7 +128,6 @@ export const CalibrationWizard: FC = () => {
     const maxCircles = 350;
     const maxAttempts = 120;
     
-    // Check if point x,y lies inside our vector letters E, C, O, X
     const checkSymbol = (x: number, y: number): boolean => {
       const nx = (x - cx) / outerR;
       const ny = (y - cy) / outerR;
@@ -190,7 +158,6 @@ export const CalibrationWizard: FC = () => {
 
     for (let i = 0; i < maxCircles; i++) {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        // Biased random distribution for tight visual packing
         const r = minR + Math.pow(Math.random(), 2.2) * (maxR - minR);
         const angle = Math.random() * Math.PI * 2;
         const distFromCenter = Math.random() * (outerR - r - 2);
@@ -198,13 +165,12 @@ export const CalibrationWizard: FC = () => {
         const x = cx + Math.cos(angle) * distFromCenter;
         const y = cy + Math.sin(angle) * distFromCenter;
         
-        // Overlap query
         let collision = false;
         for (const c of packedCircles) {
           const dx = x - c.x;
           const dy = y - c.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < r + c.r + 2.0) { // 2px safe spacing
+          if (dist < r + c.r + 2.0) {
             collision = true;
             break;
           }
@@ -240,14 +206,107 @@ export const CalibrationWizard: FC = () => {
     const cy = canvas.height / 2;
     const rOuter = Math.min(canvas.width, canvas.height) * 0.47;
     
-    // Draw Outer Container Shield
     ctx.beginPath();
     ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-    ctx.fillStyle = '#0f172a'; // Deep futuristic slate background
+    ctx.fillStyle = '#0f172a'; // Deep slate background
     ctx.fill();
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#1e293b';
     ctx.stroke();
+
+    let M_daltonize: number[][] | null = null;
+    
+    if (!hType.startsWith('triage_')) {
+      const rgb2lms = [
+        [0.3904725,  0.54990437, 0.00890159],
+        [0.07092586, 0.96310739, 0.00135809],
+        [0.02314268, 0.12801221, 0.93605194]
+      ];
+      const lms2rgb = [
+        [ 2.85831110, -1.62870796, -0.02481870],
+        [-0.21043478,  1.15841493,  0.00032046],
+        [-0.04188950, -0.11815433,  1.06888657]
+      ];
+      
+      let cvd: number[][];
+      let err2mod: number[][];
+      
+      if (hType === 'protanopia') {
+        cvd = [
+          [0.0, 0.90822864, 0.00819200],
+          [0.0, 1.0,        0.0],
+          [0.0, 0.0,        1.0]
+        ];
+        err2mod = [
+          [0.0, 0.0, 0.0],
+          [0.7, 1.0, 0.0],
+          [0.7, 0.0, 1.0]
+        ];
+      } else if (hType === 'tritanopia') {
+        cvd = [
+          [1.0,         0.0,        0.0],
+          [0.0,         1.0,        0.0],
+          [-0.15773032, 1.19465634, 0.0]
+        ];
+        err2mod = [
+          [1.0, 0.0, 0.7],
+          [0.0, 1.0, 0.7],
+          [0.0, 0.0, 0.0]
+        ];
+      } else {
+        cvd = [
+          [1.0,        0.0, 0.0],
+          [1.10104433, 0.0, -0.00901975],
+          [0.0,        0.0, 1.0]
+        ];
+        err2mod = [
+          [0.0, 0.0, 0.0],
+          [0.7, 1.0, 0.0],
+          [0.7, 0.0, 1.0]
+        ];
+      }
+
+      const matMul3x3 = (A: number[][], B: number[][]) => {
+        const C = Array(3).fill(0).map(() => Array(3).fill(0));
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            let sum = 0;
+            for (let k = 0; k < 3; k++) {
+              sum += A[i][k] * B[k][j];
+            }
+            C[i][j] = sum;
+          }
+        }
+        return C;
+      };
+      
+      const matSub3x3 = (A: number[][], B: number[][]) => {
+        const C = Array(3).fill(0).map(() => Array(3).fill(0));
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            C[i][j] = A[i][j] - B[i][j];
+          }
+        }
+        return C;
+      };
+      
+      const identity3x3 = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
+      ];
+
+      const S_mat = matMul3x3(matMul3x3(lms2rgb, cvd), rgb2lms);
+      const I_minus_S = matSub3x3(identity3x3, S_mat);
+      const M_err_remap = matMul3x3(err2mod, I_minus_S);
+      
+      M_daltonize = Array(3).fill(0).map(() => Array(3).fill(0));
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          M_daltonize[i][j] = identity3x3[i][j] + hSeverity * M_err_remap[i][j];
+        }
+      }
+    }
 
     circlesList.forEach(c => {
       let baseR = 0;
@@ -257,7 +316,6 @@ export const CalibrationWizard: FC = () => {
       const noise = (Math.random() - 0.5) * 32; // Organic color noise
       
       if (hType.startsWith('triage_')) {
-        // Triage hardcoded confusion plates
         if (hType === 'triage_protan_A') {
           baseR = c.isSymbol ? 200 : 20; baseG = c.isSymbol ? 0 : 20; baseB = c.isSymbol ? 0 : 20;
         } else if (hType === 'triage_protan_B') {
@@ -280,45 +338,48 @@ export const CalibrationWizard: FC = () => {
       }
 
       if (hType === 'tritanopia') {
-        // Tritan (Blue-Yellow confusion)
         if (c.isSymbol) {
-          baseR = 195 + noise;
-          baseG = 205 + noise;
-          baseB = 35 + noise;
+          baseR = 195 + noise; baseG = 205 + noise; baseB = 35 + noise;
         } else {
-          baseR = 45 + noise;
-          baseG = 115 + noise;
-          baseB = 175 + noise;
+          baseR = 45 + noise; baseG = 115 + noise; baseB = 175 + noise;
         }
       } else {
-        // Protan/Deutan (Red-Green confusion)
         if (c.isSymbol) {
-          baseR = 210 + noise;
-          baseG = 75 + noise;
-          baseB = 50 + noise;
+          baseR = 210 + noise; baseG = 75 + noise; baseB = 50 + noise;
         } else {
-          baseR = 95 + noise;
-          baseG = 140 + noise;
-          baseB = 70 + noise;
+          baseR = 95 + noise; baseG = 140 + noise; baseB = 70 + noise;
         }
       }
       
-      // Daltonization correction formula matching real-time TF.js preview
-      let cr = baseR;
-      let cg = baseG;
-      let cb = baseB;
+      let finalR = baseR;
+      let finalG = baseG;
+      let finalB = baseB;
       
-      if (hType === 'protanopia') {
-        cr = baseR * (1.0 - 0.5 * hSeverity) + baseG * (0.5 * hSeverity);
-      } else if (hType === 'deuteranopia') {
-        cg = baseG * (1.0 - 0.5 * hSeverity) + baseR * (0.5 * hSeverity);
-      } else if (hType === 'tritanopia') {
-        cb = baseB * (1.0 - 0.5 * hSeverity) + baseG * (0.5 * hSeverity);
+      if (M_daltonize) {
+        const rNorm = baseR / 255.0;
+        const gNorm = baseG / 255.0;
+        const bNorm = baseB / 255.0;
+        
+        const rLinear = rNorm <= 0.04045 ? rNorm / 12.92 : Math.pow((rNorm + 0.055) / 1.055, 2.4);
+        const gLinear = gNorm <= 0.04045 ? gNorm / 12.92 : Math.pow((gNorm + 0.055) / 1.055, 2.4);
+        const bLinear = bNorm <= 0.04045 ? bNorm / 12.92 : Math.pow((bNorm + 0.055) / 1.055, 2.4);
+        
+        const rCorr = M_daltonize[0][0] * rLinear + M_daltonize[0][1] * gLinear + M_daltonize[0][2] * bLinear;
+        const gCorr = M_daltonize[1][0] * rLinear + M_daltonize[1][1] * gLinear + M_daltonize[1][2] * bLinear;
+        const bCorr = M_daltonize[2][0] * rLinear + M_daltonize[2][1] * gLinear + M_daltonize[2][2] * bLinear;
+        
+        const rClipped = Math.max(0.0, Math.min(1.0, rCorr));
+        const gClipped = Math.max(0.0, Math.min(1.0, gCorr));
+        const bClipped = Math.max(0.0, Math.min(1.0, bCorr));
+        
+        const rSRGB = rClipped <= 0.0031308 ? rClipped * 12.92 : 1.055 * Math.pow(rClipped, 1.0 / 2.4) - 0.055;
+        const gSRGB = gClipped <= 0.0031308 ? gClipped * 12.92 : 1.055 * Math.pow(gClipped, 1.0 / 2.4) - 0.055;
+        const bSRGB = bClipped <= 0.0031308 ? bClipped * 12.92 : 1.055 * Math.pow(bClipped, 1.0 / 2.4) - 0.055;
+        
+        finalR = Math.round(Math.max(0, Math.min(255, rSRGB * 255.0)));
+        finalG = Math.round(Math.max(0, Math.min(255, gSRGB * 255.0)));
+        finalB = Math.round(Math.max(0, Math.min(255, bSRGB * 255.0)));
       }
-      
-      const finalR = Math.round(Math.max(0, Math.min(255, cr)));
-      const finalG = Math.round(Math.max(0, Math.min(255, cg)));
-      const finalB = Math.round(Math.max(0, Math.min(255, cb)));
       
       ctx.beginPath();
       ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
@@ -328,11 +389,8 @@ export const CalibrationWizard: FC = () => {
   };
 
   const selectOptimalPair = (currHyps: Hypothesis[]): [Hypothesis, Hypothesis] => {
-    // Sort by probability descending
     const sorted = [...currHyps].sort((a, b) => b.probability - a.probability);
     const top1 = sorted[0];
-    
-    // 70% top 1 vs top 2. 30% top 1 vs random lower half.
     if (Math.random() < 0.7) {
       return [top1, sorted[1]];
     } else {
@@ -342,12 +400,11 @@ export const CalibrationWizard: FC = () => {
     }
   };
 
-  // 4. Start Calibration Process
   const startCalibration = () => {
     const initialHyps = hypothesesSpace.map(h => ({
       ...h,
       probability: 1 / hypothesesSpace.length,
-      alpha: 1.0 // Initial Dirichlet prior
+      alpha: 1.0
     }));
     
     let maxH = 0;
@@ -355,12 +412,11 @@ export const CalibrationWizard: FC = () => {
     
     setEntropyHistory([maxH]);
     setHypotheses(initialHyps);
-    setSelections([]); // Reset trackers
+    setSelections([]);
     setStep('calibration');
     startNextRound(1, initialHyps);
   };
 
-  // 5. Trigger transition to next round
   const startNextRound = (nextRound: number, currentHyps: Hypothesis[]) => {
     const symbols = ['E', 'C', 'O', 'X'];
     const nextSymbol = symbols[Math.floor(Math.random() * symbols.length)];
@@ -381,10 +437,8 @@ export const CalibrationWizard: FC = () => {
     setRound(nextRound);
   };
 
-  // Render trigger on round state shifts
   useEffect(() => {
     if (step === 'calibration' && currentPair && circles.length > 0) {
-      // Small timeout to allow canvas elements to paint in the DOM
       const timer = setTimeout(() => {
         if (canvasRefA.current) {
           drawPlate(canvasRefA.current, circles, currentPair[0].type, currentPair[0].severity);
@@ -397,7 +451,6 @@ export const CalibrationWizard: FC = () => {
     }
   }, [step, round, currentPair, circles]);
 
-  // Render trigger for Live Preview in Results
   useEffect(() => {
     if (step === 'results' && diagnosedProfile) {
       if (circles.length === 0) {
@@ -412,7 +465,6 @@ export const CalibrationWizard: FC = () => {
     }
   }, [step, diagnosedProfile, customSeverity, circles]);
 
-  // 6. Handle User Comparative Choice Update
   const handleSelection = (selected: 'A' | 'B' | 'both_clear' | 'neither') => {
     if (!currentPair) return;
     
@@ -422,23 +474,20 @@ export const CalibrationWizard: FC = () => {
     let updatedHyps: Hypothesis[] = [...hypotheses];
     
     if (round <= 3) {
-      // Triage Phase: Map rounds to primary CVD types
       const boostType = round === 1 ? 'protanopia' : round === 2 ? 'deuteranopia' : 'tritanopia';
       
       updatedHyps = updatedHyps.map(h => {
         let newAlpha = h.alpha;
         if (h.type === boostType) {
-          // If B is clearer, they struggled with the confusion color A -> Strongly boost this CVD hypothesis
           if (selected === 'B' || selected === 'neither') {
             newAlpha += 10.0; 
           } else if (selected === 'both_clear' || selected === 'A') {
-            newAlpha *= 0.1; // Penalize if they can see the confusion color clearly
+            newAlpha *= 0.1;
           }
         }
         return { ...h, alpha: newAlpha };
       });
     } else {
-      // Normal Bayesian Optimization Phase
       const getVisibility = (hTrue: Hypothesis, hTest: Hypothesis) => {
         if (hTrue.type === hTest.type) {
           return 1.0 - 0.5 * Math.abs(hTrue.severity - hTest.severity);
@@ -451,10 +500,7 @@ export const CalibrationWizard: FC = () => {
           const visA = getVisibility(h, currentPair![0]);
           const visB = getVisibility(h, currentPair![1]);
           const likelihood = selected === 'both_clear' ? (0.55 * (visA + visB)) : (1.0 - 0.55 * (visA + visB));
-          return {
-            ...h,
-            alpha: h.alpha * likelihood
-          };
+          return { ...h, alpha: h.alpha * likelihood };
         });
       } else {
         const beta = 3.5;
@@ -463,19 +509,14 @@ export const CalibrationWizard: FC = () => {
           const visB = getVisibility(h, currentPair![1]);
           const pA = 1.0 / (1.0 + Math.exp(-beta * (visA - visB)));
           const likelihood = selected === 'A' ? pA : 1.0 - pA;
-          return {
-            ...h,
-            alpha: h.alpha * likelihood
-          };
+          return { ...h, alpha: h.alpha * likelihood };
         });
       }
     }
 
-    // Recalculate probabilities based on new alphas
     const sumAlphas = updatedHyps.reduce((s, h) => s + h.alpha, 0);
     updatedHyps = updatedHyps.map(h => ({ ...h, probability: h.alpha / sumAlphas }));
     
-    // Calculate new entropy
     let newEntropy = 0;
     updatedHyps.forEach(h => {
       if (h.probability > 1e-9) {
@@ -487,7 +528,6 @@ export const CalibrationWizard: FC = () => {
     setEntropyHistory(newEntropyHistory);
     setHypotheses(updatedHyps);
 
-    // Early Stopping Check
     const prevEntropy = entropyHistory[entropyHistory.length - 1];
     const deltaH = Math.abs(prevEntropy - newEntropy);
     const hasConverged = round >= 5 && deltaH < 0.05;
@@ -498,19 +538,13 @@ export const CalibrationWizard: FC = () => {
     if (hasConverged || hitHardLimit || perfectTriage) {
       const allClear = perfectTriage || newSelections.every(s => s === 'both_clear');
       if (allClear) {
-        const normalProfile: Hypothesis = {
-          type: 'normal',
-          severity: 0.0,
-          probability: 1.0,
-          alpha: 1.0
-        };
+        const normalProfile: Hypothesis = { type: 'normal', severity: 0.0, probability: 1.0, alpha: 1.0 };
         setDiagnosedProfile(normalProfile);
         setCustomSeverity(0.0);
         setCustomContrast(1.0);
         setCustomSaturation(1.0);
         setCustomIntensity(1.0);
       } else {
-        // Find the argmax hypothesis
         let bestHyp = updatedHyps[0];
         for (const h of updatedHyps) {
           if (h.probability > bestHyp.probability) {
@@ -523,56 +557,35 @@ export const CalibrationWizard: FC = () => {
       setStep('results');
       
       if (hitHardLimit && !hasConverged) {
-        toast({
-          title: "Confidence Limit Reached",
-          description: "Reached maximum rounds—profile may need manual refinement.",
-          status: "warning",
-          duration: 5000,
-          isClosable: true
-        });
+        triggerNotification('info', 'Confidence limit reached. Calibration complete.');
       } else {
-        toast({
-          title: "Calibration Complete",
-          description: "Successfully estimated your personalized color sensitivity profile.",
-          status: "success",
-          duration: 4000,
-          isClosable: true
-        });
+        triggerNotification('success', 'Estimate complete. Personalized profile resolved.');
       }
     } else {
       startNextRound(round + 1, updatedHyps);
     }
   };
 
-  // 7. Dynamic 3x3 Remap Coefficient Solver
   const getMatrixCoefficients = () => {
     const type = diagnosedProfile?.type || 'deuteranopia';
     const s = customSeverity;
-    
-    // Matrix structure: rows of [R, G, B] remapping
     const mat = [
       [1.0, 0.0, 0.0],
       [0.0, 1.0, 0.0],
       [0.0, 0.0, 1.0]
     ];
-    
     if (type === 'protanopia') {
-      mat[0][0] = 1.0 - 0.5 * s;
-      mat[0][1] = 0.5 * s;
+      mat[0][0] = 1.0 - 0.5 * s; mat[0][1] = 0.5 * s;
     } else if (type === 'deuteranopia') {
-      mat[1][0] = 0.5 * s;
-      mat[1][1] = 1.0 - 0.5 * s;
+      mat[1][0] = 0.5 * s; mat[1][1] = 1.0 - 0.5 * s;
     } else if (type === 'tritanopia') {
-      mat[2][1] = 0.5 * s;
-      mat[2][2] = 1.0 - 0.5 * s;
+      mat[2][1] = 0.5 * s; mat[2][2] = 1.0 - 0.5 * s;
     }
-    
     return mat;
   };
 
   const matrix = getMatrixCoefficients();
 
-  // 8. Push Diagnostic Results direct to DB
   const handleSaveProfile = async () => {
     setIsSaving(true);
     const payload: VisionProfile = {
@@ -586,29 +599,14 @@ export const CalibrationWizard: FC = () => {
     try {
       await profileService.updateProfile(payload);
       localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
-      toast({
-        title: "Matrix Remapping Applied",
-        description: "Your personalized active calibration coefficients are locked and synced.",
-        status: "success",
-        duration: 4000,
-        isClosable: true
-      });
+      triggerNotification('success', 'Vision profile applied and locked.');
     } catch (e) {
-      // Create if it doesn't exist
       try {
         await profileService.createProfile(payload);
         localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
-        toast({
-          title: "Profile Created & Saved",
-          status: "success",
-          duration: 3000
-        });
+        triggerNotification('success', 'Profile Created & Saved');
       } catch (err) {
-        toast({
-          title: "Synchronization Failed",
-          description: "Could not save profile settings to the database.",
-          status: "error"
-        });
+        triggerNotification('error', 'Failed to synchronize with server.');
       }
     } finally {
       setIsSaving(false);
@@ -616,550 +614,466 @@ export const CalibrationWizard: FC = () => {
   };
 
   return (
-    <Box className="w-full max-w-5xl mx-auto mt-6 p-1 bg-gradient-to-tr from-blue-600 via-purple-600 to-indigo-700 rounded-3xl shadow-2xl">
-      <Box className="w-full h-full p-8 bg-white/95 backdrop-blur-xl rounded-[22px] border border-white/50">
-        
+    <div 
+      className="card-solid animate-fade-in"
+      style={{
+        width: '100%',
+        maxWidth: '960px',
+        margin: '0 auto',
+        padding: 0,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-xl)',
+        border: '1px solid var(--border-primary)',
+        position: 'relative'
+      }}
+    >
+      {/* Top accent bar */}
+      <div style={{ height: '3px', background: 'var(--primary-gradient)' }} />
+      
+      {/* Notification Toast replacement */}
+      {notification && (
+        <div className={`badge badge-${notification.type}`} style={{
+          position: 'absolute',
+          top: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          padding: '10px 20px',
+          borderRadius: 'var(--radius-full)',
+          boxShadow: 'var(--shadow-lg)',
+          border: 'none',
+          textTransform: 'none',
+          fontWeight: 'bold',
+          animation: 'slide-up 0.2s ease-out'
+        }}>
+          {notification.text}
+        </div>
+      )}
+
+      <div style={{ padding: '32px' }} className="vstack gap-6">
+
         {/* ================= STAGE 1: WELCOME INTRO ================= */}
         {step === 'welcome' && (
-          <VStack spacing={8} py={8} align="center">
-            <CalibrationIcon />
-            <VStack spacing={2} textAlign="center">
-              <Heading fontSize="3xl" fontWeight="black" bgGradient="linear(to-r, blue.600, purple.600)" bgClip="text">
-                Personalized Vision Calibration
-              </Heading>
-              <Text fontSize="lg" color="gray.600" maxW="2xl">
-                An easy, interactive 5-round game that maps your color sensitivity to create a personalized color correction filter tailored just for you.
-              </Text>
-            </VStack>
+          <div className="vstack gap-8" style={{ alignItems: 'center', padding: '24px 0' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--primary-gradient)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              boxShadow: 'var(--shadow-md)'
+            }}>
+              <FiSliders size={28} />
+            </div>
 
-            <Divider />
+            <div className="vstack gap-2" style={{ alignItems: 'center', textAlign: 'center' }}>
+              <h2 className="text-gradient">Personalized Vision Calibration</h2>
+              <p style={{ maxWidth: '600px', fontSize: '0.95rem' }}>
+                An adaptive, interactive diagnostics test that maps your color sensitivity to create a physiological remapping filter tailored to your color perception.
+              </p>
+            </div>
 
-            <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6} w="full" maxW="4xl">
-              <GridItem>
-                <Card variant="outline" borderRadius="xl" h="full" bg="gray.50/50">
-                  <CardBody className="flex flex-col items-center text-center p-6 space-y-3">
-                    <Box className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                    </Box>
-                    <Text fontWeight="bold" color="gray.800">Adaptive Anomaloscope</Text>
-                    <Text fontSize="sm" color="gray.500">
-                      Plays an interactive game (up to 10 rounds) comparing dynamically generated plates to pinpoint your exact visual deficiency.
-                    </Text>
-                  </CardBody>
-                </Card>
-              </GridItem>
+            <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
-              <GridItem>
-                <Card variant="outline" borderRadius="xl" h="full" bg="gray.50/50">
-                  <CardBody className="flex flex-col items-center text-center p-6 space-y-3">
-                    <Box className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-                      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                    </Box>
-                    <Text fontWeight="bold" color="gray.800">Active Learning</Text>
-                    <Text fontSize="sm" color="gray.500">
-                      Driven by Bayesian optimization to adaptively select the most informative query each round, converging on your profile in as few as 5 rounds.
-                    </Text>
-                  </CardBody>
-                </Card>
-              </GridItem>
+            {/* Explanation grid */}
+            <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', width: '100%' }}>
+              <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
+                <span className="badge badge-primary" style={{ padding: '8px' }}>
+                  Anomaloscope
+                </span>
+                <strong>Active Diagnostics</strong>
+                <p style={{ fontSize: '0.85rem' }}>
+                  Compares dynamically generated plate variations to pinpoint color blindness patterns.
+                </p>
+              </div>
 
-              <GridItem>
-                <Card variant="outline" borderRadius="xl" h="full" bg="gray.50/50">
-                  <CardBody className="flex flex-col items-center text-center p-6 space-y-3">
-                    <Box className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
-                    </Box>
-                    <Text fontWeight="bold" color="gray.800">Custom 3x3 Matrices</Text>
-                    <Text fontSize="sm" color="gray.500">
-                      Calculates an individualized physiological correction matrix to instantly Daltonize your real-time camera and media uploads.
-                    </Text>
-                  </CardBody>
-                </Card>
-              </GridItem>
-            </Grid>
+              <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
+                <span className="badge badge-primary" style={{ padding: '8px', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)' }}>
+                  Bayesian Opt
+                </span>
+                <strong>Active Learning</strong>
+                <p style={{ fontSize: '0.85rem' }}>
+                  Algorithm adapts after every selection, converging on your profile in as few as 5 rounds.
+                </p>
+              </div>
+
+              <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
+                <span className="badge badge-primary" style={{ padding: '8px', color: 'var(--color-success)', backgroundColor: 'rgba(13, 148, 136, 0.1)' }}>
+                  Fidelity
+                </span>
+                <strong>Physiological Matrix</strong>
+                <p style={{ fontSize: '0.85rem' }}>
+                  Calculates custom remapping variables to Daltonize your uploads with zero GPU latency.
+                </p>
+              </div>
+            </div>
 
             {diagnosedProfile && (
-              <Box w="full" maxW="4xl" mt={4} mb={2} p={6} bg="purple.50" borderRadius="2xl" border="1px" borderColor="purple.100" textAlign="left" shadow="sm">
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="xs" fontWeight="black" textTransform="uppercase" color="purple.500" letterSpacing="wider">Active Vision Profile</Text>
-                  <Heading fontSize="xl" color="gray.800" textTransform="capitalize">
+              <div className="badge badge-primary" style={{ width: '100%', padding: '16px', borderRadius: 'var(--radius-md)', textTransform: 'none', textAlign: 'left', display: 'block' }}>
+                <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 'bold' }}>Active Vision Profile</span>
+                  <strong style={{ fontSize: '1.1rem', textTransform: 'capitalize', color: 'var(--primary)' }}>
                     {diagnosedProfile.type.replace('_', ' ')}
-                  </Heading>
-                  <Text fontSize="sm" color="gray.600">
-                    Severity: <Text as="span" fontWeight="bold" color="purple.600">{(customSeverity * 100).toFixed(0)}%</Text> &nbsp;&bull;&nbsp; 
-                    Contrast: <Text as="span" fontWeight="bold" color="purple.600">{(customContrast * 100).toFixed(0)}%</Text> &nbsp;&bull;&nbsp; 
-                    Saturation: <Text as="span" fontWeight="bold" color="purple.600">{(customSaturation * 100).toFixed(0)}%</Text>
-                  </Text>
-                </VStack>
-              </Box>
+                  </strong>
+                  <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                    Severity strength: <strong>{(customSeverity * 100).toFixed(0)}%</strong> | Contrast: <strong>{(customContrast * 100).toFixed(0)}%</strong>
+                  </span>
+                </div>
+              </div>
             )}
 
-            <Button
-              size="lg"
-              px={10}
-              py={7}
-              fontSize="md"
-              fontWeight="black"
-              colorScheme="blue"
-              bgGradient="linear(to-r, blue.500, indigo-600)"
-              _hover={{ bgGradient: "linear(to-r, blue.600, indigo-700)" }}
-              borderRadius="xl"
+            <button 
               onClick={startCalibration}
-              shadow="lg"
+              className="btn btn-lg btn-primary"
+              style={{ marginTop: '16px', padding: '14px 40px' }}
             >
-              {diagnosedProfile ? "Recalibrate Vision Profile" : "Start Interactive Calibration"}
-            </Button>
-          </VStack>
+              <FiPlay size={16} />
+              <span>{diagnosedProfile ? 'Recalibrate Vision Profile' : 'Start Diagnostic Calibration'}</span>
+            </button>
+          </div>
         )}
 
         {/* ================= STAGE 2: ACTIVE COMPARISON GAME ================= */}
         {step === 'calibration' && currentPair && (
-          <VStack spacing={8} align="stretch" py={2}>
-            {/* Header Trackers */}
-            <Box className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
-              <VStack align="start" spacing={1}>
-                <HStack>
-                  <Badge colorScheme={round <= 3 ? "purple" : "blue"} borderRadius="md" px={2} py={0.5} fontSize="xs" fontWeight="bold">
-                    {round <= 3 ? "Triage Phase" : "Active learning"}
-                  </Badge>
-                  <Text fontSize="sm" fontWeight="semibold" color="gray.400">{round <= 3 ? "Common Confusions" : "Bayesian Anomaloscope"}</Text>
-                </HStack>
-                <Heading fontSize="2xl" fontWeight="black" color="gray.800">
-                  Select the clearer symbol
-                </Heading>
-              </VStack>
-              <VStack align="end" spacing={1} w={{ base: "full", md: "250px" }}>
-                <HStack justify="space-between" w="full" fontSize="sm" fontWeight="bold" color="gray.600">
-                  <Text>Confidence</Text>
-                  <Text>{entropyHistory.length > 0 ? Math.round((1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100) : 0}%</Text>
-                </HStack>
-                <Progress value={entropyHistory.length > 0 ? (1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100 : 0} size="sm" colorScheme="purple" borderRadius="full" w="full" />
-                <Text fontSize="xs" color="gray.400">Round {round} (Max 10)</Text>
-              </VStack>
-            </Box>
+          <div className="vstack gap-6" style={{ width: '100%', alignItems: 'stretch' }}>
+            
+            {/* Round Tracker header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
+                <div className="hstack gap-2">
+                  <span className={`badge ${round <= 3 ? 'badge-primary' : 'badge-success'}`} style={{ padding: '4px 8px' }}>
+                    {round <= 3 ? 'Triage Phase' : 'Active Optimization'}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {round <= 3 ? 'CVD Group Testing' : 'Bayesian Anomaloscope'}
+                  </span>
+                </div>
+                <h3 style={{ fontFamily: 'var(--font-heading)' }}>Select the clearer symbol</h3>
+              </div>
 
-            <Divider />
+              {/* Confidence progress */}
+              <div className="vstack gap-1" style={{ width: '220px', alignItems: 'stretch' }}>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                  <span>Diagnostic confidence</span>
+                  <strong>{entropyHistory.length > 0 ? Math.round((1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100) : 0}%</strong>
+                </div>
+                <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${entropyHistory.length > 0 ? Math.max(0, Math.min(100, (1 - (entropyHistory[entropyHistory.length - 1] / Math.log2(hypothesesSpace.length))) * 100)) : 0}%`,
+                    height: '100%',
+                    background: 'var(--primary-gradient)',
+                    transition: 'width 0.4s ease-out'
+                  }} />
+                </div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>Round {round} of 10</span>
+              </div>
+            </div>
 
-            {/* Canvas Pair Display */}
-            <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={8} w="full">
-              {/* Option A Canvas Card */}
-              <GridItem>
-                <Card
-                  variant="outline"
-                  borderRadius="2xl"
-                  overflow="hidden"
-                  borderWidth="2px"
-                  borderColor="gray.100"
-                >
-                  <CardBody p={6} display="flex" flexDirection="column" gap={6} width="full" alignItems="center">
-                    {/* Top Left Title/Badge */}
-                    <Box alignSelf="flex-start">
-                      <Badge colorScheme="blue" fontSize="md" px={3} py={1} borderRadius="full">Option A</Badge>
-                    </Box>
-                    
-                    {/* Visual Indicator (Canvas display) */}
-                    <Box 
-                      className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      flexShrink={0}
-                    >
-                      <canvas ref={canvasRefA} width={250} height={250} className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl" />
-                    </Box>
-                    
-                    {/* Action Button: directly below the visual indicator, perfectly centered */}
-                    <Button
-                      w="full"
-                      size="lg"
-                      onClick={() => handleSelection('A')}
-                      variant="solid"
-                      bg="blue.50"
-                      color="blue.700"
-                      border="1px"
-                      borderColor="blue.200"
-                      _hover={{ bg: "blue.500", color: "white", transform: "translateY(-2px)", shadow: "md" }}
-                      _active={{ bg: "blue.600" }}
-                      transition="all 0.2s"
-                    >
-                      Option A is Clearer
-                    </Button>
-                  </CardBody>
-                </Card>
-              </GridItem>
+            <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
-              {/* Option B Canvas Card */}
-              <GridItem>
-                <Card
-                  variant="outline"
-                  borderRadius="2xl"
-                  overflow="hidden"
-                  borderWidth="2px"
-                  borderColor="gray.100"
-                >
-                  <CardBody p={6} display="flex" flexDirection="column" gap={6} width="full" alignItems="center">
-                    {/* Top Left Title/Badge */}
-                    <Box alignSelf="flex-start">
-                      <Badge colorScheme="purple" fontSize="md" px={3} py={1} borderRadius="full">Option B</Badge>
-                    </Box>
-                    
-                    {/* Visual Indicator (Canvas display) */}
-                    <Box 
-                      className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      flexShrink={0}
-                    >
-                      <canvas ref={canvasRefB} width={250} height={250} className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl" />
-                    </Box>
-                    
-                    {/* Action Button: directly below the visual indicator, perfectly centered */}
-                    <Button
-                      w="full"
-                      size="lg"
-                      onClick={() => handleSelection('B')}
-                      variant="solid"
-                      bg="purple.50"
-                      color="purple.700"
-                      border="1px"
-                      borderColor="purple.200"
-                      _hover={{ bg: "purple.500", color: "white", transform: "translateY(-2px)", shadow: "md" }}
-                      _active={{ bg: "purple.600" }}
-                      transition="all 0.2s"
-                    >
-                      Option B is Clearer
-                    </Button>
-                  </CardBody>
-                </Card>
-              </GridItem>
-            </Grid>
-
-            {/* 4 Bayesian Anomaloscope Choice Options */}
-            <VStack w="full" align="center" pt={4} spacing={4}>
-              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={6} w="full" maxW="2xl">
-                <Button
-                  leftIcon={<CheckIcon />}
-                  colorScheme="green"
-                  variant="solid"
-                  bg="green.50"
-                  color="green.700"
-                  border="1px"
-                  borderColor="green.200"
-                  _hover={{ bg: "green.100", transform: "translateY(-2px)", shadow: "md" }}
-                  _active={{ bg: "green.200" }}
-                  size="lg"
-                  py={7}
-                  borderRadius="2xl"
-                  onClick={() => handleSelection('both_clear')}
-                  fontWeight="bold"
-                  transition="all 0.2s"
-                >
-                  Both look clear
-                </Button>
-                <Button
-                  leftIcon={<CrossIcon />}
-                  colorScheme="red"
-                  variant="solid"
-                  bg="red.50"
-                  color="red.700"
-                  border="1px"
-                  borderColor="red.200"
-                  _hover={{ bg: "red.100", transform: "translateY(-2px)", shadow: "md" }}
-                  _active={{ bg: "red.200" }}
-                  size="lg"
-                  py={7}
-                  borderRadius="2xl"
-                  onClick={() => handleSelection('neither')}
-                  fontWeight="bold"
-                  transition="all 0.2s"
-                >
-                  Both look unclear
-                </Button>
-              </SimpleGrid>
+            {/* Canvas Cards Pair */}
+            <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
               
-              <Text fontSize="xs" color="gray.400" textAlign="center" maxW="lg">
-                Pro-Tip: Select "Option A is Clearer" or "Option B is Clearer" by clicking on the action buttons above. Use "Both look clear" or "Both look unclear" if there's no visual difference.
-              </Text>
-            </VStack>
-          </VStack>
+              {/* Option A */}
+              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: '24px' }}>
+                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '4px 8px' }}>Option A</span>
+                
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: '#0f172a',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid #1e293b',
+                  boxShadow: 'var(--shadow-inner)'
+                }}>
+                  <canvas ref={canvasRefA} width={250} height={250} style={{ display: 'block', width: '220px', height: '220px', borderRadius: 'var(--radius-sm)' }} />
+                </div>
+
+                <button onClick={() => handleSelection('A')} className="btn btn-outline" style={{ width: '100%', padding: '12px' }}>
+                  Select Option A
+                </button>
+              </div>
+
+              {/* Option B */}
+              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: '24px' }}>
+                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)', padding: '4px 8px' }}>Option B</span>
+                
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: '#0f172a',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid #1e293b',
+                  boxShadow: 'var(--shadow-inner)'
+                }}>
+                  <canvas ref={canvasRefB} width={250} height={250} style={{ display: 'block', width: '220px', height: '220px', borderRadius: 'var(--radius-sm)' }} />
+                </div>
+
+                <button onClick={() => handleSelection('B')} className="btn btn-outline" style={{ width: '100%', padding: '12px' }}>
+                  Select Option B
+                </button>
+              </div>
+
+            </div>
+
+            {/* Auxiliary actions */}
+            <div className="vstack gap-4" style={{ alignItems: 'center', marginTop: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%', maxWidth: '480px' }}>
+                <button onClick={() => handleSelection('both_clear')} className="btn btn-sm btn-outline">
+                  <CheckIcon />
+                  <span>Both look clear</span>
+                </button>
+                <button onClick={() => handleSelection('neither')} className="btn btn-sm btn-outline">
+                  <CrossIcon />
+                  <span>Both look unclear</span>
+                </button>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Click Option A or B directly. Choose "Both clear" or "Both unclear" if colors appear identical.
+              </p>
+            </div>
+
+          </div>
         )}
 
         {/* ================= STAGE 3: CONVERGED DIAGNOSTIC RESULTS ================= */}
         {step === 'results' && diagnosedProfile && (
-          <VStack spacing={8} align="stretch" py={2}>
-            {/* Header Diagnostic Badge */}
-            <HStack spacing={4} align="center">
-              <Box className="p-3 bg-green-50 text-green-600 rounded-2xl">
-                <SuccessIcon />
-              </Box>
-              <VStack align="start" spacing={1}>
-                <HStack>
-                  <Badge colorScheme="green" px={2} py={0.5} borderRadius="md" fontSize="xs" fontWeight="bold">
-                    Calibration Complete
-                  </Badge>
-                </HStack>
-                <Heading fontSize="3xl" fontWeight="black" color="gray.800">
-                  Your Vision Diagnostic Profile
-                </Heading>
-              </VStack>
-            </HStack>
+          <div className="vstack gap-6" style={{ width: '100%', alignItems: 'stretch' }}>
+            
+            <div className="hstack gap-3">
+              <FiCheckCircle size={32} style={{ color: 'var(--color-success)' }} />
+              <div className="vstack" style={{ alignItems: 'flex-start' }}>
+                <h3 style={{ margin: 0, fontFamily: 'var(--font-heading)' }}>Vision Calibration Resolved</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estimated active remapping variables.</span>
+              </div>
+            </div>
 
-            <Divider />
+            <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
-            {/* Results Two-Column Layout */}
-            <Grid templateColumns={{ base: '1fr', lg: '1.2fr 0.8fr' }} gap={8} w="full">
+            {/* Results layout */}
+            <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', width: '100%' }}>
               
-              {/* Left Column: Diagnostics + Sliders */}
-              <GridItem>
-                <VStack spacing={6} align="stretch" h="full">
-                  <Card variant="outline" borderRadius="2xl" border="1px" borderColor="gray.100" bg="gray.50/30">
-                    <CardBody className="space-y-4">
-                      <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
-                        Detected Color Blindness / Color Sensitivity Type
-                      </Text>
-                      <Box className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <VStack align="start" spacing={0}>
-                          <Text fontSize="2xl" fontWeight="extrabold" className="capitalize text-slate-800">
-                            {diagnosedProfile.type === 'normal' ? 'Normal Color Vision' :
-                             diagnosedProfile.type === 'protanopia' ? 'Red sensitivity reduced' :
-                             diagnosedProfile.type === 'deuteranopia' ? 'Green sensitivity reduced' :
-                             diagnosedProfile.type === 'tritanopia' ? 'Blue sensitivity reduced' :
-                             diagnosedProfile.type.replace('opia', 'omaly')}
-                          </Text>
-                          <Text fontSize="sm" color="gray.500">
-                            {diagnosedProfile.type === 'normal' && 'No color vision deficiency detected (Standard Vision)'}
-                            {diagnosedProfile.type === 'protanopia' && 'Reduced sensitivity to Red colors (Protanopia)'}
-                            {diagnosedProfile.type === 'deuteranopia' && 'Reduced sensitivity to Green colors (Deuteranopia)'}
-                            {diagnosedProfile.type === 'tritanopia' && 'Reduced sensitivity to Blue colors (Tritanopia)'}
-                          </Text>
-                        </VStack>
-                        <Badge
-                          colorScheme={
-                            diagnosedProfile.type === 'normal' ? 'teal' :
-                            diagnosedProfile.type === 'protanopia' ? 'red' : 
-                            diagnosedProfile.type === 'deuteranopia' ? 'green' : 'blue'
-                          }
-                          fontSize="lg"
-                          px={4}
-                          py={1.5}
-                          borderRadius="xl"
-                          className="capitalize"
-                        >
-                          {diagnosedProfile.type === 'normal' ? 'Standard' : diagnosedProfile.type.replace('opia', '')}
-                        </Badge>
-                      </Box>
-                    </CardBody>
-                  </Card>
+              {/* Left Column: settings sliders */}
+              <div className="vstack gap-4" style={{ alignItems: 'stretch' }}>
+                <div className="card-solid vstack gap-2" style={{ padding: '20px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Deficiency Classification</span>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <strong style={{ fontSize: '1.25rem', textTransform: 'capitalize', color: 'var(--text-primary)' }}>
+                      {diagnosedProfile.type === 'normal' ? 'Standard Vision' : diagnosedProfile.type.replace('_', ' ')}
+                    </strong>
+                    <span className="badge badge-success" style={{ padding: '4px 12px' }}>
+                      {diagnosedProfile.type === 'normal' ? 'Normal' : diagnosedProfile.type.replace('opia', '')}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {diagnosedProfile.type === 'normal' && 'No color vision deficiency detected.'}
+                    {diagnosedProfile.type === 'protanopia' && 'Estimating reduced sensitivity to red pigments.'}
+                    {diagnosedProfile.type === 'deuteranopia' && 'Estimating reduced sensitivity to green pigments.'}
+                    {diagnosedProfile.type === 'tritanopia' && 'Estimating reduced sensitivity to blue pigments.'}
+                  </p>
+                </div>
 
-                  {/* Manual adjustment sliders */}
-                  <Card variant="outline" borderRadius="2xl" p={2}>
-                    <CardBody className="space-y-6">
-                      <HStack spacing={2} color="gray.700" fontWeight="bold" fontSize="sm">
-                        <SparklesIcon />
-                        <Text>Fine-tune Correction Coefficients</Text>
-                      </HStack>
+                <div className="card-solid vstack gap-5" style={{ padding: '20px' }}>
+                  <div className="hstack gap-2">
+                    <SparkleIcon />
+                    <strong style={{ fontSize: '0.85rem' }}>Fine-tune Daltonization Coefficients</strong>
+                  </div>
 
-                      {/* Severity Slider */}
-                      <Box>
-                        <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Photo Severity</Text>
-                          <Text fontWeight="black" color="blue.600">{customSeverity.toFixed(2)}</Text>
-                        </HStack>
-                        <Slider
-                          min={0.1}
-                          max={2.0}
-                          step={0.05}
-                          value={customSeverity}
-                          onChange={(v) => setCustomSeverity(v)}
-                          colorScheme="blue"
-                        >
-                          <SliderTrack bg="gray.100" h="6px" borderRadius="full">
-                            <SliderFilledTrack />
-                          </SliderTrack>
-                          <SliderThumb boxSize={5} shadow="md" border="2px" borderColor="blue.500" />
-                        </Slider>
-                        <Text fontSize="xs" color="gray.400" mt={1}>
-                          Determines how strongly colors are shifted to make red, green, and blue details stand out.
-                        </Text>
-                      </Box>
+                  <div className="form-group">
+                    <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                      <label className="label">Photo Severity</label>
+                      <strong style={{ color: 'var(--primary)' }}>{customSeverity.toFixed(2)}</strong>
+                    </div>
+                    <div className="slider-container">
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="2.0"
+                        step="0.05"
+                        value={customSeverity}
+                        onChange={e => setCustomSeverity(parseFloat(e.target.value))}
+                        className="slider"
+                      />
+                    </div>
+                  </div>
 
-                      {/* Intensity Slider */}
-                      <Box>
-                        <HStack justify="space-between" mb={2} fontSize="sm">
-                          <Text fontWeight="bold" color="gray.600">Text Clarity (Filter Intensity)</Text>
-                          <Text fontWeight="black" color="blue.600">{(customIntensity * 100).toFixed(0)}%</Text>
-                        </HStack>
-                        <Slider
-                          min={0.5}
-                          max={1.5}
-                          step={0.05}
-                          value={customIntensity}
-                          onChange={(v) => setCustomIntensity(v)}
-                          colorScheme="blue"
-                        >
-                          <SliderTrack bg="gray.100" h="6px" borderRadius="full">
-                            <SliderFilledTrack />
-                          </SliderTrack>
-                          <SliderThumb boxSize={5} shadow="md" border="2px" borderColor="blue.500" />
-                        </Slider>
-                      </Box>
+                  <div className="form-group">
+                    <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                      <label className="label">Text Clarity multiplier</label>
+                      <strong style={{ color: 'var(--primary)' }}>{Math.round(customIntensity * 100)}%</strong>
+                    </div>
+                    <div className="slider-container">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.5"
+                        step="0.05"
+                        value={customIntensity}
+                        onChange={e => setCustomIntensity(parseFloat(e.target.value))}
+                        className="slider"
+                      />
+                    </div>
+                  </div>
 
-                      {/* Contrast/Saturation modifiers */}
-                      <Grid templateColumns="1fr 1fr" gap={4}>
-                        <Box>
-                          <HStack justify="space-between" mb={2} fontSize="xs">
-                            <Text fontWeight="bold" color="gray.500">Chart Contrast</Text>
-                            <Text fontWeight="black" color="blue.600">{(customContrast * 100).toFixed(0)}%</Text>
-                          </HStack>
-                          <Slider
-                            min={0.5}
-                            max={1.5}
-                            step={0.05}
-                            value={customContrast}
-                            onChange={(v) => setCustomContrast(v)}
-                            colorScheme="blue"
-                          >
-                            <SliderTrack bg="gray.100" h="4px" borderRadius="full"><SliderFilledTrack /></SliderTrack>
-                            <SliderThumb boxSize={4} />
-                          </Slider>
-                        </Box>
-                        <Box>
-                          <HStack justify="space-between" mb={2} fontSize="xs">
-                            <Text fontWeight="bold" color="gray.500">Saturation Boost</Text>
-                            <Text fontWeight="black" color="blue.600">{(customSaturation * 100).toFixed(0)}%</Text>
-                          </HStack>
-                          <Slider
-                            min={0.5}
-                            max={1.5}
-                            step={0.05}
-                            value={customSaturation}
-                            onChange={(v) => setCustomSaturation(v)}
-                            colorScheme="blue"
-                          >
-                            <SliderTrack bg="gray.100" h="4px" borderRadius="full"><SliderFilledTrack /></SliderTrack>
-                            <SliderThumb boxSize={4} />
-                          </Slider>
-                        </Box>
-                      </Grid>
-                    </CardBody>
-                  </Card>
-                </VStack>
-              </GridItem>
+                  <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="form-group">
+                      <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                        <label className="label">Contrast</label>
+                        <span style={{ fontSize: '0.75rem' }}>{Math.round(customContrast * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.5"
+                        step="0.05"
+                        value={customContrast}
+                        onChange={e => setCustomContrast(parseFloat(e.target.value))}
+                        className="slider"
+                      />
+                    </div>
 
-              {/* Right Column: Premium Matrix Visualizer */}
-              <GridItem>
-                <VStack spacing={6} align="stretch" h="full">
-                  <Card variant="outline" borderRadius="2xl" border="1px" borderColor="gray.100" className="flex-1">
-                    <CardBody className="space-y-4 flex flex-col justify-between p-6">
-                      <VStack align="stretch" spacing={3}>
-                        <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
-                          Live Filter Preview
-                        </Text>
-                        <Box 
-                          className="relative p-2 bg-gray-900 rounded-3xl shadow-inner border border-gray-800"
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="center"
-                          overflow="hidden"
-                        >
-                          <canvas 
-                            ref={canvasRefPreview} 
-                            width={250} 
-                            height={250} 
-                            className="w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-2xl transition-all duration-75"
-                            style={{
-                              filter: `contrast(${customContrast}) saturate(${customSaturation}) brightness(${customIntensity})`
-                            }}
-                          />
-                        </Box>
-                        <Text fontSize="xs" color="gray.500" textAlign="center">
-                          Adjust the sliders to see how they affect the color separation in real-time.
-                        </Text>
-                      </VStack>
+                    <div className="form-group">
+                      <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                        <label className="label">Saturation</label>
+                        <span style={{ fontSize: '0.75rem' }}>{Math.round(customSaturation * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.5"
+                        step="0.05"
+                        value={customSaturation}
+                        onChange={e => setCustomSaturation(parseFloat(e.target.value))}
+                        className="slider"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                      <VStack align="stretch" spacing={3} pt={4}>
-                        <Text fontSize="xs" color="gray.400" fontWeight="bold" letterSpacing="widest" textTransform="uppercase">
-                          Personalized 3x3 Correction Matrix
-                        </Text>
-                        
-                        {/* Mathematical Matrix visual block */}
-                        <Box className="p-6 bg-slate-900 rounded-2xl shadow-inner border border-slate-800 text-center font-mono">
-                          <VStack spacing={3} align="center" className="text-emerald-400 font-bold text-lg">
-                            <HStack spacing={6}>
-                              <Text className="w-16">[{matrix[0][0].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[0][1].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[0][2].toFixed(2)}]</Text>
-                            </HStack>
-                            <HStack spacing={6}>
-                              <Text className="w-16">[{matrix[1][0].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[1][1].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[1][2].toFixed(2)}]</Text>
-                            </HStack>
-                            <HStack spacing={6}>
-                              <Text className="w-16">[{matrix[2][0].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[2][1].toFixed(2)}]</Text>
-                              <Text className="w-16">[{matrix[2][2].toFixed(2)}]</Text>
-                            </HStack>
-                          </VStack>
-                        </Box>
+              {/* Right Column: preview & matrix values */}
+              <div className="vstack gap-4" style={{ alignItems: 'stretch' }}>
+                <div className="card-solid vstack gap-4" style={{ padding: '20px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', alignSelf: 'flex-start' }}>
+                    Live Color Separation Preview
+                  </span>
 
-                        <Text fontSize="xs" color="gray.400" textAlign="justify">
-                          This calculated matrix shifts red, green, and blue pixels orthogonally in CIELAB/RGB space, resolving visual confusion with zero rendering latency guided by AI semantic masks.
-                        </Text>
-                      </VStack>
+                  <div style={{
+                    padding: '8px',
+                    backgroundColor: '#0f172a',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #1e293b'
+                  }}>
+                    <canvas 
+                      ref={canvasRefPreview} 
+                      width={250} 
+                      height={250} 
+                      style={{
+                        display: 'block',
+                        width: '180px',
+                        height: '180px',
+                        borderRadius: 'var(--radius-sm)',
+                        filter: `contrast(${customContrast}) saturate(${customSaturation}) brightness(${customIntensity})`
+                      }} 
+                    />
+                  </div>
+                </div>
 
-                      {/* Code preview block */}
-                      <VStack align="stretch" spacing={2} pt={4}>
-                        <Text fontSize="xs" fontWeight="bold" color="gray.500">Profile Config Schema</Text>
-                        <Code className="p-3 rounded-lg overflow-x-auto text-[10px] w-full" colorScheme="gray" variant="solid">
-                          {JSON.stringify({
-                            cvd_type: diagnosedProfile.type,
-                            severity: parseFloat(customSeverity.toFixed(3)),
-                            contrast_multiplier: parseFloat(customContrast.toFixed(2)),
-                            saturation_multiplier: parseFloat(customSaturation.toFixed(2)),
-                            intensity: parseFloat(customIntensity.toFixed(2))
-                          }, null, 2)}
-                        </Code>
-                      </VStack>
-                    </CardBody>
-                  </Card>
-                </VStack>
-              </GridItem>
-            </Grid>
+                <div className="card-solid vstack gap-3" style={{ padding: '20px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Personalized 3x3 Transform Matrix
+                  </span>
 
-            <Divider />
+                  <div style={{
+                    backgroundColor: '#0f172a',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.85rem',
+                    color: '#10b981',
+                    textAlign: 'center',
+                    border: '1px solid #1e293b'
+                  }} className="vstack gap-2">
+                    <div>[{matrix[0][0].toFixed(2)}] [{matrix[0][1].toFixed(2)}] [{matrix[0][2].toFixed(2)}]</div>
+                    <div>[{matrix[1][0].toFixed(2)}] [{matrix[1][1].toFixed(2)}] [{matrix[1][2].toFixed(2)}]</div>
+                    <div>[{matrix[2][0].toFixed(2)}] [{matrix[2][1].toFixed(2)}] [{matrix[2][2].toFixed(2)}]</div>
+                  </div>
 
-            {/* Save Buttons */}
-            <HStack spacing={4} justify="end" pt={2}>
-              <Button
-                variant="outline"
-                size="lg"
-                colorScheme="blue"
-                borderRadius="xl"
-                onClick={() => setStep('welcome')}
-              >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <span>Profile config schema</span>
+                    <button 
+                      onClick={() => {
+                        const payload = JSON.stringify({
+                          cvd_type: diagnosedProfile.type,
+                          severity: parseFloat(customSeverity.toFixed(3)),
+                          contrast_multiplier: parseFloat(customContrast.toFixed(2)),
+                          saturation_multiplier: parseFloat(customSaturation.toFixed(2)),
+                          intensity: parseFloat(customIntensity.toFixed(2))
+                        }, null, 2);
+                        navigator.clipboard?.writeText(payload);
+                        triggerNotification('success', 'Config copied to clipboard!');
+                      }}
+                      className="btn-ghost"
+                      style={{ fontWeight: 'bold', color: 'var(--primary)' }}
+                    >
+                      Copy JSON
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
+
+            {/* Action buttons */}
+            <div className="hstack gap-3" style={{ justifyContent: 'flex-end' }}>
+              <button onClick={() => setStep('welcome')} className="btn btn-outline">
                 Recalibrate
-              </Button>
-              <Button
-                size="lg"
-                px={8}
-                colorScheme="blue"
-                bgGradient="linear(to-r, blue.500, purple.500)"
-                _hover={{ bgGradient: "linear(to-r, blue.600, purple.600)" }}
-                borderRadius="xl"
+              </button>
+              <button 
                 onClick={handleSaveProfile}
-                isLoading={isSaving}
-                shadow="md"
+                disabled={isSaving}
+                className="btn btn-primary"
+                style={{ padding: '10px 24px' }}
               >
-                Save & Apply Profile
-              </Button>
-            </HStack>
-          </VStack>
+                {isSaving ? 'Saving...' : 'Save & Apply Vision Profile'}
+              </button>
+            </div>
+
+            {/* Account Delete Danger area */}
+            <div className="card-solid vstack gap-3" style={{ border: '1px solid rgba(185, 28, 28, 0.25)', backgroundColor: 'rgba(185, 28, 28, 0.02)', marginTop: '24px', padding: '20px' }}>
+              <h4 style={{ color: 'var(--color-error)', fontFamily: 'var(--font-heading)', margin: 0 }}>Danger Zone</h4>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                Wipe all visual calibration datasets, S3-stored media, and telemetry reports. Account deletion is permanent.
+              </p>
+              <button 
+                onClick={async () => {
+                  if (window.confirm("ARE YOU SURE? This will permanently delete your account, calibration files, and S3-stored media. This cannot be undone.")) {
+                    try {
+                      const { default: api } = await import('../services/api');
+                      await api.delete('/auth/me');
+                      triggerNotification('success', 'Account wiped.');
+                      localStorage.clear();
+                      setTimeout(() => { window.location.href = '/'; }, 1000);
+                    } catch (e) {
+                      triggerNotification('error', 'Deletion failed.');
+                    }
+                  }
+                }}
+                className="btn btn-sm btn-primary" 
+                style={{ backgroundColor: 'var(--color-error)', alignSelf: 'flex-start', display: 'flex', gap: '6px', alignItems: 'center' }}
+              >
+                <FiTrash2 size={12} />
+                <span>Delete Account</span>
+              </button>
+            </div>
+
+          </div>
         )}
 
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
-
