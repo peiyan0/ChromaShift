@@ -1,57 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  VStack,
-  Heading,
-  Text,
-  useToast,
-  Link as ChakraLink
-} from '@chakra-ui/react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import favicon from '../../assets/favicon.ico';
 
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const toast = useToast();
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navigate = useNavigate();
   const { isAuthenticated, isGuest } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated && !isGuest) {
-      navigate('/');
-    }
+    if (isAuthenticated && !isGuest) navigate('/');
   }, [isAuthenticated, isGuest, navigate]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setMessage(null);
     try {
-      await api.post('/auth/register', {
-        email,
-        password
+      await api.post('/auth/register', { email, password });
+      setMessage({
+        type: 'success',
+        text: 'Account created! Check your email to verify your account.'
       });
-      toast({
-        title: 'Account created.',
-        description: "We've created your account for you.",
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      navigate('/auth/login');
+      setTimeout(() => {
+        navigate('/auth/login');
+      }, 3000);
     } catch (error: any) {
-      toast({
-        title: 'Error creating account.',
-        description: error.response?.data?.detail || "Something went wrong",
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.detail || 'Something went wrong.'
       });
     } finally {
       setIsLoading(false);
@@ -59,51 +40,136 @@ const Register = () => {
   };
 
   return (
-    <Box minH="100vh" display="flex" alignItems="center" justifyContent="center" bg="gray.50">
-      <Box p={8} maxWidth="400px" borderWidth={1} borderRadius={8} boxShadow="lg" bg="white">
-        <VStack spacing={4} as="form" onSubmit={handleRegister}>
-          <Heading size="lg">Create Account</Heading>
-          <Text color="gray.500">CVD Accessibility Platform</Text>
-          
-          <FormControl isRequired>
-            <FormLabel>Email address</FormLabel>
-            <Input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email" 
-            />
-          </FormControl>
-          
-          <FormControl isRequired>
-            <FormLabel>Password</FormLabel>
-            <Input 
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password" 
-            />
-          </FormControl>
-          
-          <Button 
-            width="full" 
-            mt={4} 
-            colorScheme="blue" 
-            isLoading={isLoading}
-            type="submit"
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-4)',
+        backgroundColor: 'var(--bg-primary)'
+      }}
+    >
+      <div
+        className="card-solid"
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          padding: '0'
+        }}
+      >
+        {/* Card top accent */}
+        <div style={{ height: '4px', background: 'var(--primary-gradient)' }} />
+
+        <div style={{ padding: 'var(--space-8)' }} className="vstack gap-6">
+          <RouterLink
+            to="/"
+            className="btn btn-sm btn-ghost"
+            style={{ alignSelf: 'flex-start' }}
           >
-            Register
-          </Button>
-          
-          <Text>
-            Already have an account?{' '}
-            <ChakraLink as={RouterLink} to="/auth/login" color="blue.500">
-              Log In
-            </ChakraLink>
-          </Text>
-        </VStack>
-      </Box>
-    </Box>
+            <span style={{ fontSize: '16px' }}>←</span> Back to Home
+          </RouterLink>
+
+          {/* Logo */}
+          <div className="vstack gap-2" style={{ alignItems: 'center', textAlign: 'center' }}>
+            <div className="hstack gap-2" style={{ justifyContent: 'center' }}>
+              <img
+                src={favicon}
+                alt="ChromaShift Logo"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  objectFit: 'contain',
+                  borderRadius: '6px'
+                }}
+              />
+              <span
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '800',
+                  letterSpacing: '-0.5px',
+                  background: 'var(--primary-gradient)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                ChromaShift
+              </span>
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', marginTop: 'var(--space-2)' }}>Create your account</h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Start Daltonizing your media in seconds</p>
+          </div>
+
+          {/* Notification banner */}
+          {message && (
+            <div
+              className={`badge badge-${message.type}`}
+              style={{
+                width: '100%',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)',
+                textTransform: 'none',
+                justifyContent: 'center',
+                fontWeight: '600',
+                fontSize: '0.85rem'
+              }}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleRegister} className="vstack gap-4" style={{ width: '100%' }}>
+            <div className="form-group">
+              <label className="label" htmlFor="email">Email address</label>
+              <input
+                id="email"
+                type="email"
+                required
+                className="input"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="label" htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                required
+                className="input"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isLoading}
+              style={{ width: '100%', marginTop: 'var(--space-2)' }}
+            >
+              {isLoading ? 'Creating account...' : 'Create Account'}
+            </button>
+
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: 'var(--space-2)' }}>
+              Already have an account?{' '}
+              <RouterLink to="/auth/login" style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'none' }}>
+                Sign in
+              </RouterLink>
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 };
 
