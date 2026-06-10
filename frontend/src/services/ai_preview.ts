@@ -5,8 +5,8 @@ ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
 // YOLO26n-seg: NMS-free instance segmentation from Ultralytics
 // https://docs.ultralytics.com/models/yolo26
-const MODEL_URL     = 'https://huggingface.co/peiyan2/cvd-onnx-models/resolve/main/yolo26n-seg.onnx';
-const MODEL_INT8_URL = 'https://huggingface.co/peiyan2/cvd-onnx-models/resolve/main/yolo26n-seg_int8.onnx';
+// const MODEL_INT8_URL = 'https://huggingface.co/peiyan2/cvd-onnx-models/resolve/main/yolo26n-seg_int8.onnx';
+const MODEL_INT8_URL = '/models/yolo26n-seg_int8.onnx';
 const CACHE_NAME    = 'chromashift-models-v3';
 
 export class AIPreviewService {
@@ -20,21 +20,36 @@ export class AIPreviewService {
   }
 
   private async initModel(): Promise<void> {
-    // Low-memory devices (≤2 GB) use the int8-quantised model.
-    // Devices with 4 GB+ use the full fp32 model.
-    const deviceMemory = (navigator as any).deviceMemory as number | undefined;
-    const useInt8 = deviceMemory !== undefined && deviceMemory <= 2;
-    const url = useInt8 ? MODEL_INT8_URL : MODEL_URL;
+    // Default to the INT8 version for browser-based projects for optimal performance,
+    // as it is lightweight (3.32MB vs 11.2MB), downloads faster, and uses less RAM.
+    const url = MODEL_INT8_URL;
 
     try {
       const modelBuffer = await this.fetchModelWithCache(url);
-      this.session = await ort.InferenceSession.create(modelBuffer, {
+      const modelData = modelBuffer instanceof Uint8Array ? modelBuffer : new Uint8Array(modelBuffer);
+
+      // Verify if the buffer is actually HTML content (starts with '<' which is ASCII 60)
+      if (modelData.length > 0 && modelData[0] === 60) {
+        throw new Error('Fetched model data is HTML content, not a valid ONNX binary. This usually happens due to SPA router rewrite.');
+      }
+
+      this.session = await ort.InferenceSession.create(modelData, {
         executionProviders: ['wasm'],
       });
       this.isLoaded = true;
-      console.log(`YOLO26n-seg ONNX (${useInt8 ? 'int8' : 'fp32'}) loaded successfully.`);
+      console.log('YOLO26n-seg ONNX (int8) loaded successfully.');
     } catch (error) {
       console.error('Failed to load YOLO26n-seg ONNX:', error);
+      // Evict corrupted model from cache so the next reload tries a fresh download
+      if ('caches' in self) {
+        try {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.delete(url);
+          console.log('Evicted corrupted model from Cache API:', url);
+        } catch (cacheError) {
+          console.warn('Failed to evict model from Cache API:', cacheError);
+        }
+      }
     }
   }
 
@@ -49,8 +64,16 @@ export class AIPreviewService {
         const cache = await caches.open(CACHE_NAME);
         const cached = await cache.match(url);
         if (cached) {
-          console.log('Model loaded from Cache API.');
-          return await cached.arrayBuffer();
+          // Verify cached response before using it
+          const cachedBuffer = await cached.arrayBuffer();
+          const cachedData = new Uint8Array(cachedBuffer);
+          if (cachedData.length > 0 && cachedData[0] === 60) {
+            console.warn('Cached response is HTML, deleting from cache...');
+            await cache.delete(url);
+          } else {
+            console.log('Model loaded from Cache API.');
+            return cachedBuffer;
+          }
         }
       } catch (e) {
         console.warn('Cache API check failed:', e);
@@ -60,6 +83,12 @@ export class AIPreviewService {
     // Fetch from network with progress tracking
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Model fetch failed: ${response.status}`);
+
+    // Verify response content-type to prevent caching fallback HTML
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      throw new Error('Fetched model URL returned HTML content instead of binary data. Check static file routing.');
+    }
 
     const contentLength = Number(response.headers.get('content-length') || 0);
     const reader = response.body?.getReader();
