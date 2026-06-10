@@ -3,7 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChromaShift - AI CVD Accessibility Platform</title>
+    <meta name="description" content="ChromaShift — AI-powered color accessibility platform for the 300 million people living with Color Vision Deficiency. Daltonize images, videos, and PDFs with WCAG compliance reporting." />
+    <title>ChromaShift — AI Color Accessibility for CVD</title>
+    <link rel="icon" type="image/x-icon" href="/src/assets/favicon.ico" />
+
+    <!-- Google Fonts: Instrument Sans (headings), Inter (body), JetBrains Mono (monospaced telemetry) -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
