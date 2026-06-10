@@ -6,7 +6,7 @@ from app import schemas
 
 router = APIRouter()
 
-@router.get("/", response_model=schemas.VisionProfileResponse)
+@router.get("", response_model=schemas.VisionProfileResponse)
 def get_user_profile(
     current_user: models.User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db)
@@ -16,7 +16,7 @@ def get_user_profile(
         raise HTTPException(status_code=404, detail="Vision profile not found")
     return profile
 
-@router.post("/", response_model=schemas.VisionProfileResponse)
+@router.post("", response_model=schemas.VisionProfileResponse)
 def create_user_profile(
     profile_in: schemas.VisionProfileCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
@@ -37,7 +37,7 @@ def create_user_profile(
     db.refresh(profile)
     return profile
 
-@router.put("/", response_model=schemas.VisionProfileResponse)
+@router.put("", response_model=schemas.VisionProfileResponse)
 def update_user_profile(
     profile_in: schemas.VisionProfileUpdate,
     current_user: models.User = Depends(deps.get_current_active_user),

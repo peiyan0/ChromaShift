@@ -1,5 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from fastapi import UploadFile
 import uuid
 import os
@@ -20,24 +21,58 @@ class StorageService:
     or by generating expiring presigned URLs.
     """
     def __init__(self):
-        # Initialize boto3 client for S3/MinIO
-        self.s3_client = boto3.client(
-            's3',
-            endpoint_url=f"http://{settings.MINIO_SERVER}",
-            aws_access_key_id=settings.MINIO_ROOT_USER,
-            aws_secret_access_key=settings.MINIO_ROOT_PASSWORD,
-            region_name="us-east-1" # MinIO default or AWS region
+        # Determine if Supabase S3 is active (and not using default placeholders)
+        is_placeholder = lambda val: not val or any(p in val for p in ["your-project-ref", "your-s3-key", "your-s3-access-key", "your-new-publishable-key", "your-new-secret-key"])
+        
+        self.is_supabase = bool(
+            settings.SUPABASE_S3_ACCESS_KEY and not is_placeholder(settings.SUPABASE_S3_ACCESS_KEY) and
+            (settings.SUPABASE_S3_ENDPOINT or settings.SUPABASE_URL or os.environ.get("VITE_SUPABASE_URL")) and
+            not is_placeholder(settings.SUPABASE_S3_ENDPOINT or settings.SUPABASE_URL or os.environ.get("VITE_SUPABASE_URL"))
         )
-        self.bucket_name = settings.MINIO_BUCKET_NAME
-        self._ensure_bucket_exists()
+        
+        if self.is_supabase:
+            # Dynamically resolve S3 endpoint if not explicitly provided
+            endpoint_url = settings.SUPABASE_S3_ENDPOINT
+            if not endpoint_url:
+                supabase_url = settings.SUPABASE_URL or os.environ.get("VITE_SUPABASE_URL")
+                if supabase_url:
+                    project_ref = supabase_url.replace("https://", "").replace("http://", "").split(".")[0]
+                    endpoint_url = f"https://{project_ref}.storage.supabase.co/storage/v1/s3"
+                else:
+                    raise ValueError("Either SUPABASE_S3_ENDPOINT or SUPABASE_URL / VITE_SUPABASE_URL must be configured when using Supabase S3.")
+            
+            self.s3_client = boto3.client(
+                's3',
+                endpoint_url=endpoint_url,
+                aws_access_key_id=settings.SUPABASE_S3_ACCESS_KEY,
+                aws_secret_access_key=settings.SUPABASE_S3_SECRET_KEY,
+                region_name=settings.SUPABASE_S3_REGION,
+                config=Config(signature_version='s3v4')
+            )
+        else:
+            minio_srv = settings.MINIO_SERVER or "localhost:9000"
+            self.s3_client = boto3.client(
+                's3',
+                endpoint_url=f"http://{minio_srv}" if not minio_srv.startswith("http") else minio_srv,
+                aws_access_key_id=settings.MINIO_ROOT_USER or "minioadmin",
+                aws_secret_access_key=settings.MINIO_ROOT_PASSWORD or "minioadmin",
+                region_name="us-east-1",
+                config=Config(signature_version='s3v4')
+            )
+        self.bucket_name = settings.STORAGE_BUCKET_NAME or "cvd-media"
+        self._bucket_verified = False
 
     def _ensure_bucket_exists(self):
+        if self._bucket_verified:
+            return
         try:
             self.s3_client.head_bucket(Bucket=self.bucket_name)
+            self._bucket_verified = True
         except ClientError:
             # Bucket does not exist, create it
             try:
                 self.s3_client.create_bucket(Bucket=self.bucket_name)
+                self._bucket_verified = True
             except ClientError as e:
                 print(f"Failed to create bucket: {e}")
                 
@@ -70,6 +105,7 @@ class StorageService:
         """
         Uploads a file to S3 and returns the generated S3 object key.
         """
+        self._ensure_bucket_exists()
         file_ext = os.path.splitext(file.filename)[1]
         object_key = f"{prefix}{uuid.uuid4()}{file_ext}"
         
@@ -89,6 +125,7 @@ class StorageService:
         """
         Downloads a file from S3 to a local path.
         """
+        self._ensure_bucket_exists()
         try:
             self.s3_client.download_file(self.bucket_name, object_key, local_path)
         except ClientError as e:
@@ -99,6 +136,7 @@ class StorageService:
         """
         Uploads a file from a local path to S3 with content type detection.
         """
+        self._ensure_bucket_exists()
         import mimetypes
         content_type, _ = mimetypes.guess_type(local_path)
         extra_args = {}
@@ -120,6 +158,7 @@ class StorageService:
         """
         Copies an object within the same bucket.
         """
+        self._ensure_bucket_exists()
         try:
             copy_source = {
                 'Bucket': self.bucket_name,
@@ -130,18 +169,23 @@ class StorageService:
             print(f"Error copying file in S3: {e}")
             raise e
 
-    def generate_presigned_url(self, object_key: str, expiration: int = 3600) -> str:
+    def generate_presigned_url(self, object_key: str, expiration: int = 900, download_filename: str = None) -> str:
         """
         Generates a presigned URL to download an object from S3.
-        Default expiration is 1 hour (3600 seconds).
+        Default expiration is 15 minutes (900 seconds) to prevent URL sharing or link leaks.
         Framer-friendly: Forces inline content-disposition and corrects ContentType dynamically.
         """
         import mimetypes
         try:
+            disposition = 'inline'
+            if download_filename:
+                # Ensure filename header parameters are properly formatted
+                disposition = f'attachment; filename="{download_filename}"'
+                
             params = {
                 'Bucket': self.bucket_name, 
                 'Key': object_key,
-                'ResponseContentDisposition': 'inline'
+                'ResponseContentDisposition': disposition
             }
             # Guess the content type to override ResponseContentType
             content_type, _ = mimetypes.guess_type(object_key)
@@ -154,7 +198,7 @@ class StorageService:
                 ExpiresIn=expiration
             )
             # Address client-side preview in docker environment by mapping internal container network hostname to localhost
-            if response:
+            if response and not self.is_supabase:
                 response = response.replace("://minio:", "://localhost:")
             return response
         except ClientError as e:
@@ -165,6 +209,7 @@ class StorageService:
         """
         Deletes a file from S3.
         """
+        self._ensure_bucket_exists()
         try:
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_key)
         except ClientError as e:
