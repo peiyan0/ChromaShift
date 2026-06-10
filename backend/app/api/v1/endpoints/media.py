@@ -37,6 +37,12 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
     # Create tmp dir if not exists (inside container /tmp is usually fine)
     os.makedirs("/tmp", exist_ok=True)
     
+    # Explicitly remove any existing local files from a previous run to avoid re-processing the processed file
+    if os.path.exists(local_input):
+        os.remove(local_input)
+    if os.path.exists(local_output):
+        os.remove(local_output)
+    
     try:
         # 2. Download from S3
         storage_service.download_file(s3_key, local_input)
@@ -119,7 +125,7 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         elif file_ext.lower() in ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.m4v']:
             try:
                 import cv2
-                cap = cv2.VideoCapture(local_output)
+                cap = cv2.VideoCapture(local_input)
                 ret, frame = cap.read()
                 cap.release()
                 if ret:
@@ -322,6 +328,10 @@ async def process_media(
     cvd_type = cvd_type or "deuteranopia"
     severity = severity if severity is not None else 1.0
     
+    # Delete existing compliance report if any, since we are reprocessing
+    if job.compliance_report:
+        db.delete(job.compliance_report)
+        
     job.status = "processing"
     db.commit()
     
@@ -367,8 +377,19 @@ async def get_media_status(
         elif job.media_type == "image":
             thumbnail_url = download_url
             
-    # Mock progress calculation
-    progress = 100.0 if job.status == "completed" else (50.0 if job.status == "processing" else 0.0)
+    # Calculate elapsed progress estimation for processing status
+    if job.status == "completed":
+        progress = 100.0
+    elif job.status == "processing":
+        # Estimate progress: start at 10% and increment by 15% every 5 seconds, capping at 90%
+        import datetime
+        elapsed = 0.0
+        if job.updated_at:
+            now = datetime.datetime.now(job.updated_at.tzinfo) if job.updated_at.tzinfo else datetime.datetime.now()
+            elapsed = (now - job.updated_at).total_seconds()
+        progress = min(10.0 + (elapsed / 5.0) * 15.0, 90.0)
+    else:
+        progress = 0.0
     
     return {
         "job_id": job.job_id,
@@ -392,7 +413,15 @@ async def get_download_url(
     if not job or job.status != "completed" or not job.s3_key_processed:
         raise HTTPException(status_code=404, detail="Processed file not found or not completed")
         
-    url = storage_service.generate_presigned_url(job.s3_key_processed, expiration=3600)
+    # Generate download filename: [original_basename]_processed.[original_ext]
+    base, ext = os.path.splitext(job.filename)
+    download_filename = f"{base}_processed{ext}"
+    
+    url = storage_service.generate_presigned_url(
+        job.s3_key_processed, 
+        expiration=3600, 
+        download_filename=download_filename
+    )
     if not url:
         raise HTTPException(status_code=500, detail="Failed to generate download URL")
         
@@ -411,10 +440,17 @@ async def generate_share_link(
     if not job or job.status != "completed" or not job.s3_key_processed:
         raise HTTPException(status_code=404, detail="Processed file not found or not completed")
         
-    share_url = storage_service.generate_presigned_url(job.s3_key_processed, expiration=7*24*3600)
-    share_id = str(uuid.uuid4())[:8] # In a real app, save this mapping in the DB
+    share_id = str(uuid.uuid4())[:8]
+    job.share_id = share_id
+    db.commit()
     
-    return {"share_url": share_url}
+    # Generate long-lived (7 days) presigned URL
+    share_url = storage_service.generate_presigned_url(job.s3_key_processed, expiration=7*24*3600)
+    
+    return {
+        "share_id": share_id,
+        "share_url": share_url
+    }
 
 @router.get("/history", response_model=List[schemas.MediaHistoryResponse])
 async def get_media_history(
