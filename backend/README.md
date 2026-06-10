@@ -1,3 +1,13 @@
+---
+title: ChromaShift Backend
+emoji: 🚀
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+dockerfile: Dockerfile.hf
+app_port: 7860
+---
+
 # ChromaShift Backend
 
 This is the backend API for the ChromaShift platform, built with FastAPI and Python.

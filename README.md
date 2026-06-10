@@ -2,6 +2,8 @@
 
 > **Empowering the chromatic digital divide.** An AI-powered suite designed to make digital media accessible to the 300 million individuals living with Color Vision Deficiency (CVD).
 
+**🔗 Live Preview:** [chroma-shift-py.vercel.app](https://chroma-shift-py.vercel.app/)
+
 ---
 
 ## ✨ Key Features
@@ -41,14 +43,14 @@
 ### Prerequisites
 - [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
 - [Node.js v20+](https://nodejs.org/)
-- [Python 3.11+ & Poetry](https://python-poetry.org/)
+- [Python 3.12+ & Poetry](https://python-poetry.org/)
 
 ### Run the platform in Docker
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/peiyan0/chromashift.git
-   cd chromashift
+   git clone https://github.com/peiyan0/ChromaShift.git
+   cd ChromaShift
    ```
 
 2. **Start the containers**:
