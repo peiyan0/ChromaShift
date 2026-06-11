@@ -40,23 +40,27 @@ class InferenceService:
             return np.ones((image.shape[0], image.shape[1]), dtype=np.float32)
             
         try:
-            # Run inference
-            results = self.model(image, imgsz=640, verbose=False)
-            
             h_orig, w_orig = image.shape[:2]
+            
+            # Downscale for faster YOLO inference on CPU
+            max_dim = 320
+            if max(h_orig, w_orig) > max_dim:
+                scale = max_dim / max(h_orig, w_orig)
+                infer_img = cv2.resize(image, (int(w_orig * scale), int(h_orig * scale)))
+            else:
+                infer_img = image
+                
+            # Run inference
+            results = self.model(infer_img, imgsz=320, verbose=False)
+            
             final_mask = np.zeros((h_orig, w_orig), dtype=np.float32)
             
             if len(results) > 0 and results[0].masks is not None:
-                # masks.data contains the tensor of shape (N, H, W) where N is number of objects
+                # masks.data contains the tensor of shape (N, H, W)
                 masks_data = results[0].masks.data.cpu().numpy()
-                
-                # Combine all masks by taking the maximum confidence at each pixel
                 combined_mask = np.max(masks_data, axis=0)
-                
-                # Resize combined mask back to original image dimensions
                 final_mask = cv2.resize(combined_mask, (w_orig, h_orig))
             else:
-                # Fallback if no objects detected: apply uniform shift to the entire frame
                 final_mask = np.ones((h_orig, w_orig), dtype=np.float32)
                 
             return final_mask
