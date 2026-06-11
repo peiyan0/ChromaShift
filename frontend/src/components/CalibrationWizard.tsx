@@ -46,6 +46,13 @@ for (const type of CVD_TYPES) {
 }
 
 export const CalibrationWizard: FC = () => {
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [step, setStep] = useState<'welcome' | 'calibration' | 'results'>('welcome');
   const [round, setRound] = useState<number>(1);
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
@@ -596,17 +603,19 @@ export const CalibrationWizard: FC = () => {
       intensity: customIntensity
     };
     
+    // Always store locally first to guarantee guest session / offline compatibility works
+    localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
+    
     try {
       await profileService.updateProfile(payload);
-      localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
       triggerNotification('success', 'Vision profile applied and locked.');
     } catch (e) {
       try {
         await profileService.createProfile(payload);
-        localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
         triggerNotification('success', 'Profile Created & Saved');
       } catch (err) {
-        triggerNotification('error', 'Failed to synchronize with server.');
+        // Sync failure is now non-blocking for Guest/Local operations
+        triggerNotification('info', 'Profile saved locally (Offline mode).');
       }
     } finally {
       setIsSaving(false);
@@ -614,41 +623,43 @@ export const CalibrationWizard: FC = () => {
   };
 
   return (
-    <div 
-      className="card-solid animate-fade-in"
-      style={{
-        width: '100%',
-        maxWidth: '960px',
-        margin: '0 auto',
-        padding: 0,
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-xl)',
-        border: '1px solid var(--border-primary)',
-        position: 'relative'
-      }}
-    >
-      {/* Top accent bar */}
-      <div style={{ height: '3px', background: 'var(--primary-gradient)' }} />
-      
+    <>
       {/* Notification Toast replacement */}
       {notification && (
         <div className={`badge badge-${notification.type}`} style={{
-          position: 'absolute',
-          top: '16px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 100,
-          padding: '10px 20px',
-          borderRadius: 'var(--radius-full)',
+          position: 'fixed',
+          top: '80px',
+          right: '24px',
+          zIndex: 9999,
+          padding: '12px 24px',
+          borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg)',
           border: 'none',
           textTransform: 'none',
           fontWeight: 'bold',
+          backgroundColor: notification.type === 'success' ? 'var(--color-success)' : notification.type === 'error' ? 'var(--color-error)' : 'var(--color-info)',
+          color: '#ffffff',
           animation: 'slide-up 0.2s ease-out'
         }}>
           {notification.text}
         </div>
       )}
+
+      <div 
+        className="card-solid animate-fade-in"
+        style={{
+          width: '100%',
+          maxWidth: '960px',
+          margin: '0 auto',
+          padding: 0,
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-primary)',
+          position: 'relative'
+        }}
+      >
+        {/* Top accent bar */}
+        <div style={{ height: '3px', background: 'var(--primary-gradient)' }} />
 
       <div style={{ padding: '32px' }} className="vstack gap-6">
 
@@ -775,43 +786,43 @@ export const CalibrationWizard: FC = () => {
             <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
             {/* Canvas Cards Pair */}
-            <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: windowWidth <= 480 ? 'var(--space-2)' : 'var(--space-6)' }}>
               
               {/* Option A */}
-              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: '24px' }}>
-                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '4px 8px' }}>Option A</span>
+              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: windowWidth <= 480 ? '8px' : '24px' }}>
+                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '4px 8px', fontSize: windowWidth <= 480 ? '0.65rem' : '0.75rem' }}>Option A</span>
                 
                 <div style={{
-                  padding: '8px',
+                  padding: windowWidth <= 480 ? '4px' : '8px',
                   backgroundColor: '#0f172a',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid #1e293b',
                   boxShadow: 'var(--shadow-inner)'
                 }}>
-                  <canvas ref={canvasRefA} width={250} height={250} style={{ display: 'block', width: '220px', height: '220px', borderRadius: 'var(--radius-sm)' }} />
+                  <canvas ref={canvasRefA} width={250} height={250} style={{ display: 'block', width: '100%', maxWidth: '220px', aspectRatio: '1/1', borderRadius: 'var(--radius-sm)' }} />
                 </div>
 
-                <button onClick={() => handleSelection('A')} className="btn btn-outline" style={{ width: '100%', padding: '12px' }}>
-                  Select Option A
+                <button onClick={() => handleSelection('A')} className="btn btn-outline" style={{ width: '100%', padding: windowWidth <= 480 ? '8px' : '12px', fontSize: windowWidth <= 480 ? '0.75rem' : '0.9rem' }}>
+                  Select A
                 </button>
               </div>
 
               {/* Option B */}
-              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: '24px' }}>
-                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)', padding: '4px 8px' }}>Option B</span>
+              <div className="card-solid vstack gap-4" style={{ alignItems: 'center', padding: windowWidth <= 480 ? '8px' : '24px' }}>
+                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)', padding: '4px 8px', fontSize: windowWidth <= 480 ? '0.65rem' : '0.75rem' }}>Option B</span>
                 
                 <div style={{
-                  padding: '8px',
+                  padding: windowWidth <= 480 ? '4px' : '8px',
                   backgroundColor: '#0f172a',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid #1e293b',
                   boxShadow: 'var(--shadow-inner)'
                 }}>
-                  <canvas ref={canvasRefB} width={250} height={250} style={{ display: 'block', width: '220px', height: '220px', borderRadius: 'var(--radius-sm)' }} />
+                  <canvas ref={canvasRefB} width={250} height={250} style={{ display: 'block', width: '100%', maxWidth: '220px', aspectRatio: '1/1', borderRadius: 'var(--radius-sm)' }} />
                 </div>
 
-                <button onClick={() => handleSelection('B')} className="btn btn-outline" style={{ width: '100%', padding: '12px' }}>
-                  Select Option B
+                <button onClick={() => handleSelection('B')} className="btn btn-outline" style={{ width: '100%', padding: windowWidth <= 480 ? '8px' : '12px', fontSize: windowWidth <= 480 ? '0.75rem' : '0.9rem' }}>
+                  Select B
                 </button>
               </div>
 
@@ -971,8 +982,9 @@ export const CalibrationWizard: FC = () => {
                       height={250} 
                       style={{
                         display: 'block',
-                        width: '180px',
-                        height: '180px',
+                        width: '100%',
+                        maxWidth: '180px',
+                        aspectRatio: '1/1',
                         borderRadius: 'var(--radius-sm)',
                         filter: `contrast(${customContrast}) saturate(${customSaturation}) brightness(${customIntensity})`
                       }} 
@@ -1028,15 +1040,30 @@ export const CalibrationWizard: FC = () => {
             <span style={{ height: '1px', backgroundColor: 'var(--border-primary)', width: '100%' }} />
 
             {/* Action buttons */}
-            <div className="hstack gap-3" style={{ justifyContent: 'flex-end' }}>
-              <button onClick={() => setStep('welcome')} className="btn btn-outline">
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-3"} 
+              style={{ 
+                justifyContent: 'flex-end', 
+                alignItems: 'stretch',
+                width: '100%',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                onClick={() => setStep('welcome')} 
+                className="btn btn-outline"
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Recalibrate
               </button>
               <button 
                 onClick={handleSaveProfile}
                 disabled={isSaving}
                 className="btn btn-primary"
-                style={{ padding: '10px 24px' }}
+                style={{ 
+                  padding: '10px 24px',
+                  width: windowWidth <= 480 ? '100%' : 'auto' 
+                }}
               >
                 {isSaving ? 'Saving...' : 'Save & Apply Vision Profile'}
               </button>
@@ -1075,5 +1102,6 @@ export const CalibrationWizard: FC = () => {
 
       </div>
     </div>
+    </>
   );
 };

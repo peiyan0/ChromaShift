@@ -20,6 +20,7 @@ export const WorkspaceStudio: React.FC = () => {
   const [fileName, setFileName] = useState<string>('Loading file...');
   
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSharing, setIsSharing] = useState<boolean>(false);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<'side-by-side' | 'toggle'>('side-by-side');
@@ -133,15 +134,20 @@ export const WorkspaceStudio: React.FC = () => {
         setMediaType('image');
       }
 
-      try {
-        const history = await mediaService.getHistory();
-        const job = history.find(j => j.job_id === jobId);
-        if (job) {
-          setFileName(job.filename);
-          setMediaType(job.type);
+      if (statusRes.filename) {
+        setFileName(statusRes.filename);
+      }
+      if (statusRes.media_type) {
+        setMediaType(statusRes.media_type);
+      } else {
+        const ext = statusRes.download_url?.split('?')[0].split('.').pop()?.toLowerCase() || '';
+        if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'm4v'].includes(ext)) {
+          setMediaType('video');
+        } else if (ext === 'pdf') {
+          setMediaType('pdf');
+        } else {
+          setMediaType('image');
         }
-      } catch (err) {
-        console.error("Failed to deduce filename from history", err);
       }
 
       try {
@@ -192,20 +198,41 @@ export const WorkspaceStudio: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (status?.download_url) {
-      window.open(status.download_url, '_blank');
+  const handleDownload = async () => {
+    if (!jobId) return;
+    try {
+      const response = await mediaService.getDownloadUrl(jobId);
+      const downloadUrl = response.url;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const baseName = fileName !== 'Loading file...' ? fileName : 'processed_media';
+      const ext = downloadUrl.split('?')[0].split('.').pop()?.toLowerCase() || '';
+      const baseWithoutExt = baseName.substring(0, baseName.lastIndexOf('.')) || baseName;
+      a.download = `${baseWithoutExt}_processed.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("Programmatic download failed, falling back to window.open", err);
+      if (status?.download_url) {
+        window.open(status.download_url, '_blank');
+      } else {
+        triggerNotification('error', 'Download link generation failed');
+      }
     }
   };
 
   const handleShare = async () => {
     if (!jobId) return;
+    setIsSharing(true);
     try {
       const data = await mediaService.shareMedia(jobId);
       await navigator.clipboard.writeText(data.share_url);
       triggerNotification('success', 'Accessible share link copied!');
     } catch (error) {
       triggerNotification('error', 'Share Link Generation Failed');
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -293,27 +320,29 @@ export const WorkspaceStudio: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', position: 'relative' }}>
-      
+    <>
       {/* Local Notification Alerts */}
       {notification && (
         <div className={`badge badge-${notification.type}`} style={{
-          position: 'absolute',
-          top: '0px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 100,
-          padding: '10px 20px',
-          borderRadius: 'var(--radius-full)',
+          position: 'fixed',
+          top: '80px',
+          right: '24px',
+          zIndex: 9999,
+          padding: '12px 24px',
+          borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg)',
           border: 'none',
           textTransform: 'none',
           fontWeight: 'bold',
+          backgroundColor: notification.type === 'success' ? 'var(--color-success)' : notification.type === 'error' ? 'var(--color-error)' : 'var(--color-info)',
+          color: '#ffffff',
           animation: 'slide-up 0.2s ease-out'
         }}>
           {notification.text}
         </div>
       )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', position: 'relative' }}>
 
       {/* Hidden simulator SVG filters */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true" focusable="false">
@@ -639,33 +668,37 @@ export const WorkspaceStudio: React.FC = () => {
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
                   <div className="vstack gap-2" style={{ height: '580px' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)', textAlign: 'center' }}>Original</span>
-                    <iframe
-                      src={`${status?.download_url_original}#toolbar=0`}
-                      width="100%"
-                      height="100%"
-                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white' }}
-                      title="Original PDF"
-                    />
+                    <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <iframe
+                        src={`${status?.download_url_original}#toolbar=0`}
+                        width="100%"
+                        height="100%"
+                        style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                        title="Original PDF"
+                      />
+                    </div>
                   </div>
                   <div className="vstack gap-2" style={{ height: '580px' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)', textAlign: 'center' }}>Calibrated PDF</span>
-                    <iframe
-                      src={`${status?.download_url}#toolbar=0`}
-                      width="100%"
-                      height="100%"
-                      style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white' }}
-                      title="Processed PDF"
-                    />
+                    <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <iframe
+                        src={`${status?.download_url}#toolbar=0`}
+                        width="100%"
+                        height="100%"
+                        style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                        title="Processed PDF"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ height: '580px', width: '100%' }}>
+                <div style={{ height: '580px', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
                   <iframe
                     key={toggleActive}
                     src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                     width="100%"
                     height="100%"
-                    style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white' }}
+                    style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px' }}
                     title="PDF Toggle Viewer"
                   />
                 </div>
@@ -766,9 +799,9 @@ export const WorkspaceStudio: React.FC = () => {
                     <FiDownload size={14} />
                     <span>Download</span>
                   </button>
-                  <button onClick={handleShare} className="btn btn-sm btn-outline">
-                    <FiShare2 size={14} />
-                    <span>Share</span>
+                  <button onClick={handleShare} disabled={isSharing} className="btn btn-sm btn-outline">
+                    {isSharing ? <FiRefreshCw size={14} className="animate-spin" /> : <FiShare2 size={14} />}
+                    <span>{isSharing ? 'Sharing...' : 'Share'}</span>
                   </button>
                 </div>
                 <button onClick={handleExportReport} className="btn btn-sm btn-secondary" style={{ width: '100%' }}>
@@ -844,6 +877,13 @@ export const WorkspaceStudio: React.FC = () => {
 
       {/* Responsive layout fix for mobile sidebar */}
       <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
         @media (max-width: 991px) {
           [className-mobile-col~="span"] {
             grid-column: span 12 !important;
@@ -851,5 +891,6 @@ export const WorkspaceStudio: React.FC = () => {
         }
       `}</style>
     </div>
+    </>
   );
 };

@@ -21,6 +21,13 @@ interface SurveyWizardProps {
 }
 
 export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, onComplete, onBackToApp }) => {
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  React.useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [step, setStep] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -165,34 +172,25 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
   ];
 
   return (
-    <div
-      style={{
-        width: '100%',
-        maxWidth: '900px',
-        margin: 'var(--space-4) auto',
-        padding: '1px',
-        background: 'var(--primary-gradient)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-xl)',
-        position: 'relative'
-      }}
-    >
+    <>
       {/* Toast Notification */}
       {notification && (
         <div
           className={`badge badge-${notification.type === 'error' ? 'error' : 'success'}`}
           style={{
-            position: 'absolute',
-            top: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-            padding: '10px 20px',
-            borderRadius: 'var(--radius-full)',
+            position: 'fixed',
+            top: '80px',
+            right: '24px',
+            zIndex: 9999,
+            padding: '12px 24px',
+            borderRadius: 'var(--radius-md)',
             boxShadow: 'var(--shadow-lg)',
             border: 'none',
             textTransform: 'none',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            backgroundColor: notification.type === 'error' ? 'var(--color-error)' : 'var(--color-success)',
+            color: '#ffffff',
+            animation: 'slide-up 0.2s ease-out'
           }}
         >
           {notification.text}
@@ -200,7 +198,26 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
       )}
 
       <div
-        style={{
+        style={windowWidth <= 768 ? {
+          width: '100%',
+          position: 'relative'
+        } : {
+          width: '100%',
+          maxWidth: '900px',
+          margin: 'var(--space-4) auto',
+          padding: '1px',
+          background: 'var(--primary-gradient)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-xl)',
+          position: 'relative'
+        }}
+      >
+
+      <div
+        style={windowWidth <= 768 ? {
+          padding: '16px',
+          backgroundColor: 'var(--bg-primary)'
+        } : {
           padding: 'var(--space-8)',
           backgroundColor: 'var(--bg-primary)',
           borderRadius: '23px',
@@ -211,11 +228,11 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
         {/* Navigation Step Header */}
         {step > 0 && (
           <div className="vstack gap-2" style={{ width: '100%', marginBottom: 'var(--space-4)' }}>
-            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%' }}>
-              <span className="badge badge-primary">
+            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+              <span className="badge badge-primary" style={{ padding: '6px 12px' }}>
                 Step {step} of {totalSteps}
               </span>
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', flexWrap: 'wrap', textAlign: 'right' }}>
                 {step === 1 && "Demographics Intake"}
                 {step === 2 && "System Usability Scale (SUS)"}
                 {step === 3 && "NASA Task Load Index"}
@@ -290,9 +307,20 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </ul>
             </div>
 
-            <div className="hstack gap-4" style={{ marginTop: 'var(--space-4)' }}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-4"} 
+              style={{ 
+                marginTop: 'var(--space-4)',
+                width: windowWidth <= 480 ? '100%' : 'auto',
+                alignItems: 'stretch'
+              }}
+            >
               {onBackToApp && (
-                <button className="btn btn-outline btn-lg" onClick={onBackToApp}>
+                <button 
+                  className="btn btn-outline btn-lg" 
+                  onClick={onBackToApp}
+                  style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+                >
                   Return to Dashboard
                 </button>
               )}
@@ -301,7 +329,8 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                 onClick={nextStep}
                 style={{
                   background: 'var(--primary-gradient)',
-                  boxShadow: 'var(--shadow-lg)'
+                  boxShadow: 'var(--shadow-lg)',
+                  width: windowWidth <= 480 ? '100%' : 'auto'
                 }}
               >
                 Accept & Begin Study Session
@@ -327,7 +356,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gridTemplateColumns: windowWidth <= 480 ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
                 gap: 'var(--space-6)',
                 width: '100%'
               }}
@@ -439,14 +468,29 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
             </div>
 
-            <div className="hstack" style={{ justifyContent: 'flex-end', gap: 'var(--space-4)', width: '100%', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+              style={{ 
+                justifyContent: 'flex-end', 
+                gap: 'var(--space-4)', 
+                width: '100%', 
+                marginTop: 'var(--space-4)',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Back
               </button>
               <button
                 className="btn btn-primary btn-lg"
                 onClick={nextStep}
                 disabled={!age || !occupation}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
               >
                 Proceed to Usability Scale
               </button>
@@ -522,11 +566,28 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               ))}
             </div>
 
-            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+              style={{ 
+                justifyContent: 'space-between', 
+                width: '100%', 
+                marginTop: 'var(--space-4)',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Back
               </button>
-              <button className="btn btn-primary btn-lg" onClick={nextStep}>
+              <button 
+                className="btn btn-primary btn-lg" 
+                onClick={nextStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Proceed to Task Load Index
               </button>
             </div>
@@ -552,7 +613,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Mental Demand</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaMental} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaMental} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How mentally demanding were the tasks? (e.g. complex thinking, color problem-solving, legend mapping)
@@ -574,7 +635,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Physical Demand (Eye Strain)</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaPhysical} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaPhysical} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How physically demanding were the tasks? (specifically squinting, focusing effort, headache development)
@@ -596,7 +657,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Temporal Demand</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaTemporal} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaTemporal} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How hurried or rushed did you feel while performing the tasks under the stopwatch?
@@ -618,7 +679,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Successful Performance</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaPerformance} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaPerformance} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How successful do you think you were in completing the tasks? (accuracy of legend identification and tracking)
@@ -640,7 +701,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Overall Effort</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaEffort} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaEffort} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How hard did you have to work (both mentally and physically) to achieve your level of performance?
@@ -662,7 +723,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2">
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Frustration Level</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem' }}>{nasaFrustration} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaFrustration} / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   How insecure, discouraged, irritated, or annoyed did you feel during the tasks?
@@ -681,11 +742,28 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
             </div>
 
-            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+              style={{ 
+                justifyContent: 'space-between', 
+                width: '100%', 
+                marginTop: 'var(--space-4)',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Back
               </button>
-              <button className="btn btn-primary btn-lg" onClick={nextStep}>
+              <button 
+                className="btn btn-primary btn-lg" 
+                onClick={nextStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Proceed to Comfort Scale
               </button>
             </div>
@@ -709,9 +787,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
             <div className="vstack gap-6" style={{ width: '100%' }}>
               {/* Comfort Q1 */}
               <div className="vstack gap-2">
-                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>My eyes felt comfortable throughout the session.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ1} / 5</span>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>My eyes felt comfortable throughout the session.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ1} / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -728,9 +806,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               {/* Comfort Q2 */}
               <div className="vstack gap-2">
-                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I experienced eye strain, dry eyes, or ocular fatigue.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ2} / 5</span>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I experienced eye strain, dry eyes, or ocular fatigue.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ2} / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -747,9 +825,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               {/* Comfort Q3 */}
               <div className="vstack gap-2">
-                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I developed a headache during or after the comparative rounds.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ3} / 5</span>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I developed a headache during or after the comparative rounds.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ3} / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -766,9 +844,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               {/* Comfort Q4 */}
               <div className="vstack gap-2">
-                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>The remapped media (Daltonized view) looked more comfortable to view than the original.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ4} / 5</span>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>The remapped media (Daltonized view) looked more comfortable to view than the original.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ4} / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -785,9 +863,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               {/* Comfort Q5 */}
               <div className="vstack gap-2">
-                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>I would use these active remapping settings for long screen/reading sessions.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{comfortQ5} / 5</span>
+                <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I would use these active remapping settings for long screen/reading sessions.</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ5} / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -803,11 +881,28 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
             </div>
 
-            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+              style={{ 
+                justifyContent: 'space-between', 
+                width: '100%', 
+                marginTop: 'var(--space-4)',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Back
               </button>
-              <button className="btn btn-primary btn-lg" onClick={nextStep}>
+              <button 
+                className="btn btn-primary btn-lg" 
+                onClick={nextStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Proceed to Interview Notes
               </button>
             </div>
@@ -915,11 +1010,28 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
             </div>
 
-            <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+              style={{ 
+                justifyContent: 'space-between', 
+                width: '100%', 
+                marginTop: 'var(--space-4)',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Back
               </button>
-              <button className="btn btn-primary btn-lg" onClick={nextStep}>
+              <button 
+                className="btn btn-primary btn-lg" 
+                onClick={nextStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Proceed to Verification
               </button>
             </div>
@@ -961,8 +1073,20 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div><strong>NASA Workload Score</strong>: Rating registered</div>
             </div>
 
-            <div className="hstack gap-4" style={{ marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-outline btn-lg" onClick={prevStep}>
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-4"} 
+              style={{ 
+                marginTop: 'var(--space-4)',
+                width: windowWidth <= 480 ? '100%' : 'auto',
+                alignItems: 'stretch',
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+              }}
+            >
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={prevStep}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
                 Verify Answers
               </button>
               <button
@@ -971,7 +1095,11 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                 disabled={isSubmitting}
                 style={{
                   background: 'var(--primary-gradient)',
-                  boxShadow: 'var(--shadow-lg)'
+                  boxShadow: 'var(--shadow-lg)',
+                  width: windowWidth <= 480 ? '100%' : 'auto',
+                  whiteSpace: 'normal',
+                  height: 'auto',
+                  textAlign: 'center'
                 }}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Survey Results to Admin DB'}
@@ -982,5 +1110,6 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
       </div>
     </div>
+    </>
   );
 };

@@ -14,6 +14,13 @@ interface TaskResult {
 
 export const VisionTest: FC = () => {
   const navigate = useNavigate();
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 
   // Vision Profile Matrix variables
@@ -410,49 +417,51 @@ export const VisionTest: FC = () => {
   const corrTime = calculateAvgTime(correctedResults);
 
   return (
-    <div
-      style={{
-        width: '100%',
-        maxWidth: '1000px',
-        margin: 'var(--space-6) auto',
-        padding: '1px',
-        background: 'var(--primary-gradient)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-xl)',
-        position: 'relative'
-      }}
-    >
-      {/* Dynamic GPU-accelerated FeColorMatrix Filter using calibration coefficients */}
-      <svg width="0" height="0" style={{ position: 'absolute', zIndex: -100, pointerEvents: 'none' }}>
-        <defs>
-          <filter id="vision-daltonize-filter" colorInterpolationFilters="linearRGB">
-            <feColorMatrix type="matrix" values={svgMatrixValues} />
-          </filter>
-        </defs>
-      </svg>
-
+    <>
       {/* Toast Notification */}
       {notification && (
         <div
           className={`badge badge-${notification.type === 'error' ? 'error' : notification.type === 'warning' ? 'warning' : 'success'}`}
           style={{
-            position: 'absolute',
-            top: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-            padding: '10px 20px',
-            borderRadius: 'var(--radius-full)',
+            position: 'fixed',
+            top: '80px',
+            right: '24px',
+            zIndex: 9999,
+            padding: '12px 24px',
+            borderRadius: 'var(--radius-md)',
             boxShadow: 'var(--shadow-lg)',
             border: 'none',
             textTransform: 'none',
             fontWeight: 'bold',
+            backgroundColor: notification.type === 'error' ? 'var(--color-error)' : notification.type === 'warning' ? 'var(--color-warning)' : 'var(--color-success)',
+            color: '#ffffff',
             animation: 'slide-up 0.2s ease-out'
           }}
         >
           {notification.text}
         </div>
       )}
+
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '1000px',
+          margin: 'var(--space-6) auto',
+          padding: '1px',
+          background: 'var(--primary-gradient)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-xl)',
+          position: 'relative'
+        }}
+      >
+        {/* Dynamic GPU-accelerated FeColorMatrix Filter using calibration coefficients */}
+        <svg width="0" height="0" style={{ position: 'absolute', zIndex: -100, pointerEvents: 'none' }}>
+          <defs>
+            <filter id="vision-daltonize-filter" colorInterpolationFilters="linearRGB">
+              <feColorMatrix type="matrix" values={svgMatrixValues} />
+            </filter>
+          </defs>
+        </svg>
 
       <div
         style={{
@@ -505,33 +514,43 @@ export const VisionTest: FC = () => {
               {/* Option A: Sandbox Playground */}
               <div 
                 className="card card-interactive vstack gap-4"
-                style={{ textAlign: 'left' }}
+                style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                 onClick={() => {
                   setTestMode('sandbox');
                   setTestPhase('welcome');
                 }}
               >
-                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '6px 12px' }}>Vision Playground</span>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Playground Sandbox</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  A free sandbox session to test yourself on Line graphs, Heatmaps, Video Tracking, and PDF Documents. Records stopwatch completion speeds locally without saving data to the backend.
-                </p>
+                <div className="vstack gap-4">
+                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '6px 12px' }}>Vision Playground</span>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Playground Sandbox</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    A free sandbox session to test yourself on Line graphs, Heatmaps, Video Tracking, and PDF Documents. Records stopwatch completion speeds locally without saving data to the backend.
+                  </p>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '0.85rem', marginTop: 'auto' }}>
+                  Select Mode →
+                </div>
               </div>
 
               {/* Option B: Guided Research Session */}
               <div 
                 className="card card-interactive vstack gap-4"
-                style={{ textAlign: 'left' }}
+                style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                 onClick={() => {
                   setTestMode('official');
                   setTestPhase('welcome');
                 }}
               >
-                <span className="badge badge-primary" style={{ alignSelf: 'flex-start', borderColor: 'var(--primary)', color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '6px 12px' }}>Research Study Session</span>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Official Usability Study</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  A structured testing session. Guides you through demographics intake, interactive calibration, visual timed tests, and SUS/NASA-TLX usability forms. Saves results securely in the admin database.
-                </p>
+                <div className="vstack gap-4">
+                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start', borderColor: 'var(--primary)', color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '6px 12px' }}>Research Study Session</span>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Official Usability Study</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    A structured testing session. Guides you through demographics intake, interactive calibration, visual timed tests, and SUS/NASA-TLX usability forms. Saves results securely in the admin database.
+                  </p>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '0.85rem', marginTop: 'auto' }}>
+                  Select Mode →
+                </div>
               </div>
             </div>
 
@@ -657,7 +676,7 @@ export const VisionTest: FC = () => {
               <div className="vstack gap-1">
                 <span 
                   className={`badge ${testPhase === 'test_original' ? 'badge-warning' : 'badge-success'}`}
-                  style={{ alignSelf: 'flex-start', padding: '4px 8px' }}
+                  style={{ alignSelf: 'flex-start', padding: '6px 12px' }}
                 >
                   {testPhase === 'test_original' ? 'Phase 1: Original Colors' : 'Phase 2: Corrected Colors (Active)'}
                 </span>
@@ -700,7 +719,7 @@ export const VisionTest: FC = () => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gridTemplateColumns: windowWidth <= 480 ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
                 gap: 'var(--space-8)',
                 alignItems: 'center',
                 width: '100%'
@@ -1265,11 +1284,11 @@ export const VisionTest: FC = () => {
               </div>
               <div className="vstack gap-1">
                 {testMode === 'official' ? (
-                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start' }}>
+                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '6px 12px' }}>
                     Official Study Submission Success
                   </span>
                 ) : (
-                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start' }}>
+                  <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '6px 12px' }}>
                     Vision Playground Sandbox Mode
                   </span>
                 )}
@@ -1304,18 +1323,25 @@ export const VisionTest: FC = () => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gridTemplateColumns: windowWidth <= 480 ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
                 gap: 'var(--space-6)',
                 width: '100%'
               }}
             >
               {/* Accuracy */}
               <div className="card vstack gap-4">
-                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <div 
+                  className={windowWidth <= 480 ? "vstack gap-2" : "hstack"} 
+                  style={{ 
+                    justifyContent: 'space-between', 
+                    alignItems: windowWidth <= 480 ? 'flex-start' : 'center',
+                    width: '100%' 
+                  }}
+                >
                   <span style={{ fontWeight: '800', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                     Overall Task Accuracy
                   </span>
-                  <span className={`badge ${corrAccuracy >= origAccuracy ? 'badge-success' : 'badge-error'}`}>
+                  <span className={`badge ${corrAccuracy >= origAccuracy ? 'badge-success' : 'badge-error'}`} style={{ padding: '6px 12px' }}>
                     {corrAccuracy >= origAccuracy ? `+${corrAccuracy - origAccuracy}% Accuracy` : 'No improvement'}
                   </span>
                 </div>
@@ -1333,11 +1359,18 @@ export const VisionTest: FC = () => {
 
               {/* Time */}
               <div className="card vstack gap-4">
-                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <div 
+                  className={windowWidth <= 480 ? "vstack gap-2" : "hstack"} 
+                  style={{ 
+                    justifyContent: 'space-between', 
+                    alignItems: windowWidth <= 480 ? 'flex-start' : 'center',
+                    width: '100%' 
+                  }}
+                >
                   <span style={{ fontWeight: '800', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                     Average Completion Speed
                   </span>
-                  <span className={`badge ${origTime > corrTime ? 'badge-success' : 'badge-error'}`}>
+                  <span className={`badge ${origTime > corrTime ? 'badge-success' : 'badge-error'}`} style={{ padding: '6px 12px' }}>
                     {origTime > corrTime ? `${Math.round((origTime / corrTime) * 10) / 10}x Faster` : 'No improvement'}
                   </span>
                 </div>
@@ -1381,14 +1414,26 @@ export const VisionTest: FC = () => {
 
             {/* Bottom Actions */}
             {testMode === 'official' && !participantUuid ? (
-              <div className="hstack" style={{ justifyContent: 'center', marginTop: 'var(--space-4)' }}>
+              <div 
+                className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
+                style={{ 
+                  justifyContent: 'center', 
+                  alignItems: 'stretch',
+                  marginTop: 'var(--space-4)',
+                  width: windowWidth <= 480 ? '100%' : 'auto' 
+                }}
+              >
                 <button
                   className="btn btn-primary btn-lg"
                   style={{
                     background: 'var(--primary-gradient)',
                     fontWeight: '800',
                     padding: '1rem 2.5rem',
-                    boxShadow: 'var(--shadow-lg)'
+                    boxShadow: 'var(--shadow-lg)',
+                    width: windowWidth <= 480 ? '100%' : 'auto',
+                    whiteSpace: 'normal',
+                    height: 'auto',
+                    textAlign: 'center'
                   }}
                   onClick={() => setTestPhase('research_post')}
                 >
@@ -1396,13 +1441,27 @@ export const VisionTest: FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="hstack gap-4" style={{ justifyContent: 'center', marginTop: 'var(--space-4)' }}>
-                <button className="btn btn-primary btn-lg" onClick={() => navigate('/')}>
+              <div 
+                className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-4"} 
+                style={{ 
+                  justifyContent: 'center', 
+                  alignItems: 'stretch',
+                  marginTop: 'var(--space-4)',
+                  width: windowWidth <= 480 ? '100%' : 'auto',
+                  flexDirection: windowWidth <= 480 ? 'column' : 'row'
+                }}
+              >
+                <button 
+                  className="btn btn-primary btn-lg" 
+                  onClick={() => navigate('/')}
+                  style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+                >
                   Back to Dashboard
                 </button>
                 <button
                   className="btn btn-outline btn-lg"
                   onClick={() => setTestPhase('selection')}
+                  style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
                 >
                   <FiRefreshCw /> Change Test Mode
                 </button>
@@ -1413,6 +1472,7 @@ export const VisionTest: FC = () => {
 
       </div>
     </div>
+    </>
   );
 };
 export default VisionTest;

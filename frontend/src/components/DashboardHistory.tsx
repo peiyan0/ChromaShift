@@ -2,7 +2,7 @@ import { useEffect, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FiGrid, FiList, FiTrash2, FiDownload, FiFileText, FiAlertCircle, 
-  FiChevronDown, FiSearch, FiFilter, FiShare2, FiExternalLink 
+  FiChevronDown, FiSearch, FiFilter, FiShare2, FiExternalLink, FiRefreshCw 
 } from 'react-icons/fi';
 import { mediaService, type MediaHistoryResponse } from '../services/media';
 import { ComplianceReportModal } from './ComplianceReportModal';
@@ -53,6 +53,17 @@ export const DashboardHistory: FC = () => {
   // Modal states
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  
+  // Mobile / layout sharing states
+  const [sharingJobId, setSharingJobId] = useState<string | null>(null);
+
+  // Window resize width listener
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -91,24 +102,36 @@ export const DashboardHistory: FC = () => {
     }
   };
 
-  const handleDownload = async (jobId: string) => {
+  const handleDownload = async (jobId: string, itemFilename?: string) => {
     try {
       const data = await mediaService.getDownloadUrl(jobId);
-      window.open(data.url, '_blank');
+      const downloadUrl = data.url;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const baseName = itemFilename || 'processed_media';
+      const ext = downloadUrl.split('?')[0].split('.').pop()?.toLowerCase() || '';
+      const baseWithoutExt = baseName.substring(0, baseName.lastIndexOf('.')) || baseName;
+      a.download = `${baseWithoutExt}_processed.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     } catch (error) {
       console.error("Download failed", error);
-      triggerNotification('error', 'Download failed. Could not retrieve the processed file from storage.');
+      triggerNotification('error', 'Download failed. Could not retrieve the processed file.');
     }
   };
 
   const handleShare = async (jobId: string) => {
+    setSharingJobId(jobId);
     try {
       const data = await mediaService.shareMedia(jobId);
-      navigator.clipboard.writeText(data.share_url);
+      await navigator.clipboard.writeText(data.share_url);
       triggerNotification('success', 'Link Copied! Public preview link is copied to your clipboard.');
     } catch (error) {
       console.error("Share failed", error);
       triggerNotification('error', 'Share link failed. Could not generate temporary preview link.');
+    } finally {
+      setSharingJobId(null);
     }
   };
 
@@ -155,7 +178,7 @@ export const DashboardHistory: FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)', overflow: 'hidden' }}>
-              <div className="skeleton" style={{ height: '140px' }} />
+              <div className="skeleton" style={{ aspectRatio: '4/3', width: '100%' }} />
               <div style={{ padding: '12px' }}>
                 <div className="skeleton" style={{ height: '14px', width: '70%', marginBottom: '8px' }} />
                 <div className="skeleton" style={{ height: '10px', width: '40%' }} />
@@ -199,11 +222,49 @@ export const DashboardHistory: FC = () => {
     }
   };
 
-  // Grid columns calculator
-  const gridColumnsCount = 7 - gridSize; // e.g. sizing 1 to 5 maps to columns 6 to 2
+  // Grid columns calculator restricted by viewport
+  let gridColumnsCount = 7 - gridSize;
+  if (windowWidth <= 480) {
+    gridColumnsCount = 1;
+  } else if (windowWidth <= 768) {
+    if (gridColumnsCount > 3) gridColumnsCount = 2;
+    else if (gridColumnsCount < 2) gridColumnsCount = 2;
+  } else if (windowWidth <= 1024) {
+    if (gridColumnsCount > 4) gridColumnsCount = 3;
+    else if (gridColumnsCount < 2) gridColumnsCount = 2;
+  }
+
+  const getAvailableColumns = () => {
+    if (windowWidth <= 480) return [];
+    if (windowWidth <= 768) return [2, 3];
+    if (windowWidth <= 1024) return [2, 3, 4];
+    return [2, 3, 4, 5];
+  };
+  const availableCols = getAvailableColumns();
 
   return (
     <>
+      {/* Notification Toast replacement */}
+      {notification && (
+        <div className={`badge badge-${notification.type}`} style={{
+          position: 'fixed',
+          top: '80px',
+          right: '24px',
+          zIndex: 9999,
+          padding: '12px 24px',
+          borderRadius: 'var(--radius-md)',
+          textTransform: 'none',
+          fontWeight: 'bold',
+          backgroundColor: notification.type === 'success' ? 'var(--color-success)' : notification.type === 'error' ? 'var(--color-error)' : 'var(--color-info)',
+          color: '#ffffff',
+          boxShadow: 'var(--shadow-lg)',
+          border: 'none',
+          animation: 'slide-up 0.2s ease-out'
+        }}>
+          {notification.text}
+        </div>
+      )}
+
       <div 
         className="card-solid"
         style={{
@@ -218,26 +279,6 @@ export const DashboardHistory: FC = () => {
         }}
       >
         <div style={{ height: '3px', background: 'var(--primary-gradient)' }} />
-        
-        {/* Notification Toast replacement */}
-        {notification && (
-          <div className={`badge badge-${notification.type}`} style={{
-            position: 'absolute',
-            top: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-            padding: '12px 24px',
-            borderRadius: 'var(--radius-full)',
-            textTransform: 'none',
-            fontWeight: 'bold',
-            boxShadow: 'var(--shadow-lg)',
-            border: 'none',
-            animation: 'slide-up 0.2s ease-out'
-          }}>
-            {notification.text}
-          </div>
-        )}
 
         <div style={{ padding: '24px' }} className="vstack gap-6">
           
@@ -418,11 +459,11 @@ export const DashboardHistory: FC = () => {
             </div>
 
             {/* Grid Size Control */}
-            {viewMode === 'grid' && (
+            {viewMode === 'grid' && availableCols.length > 0 && (
               <div className="hstack gap-3" style={{ marginLeft: 'auto', width: 'auto', maxWidth: '200px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Columns:</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  {[2, 3, 4, 5].map((cols) => (
+                  {availableCols.map((cols) => (
                     <button
                       key={cols}
                       onClick={() => setGridSize(7 - cols)}
@@ -494,7 +535,7 @@ export const DashboardHistory: FC = () => {
                   {/* Thumbnail */}
                   <div 
                     style={{
-                      aspectRatio: '16/9',
+                      aspectRatio: '4/3',
                       width: '100%',
                       backgroundColor: 'var(--bg-secondary)',
                       position: 'relative',
@@ -564,7 +605,9 @@ export const DashboardHistory: FC = () => {
                       backgroundColor: 'var(--bg-secondary)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '8px'
                     }}
                   >
                     <div className="hstack gap-1">
@@ -592,14 +635,14 @@ export const DashboardHistory: FC = () => {
                       <button 
                         onClick={() => handleShare(item.job_id)}
                         className="btn btn-sm btn-ghost" 
-                        disabled={item.status !== 'completed'}
+                        disabled={item.status !== 'completed' || sharingJobId === item.job_id}
                         title="Share preview link"
                         style={{ padding: '4px' }}
                       >
-                        <FiShare2 size={14} />
+                        {sharingJobId === item.job_id ? <FiRefreshCw size={14} className="animate-spin" /> : <FiShare2 size={14} />}
                       </button>
                       <button 
-                        onClick={() => handleDownload(item.job_id)}
+                        onClick={() => handleDownload(item.job_id, item.filename)}
                         className="btn btn-sm btn-ghost" 
                         disabled={item.status !== 'completed'}
                         title="Download file"
@@ -620,84 +663,174 @@ export const DashboardHistory: FC = () => {
                 </div>
               ))}
             </div>
-          ) : (
-            /* List View Layout */
-            <div style={{ width: '100%', overflowX: 'auto', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
-                    <th style={{ padding: '12px 16px', cursor: 'pointer' }} onClick={() => handleSort('filename')}>
-                      Filename <FiChevronDown size={12} style={{ display: 'inline', marginLeft: '4px', opacity: sortField === 'filename' ? 1 : 0.3 }} />
-                    </th>
-                    <th style={{ padding: '12px 16px' }}>Type</th>
-                    <th style={{ padding: '12px 16px', cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
-                      Created <FiChevronDown size={12} style={{ display: 'inline', marginLeft: '4px', opacity: sortField === 'created_at' ? 1 : 0.3 }} />
-                    </th>
-                    <th style={{ padding: '12px 16px' }}>Status</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedHistory.map((item) => (
-                    <tr 
-                      key={item.job_id} 
-                      style={{ borderBottom: '1px solid var(--border-primary)' }}
-                      onClick={() => { if(item.status === 'completed') navigate(`/workspace/${item.job_id}`); }}
-                      className="btn-ghost"
-                    >
-                      <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>
-                        <div className="hstack gap-3">
-                          <FiFileText size={16} style={{ color: 'var(--text-muted)' }} />
-                          <span style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.filename}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>{getTypeBadge(item.type)}</td>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                        {new Date(item.created_at).toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>{getStatusBadge(item.status)}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                        <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }}>
-                          <button 
-                            disabled={item.status !== 'completed'}
-                            onClick={() => navigate(`/workspace/${item.job_id}`)}
-                            className="btn btn-sm btn-outline"
-                          >
-                            <FiExternalLink size={12} />
-                            <span>Workspace</span>
-                          </button>
-                          <button 
-                            disabled={item.status !== 'completed'}
-                            onClick={() => openComplianceReport(item.job_id)}
-                            className="btn btn-sm btn-outline"
-                          >
-                            Audit Report
-                          </button>
-                          <button 
-                            onClick={() => handleShare(item.job_id)}
-                            disabled={item.status !== 'completed'}
-                            className="btn btn-sm btn-ghost"
-                            style={{ padding: '6px' }}
-                            title="Copy share link"
-                          >
-                            <FiShare2 size={14} />
-                          </button>
-                          <button 
-                            onClick={() => setJobToDelete(item.job_id)}
-                            className="btn btn-sm btn-ghost"
-                            style={{ padding: '6px', color: 'var(--color-error)' }}
-                            title="Delete file"
-                          >
-                            <FiTrash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
+          ) : windowWidth <= 768 ? (
+              /* Mobile responsive cards list for List View mode on smaller viewports */
+              <div className="vstack gap-4" style={{ width: '100%' }}>
+                {sortedHistory.map((item) => (
+                  <div 
+                    key={item.job_id} 
+                    className="card-solid vstack gap-3 animate-fade-in" 
+                    style={{ padding: '16px', border: '1px solid var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
+                    onClick={() => { if(item.status === 'completed') navigate(`/workspace/${item.job_id}`); }}
+                  >
+                    <div className="hstack gap-3" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div className="vstack gap-1" style={{ alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', width: '100%' }} title={item.filename}>
+                          {item.filename}
+                        </strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="vstack gap-1" style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+                        {getTypeBadge(item.type)}
+                        {getStatusBadge(item.status)}
+                      </div>
+                    </div>
+                    
+                    <div className="hstack gap-2" style={{ justifyContent: 'flex-end', borderTop: '1px solid var(--border-primary)', paddingTop: '12px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                      <button 
+                        disabled={item.status !== 'completed'}
+                        onClick={() => navigate(`/workspace/${item.job_id}`)}
+                        className="btn btn-sm btn-outline"
+                        style={{ minHeight: '36px' }}
+                      >
+                        <FiExternalLink size={14} />
+                        <span>Workspace</span>
+                      </button>
+                      <button 
+                        disabled={item.status !== 'completed'}
+                        onClick={() => openComplianceReport(item.job_id)}
+                        className="btn btn-sm btn-outline"
+                        style={{ minHeight: '36px' }}
+                      >
+                        Audit
+                      </button>
+                      <button 
+                        onClick={() => handleShare(item.job_id)}
+                        disabled={item.status !== 'completed' || sharingJobId === item.job_id}
+                        className="btn btn-sm btn-ghost"
+                        style={{ padding: '8px', minWidth: '36px', minHeight: '36px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {sharingJobId === item.job_id ? <FiRefreshCw size={16} className="animate-spin" /> : <FiShare2 size={16} />}
+                      </button>
+                      <button 
+                        onClick={() => handleDownload(item.job_id, item.filename)}
+                        disabled={item.status !== 'completed'}
+                        className="btn btn-sm btn-ghost"
+                        style={{ padding: '8px', minWidth: '36px', minHeight: '36px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <FiDownload size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setJobToDelete(item.job_id)}
+                        className="btn btn-sm btn-ghost"
+                        style={{ padding: '8px', minWidth: '36px', minHeight: '36px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-error)' }}
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* List View Layout for Desktop (without className="btn-ghost" on <tr>) */
+              <div style={{ width: '100%', overflowX: 'auto', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
+                      <th style={{ padding: '12px 16px', cursor: 'pointer' }} onClick={() => handleSort('filename')}>
+                        Filename <FiChevronDown size={12} style={{ display: 'inline', marginLeft: '4px', opacity: sortField === 'filename' ? 1 : 0.3 }} />
+                      </th>
+                      <th style={{ padding: '12px 16px' }}>Type</th>
+                      <th style={{ padding: '12px 16px', cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
+                        Created <FiChevronDown size={12} style={{ display: 'inline', marginLeft: '4px', opacity: sortField === 'created_at' ? 1 : 0.3 }} />
+                      </th>
+                      <th style={{ padding: '12px 16px' }}>Status</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {sortedHistory.map((item) => (
+                      <tr 
+                        key={item.job_id} 
+                        style={{ borderBottom: '1px solid var(--border-primary)', cursor: item.status === 'completed' ? 'pointer' : 'default' }}
+                        onClick={() => { if(item.status === 'completed') navigate(`/workspace/${item.job_id}`); }}
+                      >
+                        <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>
+                          <div className="hstack gap-3">
+                            <FiFileText size={16} style={{ color: 'var(--text-muted)' }} />
+                            <span style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.filename}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>{getTypeBadge(item.type)}</td>
+                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                          {new Date(item.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>{getStatusBadge(item.status)}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                          <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }}>
+                            <button 
+                              disabled={item.status !== 'completed'}
+                              onClick={() => navigate(`/workspace/${item.job_id}`)}
+                              className="btn btn-sm btn-outline"
+                              style={{ minHeight: '38px', padding: '6px 12px' }}
+                            >
+                              <FiExternalLink size={14} />
+                              <span>Workspace</span>
+                            </button>
+                            <button 
+                              disabled={item.status !== 'completed'}
+                              onClick={() => openComplianceReport(item.job_id)}
+                              className="btn btn-sm btn-outline"
+                              style={{ minHeight: '38px', padding: '6px 12px' }}
+                            >
+                              Audit Report
+                            </button>
+                            <button 
+                              onClick={() => handleShare(item.job_id)}
+                              disabled={item.status !== 'completed' || sharingJobId === item.job_id}
+                              className="btn btn-sm btn-ghost"
+                              style={{ padding: '10px', minWidth: '38px', minHeight: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Copy share link"
+                            >
+                              {sharingJobId === item.job_id ? <FiRefreshCw size={16} className="animate-spin" /> : <FiShare2 size={16} />}
+                            </button>
+                            <button 
+                              onClick={() => handleDownload(item.job_id, item.filename)}
+                              disabled={item.status !== 'completed'}
+                              className="btn btn-sm btn-ghost"
+                              style={{ padding: '10px', minWidth: '38px', minHeight: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Download file"
+                            >
+                              <FiDownload size={16} />
+                            </button>
+                            <button 
+                              onClick={() => setJobToDelete(item.job_id)}
+                              className="btn btn-sm btn-ghost"
+                              style={{ padding: '10px', minWidth: '38px', minHeight: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-error)' }}
+                              title="Delete file"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+              .animate-spin {
+                animation: spin 1s linear infinite;
+              }
+            `}</style>
         </div>
       </div>
 

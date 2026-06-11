@@ -270,6 +270,12 @@
   border-color: rgba(79, 70, 229, 0.2);
 }
 
+.badge-info {
+  background-color: rgba(2, 132, 199, 0.1);
+  color: var(--color-info);
+  border-color: rgba(2, 132, 199, 0.2);
+}
+
 /* Divider */
 .divider {
   height: 1px;

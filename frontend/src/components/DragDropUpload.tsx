@@ -135,6 +135,19 @@ export const DragDropUpload: React.FC = () => {
       // 2. Trigger processing with the user's calibrated vision profile
       let cvdType = "deuteranopia";
       let severity = 1.0;
+      
+      // Try local storage baseline fallback first
+      const localProfileStr = localStorage.getItem('chromashift_cvd_profile');
+      if (localProfileStr) {
+        try {
+          const localProfile = JSON.parse(localProfileStr);
+          cvdType = localProfile.cvd_type || "deuteranopia";
+          severity = localProfile.severity !== undefined ? localProfile.severity : 1.0;
+        } catch (e) {
+          console.error("Failed to parse local profile in DragDropUpload", e);
+        }
+      }
+
       try {
         const savedProfile = await profileService.getProfile();
         if (savedProfile) {
@@ -142,7 +155,7 @@ export const DragDropUpload: React.FC = () => {
           severity = savedProfile.severity !== undefined ? savedProfile.severity : 1.0;
         }
       } catch (err) {
-        console.log("Could not load vision profile, using default values", err);
+        console.log("Could not load vision profile from server, using local/default values", err);
       }
       
       await mediaService.processMedia(uploadRes.job_id, { cvd_type: cvdType, severity });
