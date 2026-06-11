@@ -140,6 +140,14 @@ def generate_suggestions(cvd_type: str, critical_count: int, warning_count: int)
             "suggestion": "Go to settings and increase your 'Overall Filter Intensity' or 'Contrast Booster' to enhance text readability."
         })
         
+    if critical_count > 0 or warning_count > 0:
+        issues.append({
+            "sc_id": "1.4.1",
+            "severity": "Warning",
+            "description": "Colors are used as the primary means to convey information (e.g. charts, legends, or text states).",
+            "suggestion": "Ensure that color-coded information is accompanied by secondary visual indicators (such as labels, patterns, textures, or varying shapes) to comply with WCAG SC 1.4.1 (Use of Color)."
+        })
+        
     return issues
 
 def analyze_pdf_compliance(local_path: str, cvd_type: str) -> dict:
