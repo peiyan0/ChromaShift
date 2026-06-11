@@ -1,0 +1,41 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .teal { fill: #0d9488; }
+      .teal-dark { fill: #0f6e56; }
+      .orange { fill: #ea580c; }
+      .divider { stroke: #f5f5f4; stroke-width: 1.5px; opacity: 0.3; }
+      .ring { fill: none; stroke: #0d9488; stroke-width: 1px; opacity: 0.25; }
+      .center { fill: #f5f5f4; opacity: 0.4; }
+      .highlight { fill: white; }
+    </style>
+  </defs>
+
+  <!-- Background (optional, remove for transparent) -->
+  <rect width="192" height="192" fill="#0c0a09" rx="32"/>
+
+  <!-- Icon -->
+  <g transform="translate(96, 96)">
+    <!-- Outer guide ring -->
+    <circle class="ring" r="70"/>
+
+    <!-- Left semi-circle: Teal -->
+    <circle class="teal" cx="0" cy="0" r="55"/>
+
+    <!-- Right semi-circle: Orange -->
+    <path d="M 0 -55 L 0 55 A 55 55 0 0 1 0 -55" class="orange"/>
+
+    <!-- Inner ring -->
+    <circle class="ring" cx="0" cy="0" r="48" fill="none" stroke="#0d9488" stroke-width="1px" opacity="0.3"/>
+
+    <!-- Dividing line -->
+    <line class="divider" x1="0" y1="-55" x2="0" y2="55"/>
+
+    <!-- Center point -->
+    <circle class="center" cx="0" cy="0" r="4"/>
+
+    <!-- Light catches (subtle in dark mode) -->
+    <ellipse cx="-12" cy="-18" rx="14" ry="10" class="highlight" opacity="0.08"/>
+    <ellipse cx="12" cy="-18" rx="14" ry="10" class="highlight" opacity="0.05"/>
+  </g>
+</svg>

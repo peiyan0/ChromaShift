@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import favicon from '../../assets/favicon.ico';
+import { LogoIcon } from '../../components/LogoIcon';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -77,16 +77,7 @@ const Register = () => {
           {/* Logo */}
           <div className="vstack gap-2" style={{ alignItems: 'center', textAlign: 'center' }}>
             <div className="hstack gap-2" style={{ justifyContent: 'center' }}>
-              <img
-                src={favicon}
-                alt="ChromaShift Logo"
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  objectFit: 'contain',
-                  borderRadius: '6px'
-                }}
-              />
+              <LogoIcon size={36} />
               <span
                 style={{
                   fontSize: '1.25rem',

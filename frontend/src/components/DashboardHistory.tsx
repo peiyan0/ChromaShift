@@ -75,18 +75,18 @@ export const DashboardHistory: FC = () => {
 
   const getStatusBadge = (status: string) => {
     switch(status) {
-      case 'completed': return <span className="badge badge-success">Completed</span>;
-      case 'processing': return <span className="badge badge-primary">Processing</span>;
-      case 'failed': return <span className="badge badge-error">Failed</span>;
-      default: return <span className="badge" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{status}</span>;
+      case 'completed': return <span className="badge badge-success" style={{ padding: '4px 8px' }}>Completed</span>;
+      case 'processing': return <span className="badge badge-primary" style={{ padding: '4px 8px' }}>Processing</span>;
+      case 'failed': return <span className="badge badge-error" style={{ padding: '4px 8px' }}>Failed</span>;
+      default: return <span className="badge" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', padding: '4px 8px' }}>{status}</span>;
     }
   };
 
   const getTypeBadge = (type: string) => {
     switch(type) {
-      case 'image': return <span className="badge badge-primary">Image</span>;
-      case 'video': return <span className="badge badge-warning" style={{ backgroundColor: 'rgba(234, 88, 12, 0.1)', color: 'var(--color-warning)' }}>Video</span>;
-      case 'pdf': return <span className="badge badge-error">PDF</span>;
+      case 'image': return <span className="badge badge-primary" style={{ padding: '4px 8px' }}>Image</span>;
+      case 'video': return <span className="badge badge-warning" style={{ backgroundColor: 'rgba(234, 88, 12, 0.1)', color: 'var(--color-warning)', padding: '4px 8px' }}>Video</span>;
+      case 'pdf': return <span className="badge badge-error" style={{ padding: '4px 8px' }}>PDF</span>;
       default: return null;
     }
   };
@@ -472,7 +472,7 @@ export const DashboardHistory: FC = () => {
             /* Card Grid Layout */
             <div style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(auto-fill, minmax(${gridColumnsCount === 5 ? '160px' : gridColumnsCount === 4 ? '200px' : '260px'}, 1fr))`,
+              gridTemplateColumns: `repeat(${gridColumnsCount}, minmax(0, 1fr))`,
               gap: '20px',
               width: '100%'
             }}>
@@ -480,26 +480,26 @@ export const DashboardHistory: FC = () => {
                 <div 
                   key={item.job_id}
                   className="card card-interactive"
+                  onClick={() => { if (item.status === 'completed') navigate(`/workspace/${item.job_id}`); }}
                   style={{
                     padding: 0,
                     overflow: 'hidden',
                     display: 'flex',
                     flexDirection: 'column',
                     backgroundColor: 'var(--bg-primary)',
-                    boxShadow: 'var(--shadow-sm)'
+                    boxShadow: 'var(--shadow-sm)',
+                    cursor: item.status === 'completed' ? 'pointer' : 'default'
                   }}
                 >
                   {/* Thumbnail */}
                   <div 
-                    onClick={() => { if (item.status === 'completed') navigate(`/workspace/${item.job_id}`); }}
                     style={{
                       aspectRatio: '16/9',
                       width: '100%',
                       backgroundColor: 'var(--bg-secondary)',
                       position: 'relative',
                       borderBottom: '1px solid var(--border-primary)',
-                      overflow: 'hidden',
-                      cursor: item.status === 'completed' ? 'pointer' : 'default'
+                      overflow: 'hidden'
                     }}
                   >
                     {item.status === 'completed' ? (
@@ -556,14 +556,17 @@ export const DashboardHistory: FC = () => {
                   </div>
 
                   {/* Actions bar */}
-                  <div style={{
-                    padding: '8px 12px',
-                    borderTop: '1px solid var(--border-primary)',
-                    backgroundColor: 'var(--bg-secondary)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
+                  <div 
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      padding: '8px 12px',
+                      borderTop: '1px solid var(--border-primary)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
                     <div className="hstack gap-1">
                       <button 
                         onClick={() => navigate(`/workspace/${item.job_id}`)}

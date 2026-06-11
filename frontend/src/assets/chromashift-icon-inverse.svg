@@ -1,0 +1,45 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .white { fill: #ffffff; }
+      .white-light { fill: rgba(255, 255, 255, 0.3); }
+      .white-subtle { fill: rgba(255, 255, 255, 0.15); }
+      .divider { stroke: rgba(255, 255, 255, 0.5); stroke-width: 1.5px; }
+    </style>
+  </defs>
+
+  <!-- Gradient background (teal to orange) -->
+  <defs>
+    <linearGradient id="tealorange" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0d9488;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <rect width="192" height="192" fill="url(#tealorange)" rx="32"/>
+
+  <!-- Icon in white -->
+  <g transform="translate(96, 96)">
+    <!-- Outer guide ring -->
+    <circle class="white-light" cx="0" cy="0" r="70" fill="none" stroke="currentColor" stroke-width="1px"/>
+
+    <!-- Left semi-circle: White -->
+    <circle class="white" cx="0" cy="0" r="55" opacity="0.9"/>
+
+    <!-- Right semi-circle: White (slightly more opaque) -->
+    <path d="M 0 -55 L 0 55 A 55 55 0 0 1 0 -55" class="white" opacity="0.85"/>
+
+    <!-- Inner ring -->
+    <circle cx="0" cy="0" r="48" fill="none" stroke="rgba(255, 255, 255, 0.3)" stroke-width="1px"/>
+
+    <!-- Dividing line -->
+    <line class="divider" x1="0" y1="-55" x2="0" y2="55"/>
+
+    <!-- Center point -->
+    <circle cx="0" cy="0" r="4" class="white" opacity="0.7"/>
+
+    <!-- Light catches -->
+    <ellipse cx="-12" cy="-18" rx="14" ry="10" class="white-subtle"/>
+    <ellipse cx="12" cy="-18" rx="14" ry="10" class="white-subtle"/>
+  </g>
+</svg>

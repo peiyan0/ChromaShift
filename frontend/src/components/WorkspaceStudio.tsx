@@ -355,9 +355,9 @@ export const WorkspaceStudio: React.FC = () => {
           <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
             <div className="hstack gap-2">
               <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{fileName}</strong>
-              <span className="badge badge-primary">{mediaType.toUpperCase()}</span>
-              {aiMaskStatus === 'complete' && <span className="badge badge-success" style={{ fontSize: '0.6rem' }}>AI Mask Active</span>}
-              {aiMaskStatus === 'fallback' && <span className="badge badge-warning" style={{ fontSize: '0.6rem' }}>SLIC Fallback Active</span>}
+              <span className="badge badge-primary" style={{ padding: '4px 8px' }}>{mediaType.toUpperCase()}</span>
+              {aiMaskStatus === 'complete' && <span className="badge badge-success" style={{ fontSize: '0.6rem', padding: '4px 8px' }}>AI Mask Active</span>}
+              {aiMaskStatus === 'fallback' && <span className="badge badge-warning" style={{ fontSize: '0.6rem', padding: '4px 8px' }}>SLIC Fallback Active</span>}
             </div>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Job ID: {jobId}</span>
           </div>

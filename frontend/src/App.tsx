@@ -15,12 +15,14 @@ import { PromoteModal } from './components/PromoteModal';
 import { VisionTest } from './components/VisionTest';
 import { AdminAnalytics } from './components/AdminAnalytics';
 import { LandingPage } from './components/LandingPage';
+import { LogoIcon } from './components/LogoIcon';
 
 import { FiSun, FiMoon, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 
 // ─── Logo Mark ───────────────────────────────────────────
 const Logo = () => (
   <RouterLink to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <LogoIcon size={24} />
     <span style={{
       fontFamily: 'var(--font-heading)',
       fontSize: '1.25rem',
