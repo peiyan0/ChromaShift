@@ -121,9 +121,9 @@ class InferenceService:
                 [0.0,        0.0, 1.0]
             ], dtype=np.float32)
             M_err2mod = np.array([
+                [1.0, 0.7, 0.0],
                 [0.0, 0.0, 0.0],
-                [0.7, 1.0, 0.0],
-                [0.7, 0.0, 1.0]
+                [0.0, 0.7, 1.0]
             ], dtype=np.float32)
         elif cvd_type == "tritanopia":
             M_cvd = np.array([

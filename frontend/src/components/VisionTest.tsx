@@ -116,9 +116,9 @@ export const VisionTest: FC = () => {
             [0.0,        0.0, 1.0]
           ];
           err2mod = [
+            [1.0, 0.7, 0.0],
             [0.0, 0.0, 0.0],
-            [0.7, 1.0, 0.0],
-            [0.7, 0.0, 1.0]
+            [0.0, 0.7, 1.0]
           ];
         }
 
@@ -657,7 +657,7 @@ export const VisionTest: FC = () => {
               <div className="vstack gap-1">
                 <span 
                   className={`badge ${testPhase === 'test_original' ? 'badge-warning' : 'badge-success'}`}
-                  style={{ alignSelf: 'flex-start' }}
+                  style={{ alignSelf: 'flex-start', padding: '4px 8px' }}
                 >
                   {testPhase === 'test_original' ? 'Phase 1: Original Colors' : 'Phase 2: Corrected Colors (Active)'}
                 </span>

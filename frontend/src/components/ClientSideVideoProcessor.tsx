@@ -205,9 +205,9 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
               [0.0,        0.0, 1.0]
             ];
             err2mod = [
+              [1.0, 0.7, 0.0],
               [0.0, 0.0, 0.0],
-              [0.7, 1.0, 0.0],
-              [0.7, 0.0, 1.0]
+              [0.0, 0.7, 1.0]
             ];
           }
 
