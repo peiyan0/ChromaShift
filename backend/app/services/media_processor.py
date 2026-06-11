@@ -11,6 +11,7 @@ class MediaProcessor:
     def __init__(self):
         # We use the shared inference_service instance
         self.inference = inference_service
+        self._pdf_color_cache = {}
 
     def process_image(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
@@ -116,7 +117,7 @@ class MediaProcessor:
         
         # Frame-skipping parameter to avoid running YOLO on every single frame
         frame_idx = 0
-        frame_interval = 5
+        frame_interval = 15
 
         try:
             while True:
@@ -172,6 +173,28 @@ class MediaProcessor:
 
         return output_path
 
+    def _remap_pdf_color(self, color_tuple, cvd_type: str, severity: float):
+        if not color_tuple or len(color_tuple) != 3:
+            return color_tuple
+        
+        cache_key = (color_tuple, cvd_type, severity)
+        if cache_key in self._pdf_color_cache:
+            return self._pdf_color_cache[cache_key]
+        
+        # Convert RGB float to BGR [0, 255]
+        r, g, b = color_tuple
+        pixel = np.array([[[int(b * 255), int(g * 255), int(r * 255)]]], dtype=np.uint8)
+        
+        # Apply remapping, bypassing YOLO by passing a 1x1 mask of ones
+        mask = np.ones((1, 1), dtype=np.float32)
+        remapped_pixel = self.inference.remap_colors(pixel, intensity=severity, cvd_type=cvd_type, mask=mask)
+        
+        # Convert back to RGB float
+        b_new, g_new, r_new = remapped_pixel[0, 0]
+        result = (r_new / 255.0, g_new / 255.0, b_new / 255.0)
+        self._pdf_color_cache[cache_key] = result
+        return result
+
     def process_pdf(self, input_path: str, output_path: str, cvd_type: str, severity: float):
         """
         Accessibility-preserving PDF processing using PyMuPDF (fitz).
@@ -181,49 +204,94 @@ class MediaProcessor:
         """
         import fitz  # PyMuPDF
         import gc
+        import tempfile
 
+        self._pdf_color_cache.clear()
         doc = fitz.open(input_path)
 
-        def iter_pdf_images(document):
-            for page_num in range(len(document)):
-                page = document[page_num]
+        try:
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                
+                # 1. Process Vector Drawings (Recolor and Redraw)
+                drawings = page.get_drawings()
+                if drawings:
+                    # Mark original drawings for redaction
+                    for draw in drawings:
+                        page.add_redact_annot(draw["rect"])
+                    
+                    # Apply redaction to remove old drawings (keep text & images intact)
+                    page.apply_redactions(images=0, graphics=1, text=0)
+                    
+                    # Recreate drawings with corrected colors
+                    shape = page.new_shape()
+                    for draw in drawings:
+                        new_fill = self._remap_pdf_color(draw["fill"], cvd_type, severity) if draw["fill"] else None
+                        new_color = self._remap_pdf_color(draw["color"], cvd_type, severity) if draw["color"] else None
+                        
+                        for item in draw["items"]:
+                            if item[0] == "l":
+                                shape.draw_line(item[1], item[2])
+                            elif item[0] == "re":
+                                shape.draw_rect(item[1])
+                            elif item[0] == "qu":
+                                shape.draw_quad(item[1])
+                            elif item[0] == "c":
+                                shape.draw_bezier(item[1], item[2], item[3], item[4])
+                        
+                        # Build finish parameters dynamically to avoid passing None values, which can cause MuPDF syntax warnings
+                        finish_kwargs = {
+                            "fill": new_fill,
+                            "color": new_color,
+                            "width": draw.get("width", 1)
+                        }
+                        if draw.get("dashes"):
+                            finish_kwargs["dashes"] = draw["dashes"]
+                        if draw.get("lineJoin") is not None:
+                            finish_kwargs["lineJoin"] = draw["lineJoin"]
+                        if draw.get("lineCap") is not None:
+                            finish_kwargs["lineCap"] = max(draw["lineCap"])
+                        
+                        shape.finish(**finish_kwargs)
+                    shape.commit()
+
+                # 2. Process Embedded Images
                 image_list = page.get_images(full=True)
                 for img_info in image_list:
                     xref = img_info[0]
-                    yield page, xref
+                    try:
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image["image"]
 
-        try:
-            for page, xref in iter_pdf_images(doc):
-                try:
-                    base_image = doc.extract_image(xref)
-                    image_bytes = base_image["image"]
+                        nparr = np.frombuffer(image_bytes, np.uint8)
+                        cv_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                        if cv_image is None:
+                            continue
 
-                    # Decode image
-                    nparr = np.frombuffer(image_bytes, np.uint8)
-                    cv_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    if cv_image is None:
+                        processed_bgr = self.inference.remap_colors(cv_image, intensity=severity, cvd_type=cvd_type)
+
+                        # Write processed image to a temp file and replace via filename to handle encoding/filter conversion correctly
+                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_img:
+                            temp_name = temp_img.name
+                            cv2.imwrite(temp_name, processed_bgr)
+                        
+                        page.replace_image(xref, filename=temp_name)
+                        
+                        try:
+                            os.remove(temp_name)
+                        except Exception:
+                            pass
+
+                        # Actively dereference and garbage collect to keep memory low
+                        del base_image
+                        del image_bytes
+                        del nparr
+                        del cv_image
+                        del processed_bgr
+                        gc.collect()
+                    except Exception as e:
+                        print(f"Skipping image xref={xref}: {e}")
                         continue
-
-                    # Remap colors
-                    processed_bgr = self.inference.remap_colors(cv_image, intensity=severity, cvd_type=cvd_type)
-
-                    # Encode back to JPEG at reduced quality
-                    _, buffer = cv2.imencode('.jpg', processed_bgr, [cv2.IMWRITE_JPEG_QUALITY, 75])
-
-                    # Replace image in PDF
-                    page.replace_image(xref, stream=buffer.tobytes())
-
-                    # Actively dereference and garbage collect to keep memory low
-                    del base_image
-                    del image_bytes
-                    del nparr
-                    del cv_image
-                    del processed_bgr
-                    del buffer
-                    gc.collect()
-                except Exception as e:
-                    print(f"Skipping image xref={xref}: {e}")
-                    continue
 
             # Preserve metadata and append accessibility keyword
             try:
