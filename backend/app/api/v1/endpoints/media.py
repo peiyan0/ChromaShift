@@ -397,7 +397,9 @@ async def get_media_status(
         "progress": progress,
         "download_url": download_url,
         "download_url_original": download_url_original,
-        "thumbnail_url": thumbnail_url
+        "thumbnail_url": thumbnail_url,
+        "filename": job.filename,
+        "media_type": job.media_type
     }
 
 @router.get("/{job_id}/download")

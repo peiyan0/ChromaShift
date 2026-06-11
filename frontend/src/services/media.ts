@@ -18,6 +18,8 @@ export interface MediaStatusResponse {
   download_url: string | null;
   download_url_original: string | null;
   thumbnail_url?: string | null;
+  filename?: string | null;
+  media_type?: string | null;
 }
 
 export interface MediaHistoryResponse {
