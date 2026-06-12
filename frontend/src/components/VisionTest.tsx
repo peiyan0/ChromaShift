@@ -602,7 +602,7 @@ export const VisionTest: FC = () => {
 
             <div className="vstack gap-2">
               <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                {testMode === 'official' ? 'Official Vision Test' : 'Visual Testing Playground'}
+                {testMode === 'official' ? 'Visual Metrics' : 'Visual Testing Playground'}
               </h2>
               <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
                 Solve tasks in two consecutive phases: Phase 1 with <strong>Original Colors</strong>, followed by Phase 2 with <strong>Corrected Colors</strong> dynamically remapped by the GPU.

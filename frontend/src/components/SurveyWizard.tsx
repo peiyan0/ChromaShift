@@ -784,9 +784,9 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
             <div className="divider" style={{ margin: '0' }} />
 
-            <div className="vstack gap-6" style={{ width: '100%' }}>
+            <div className="vstack gap-8" style={{ width: '100%' }}>
               {/* Comfort Q1 */}
-              <div className="vstack gap-2">
+              <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>My eyes felt comfortable throughout the session.</span>
                   <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ1} / 5</span>
@@ -802,10 +802,14 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                     onChange={e => setComfortQ1(parseInt(e.target.value, 10))}
                   />
                 </div>
+                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span>Strongly Disagree</span>
+                  <span>Strongly Agree</span>
+                </div>
               </div>
 
               {/* Comfort Q2 */}
-              <div className="vstack gap-2">
+              <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I experienced eye strain, dry eyes, or ocular fatigue.</span>
                   <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ2} / 5</span>
@@ -821,10 +825,14 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                     onChange={e => setComfortQ2(parseInt(e.target.value, 10))}
                   />
                 </div>
+                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span>Strongly Disagree</span>
+                  <span>Strongly Agree</span>
+                </div>
               </div>
 
               {/* Comfort Q3 */}
-              <div className="vstack gap-2">
+              <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I developed a headache during or after the comparative rounds.</span>
                   <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ3} / 5</span>
@@ -840,10 +848,14 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                     onChange={e => setComfortQ3(parseInt(e.target.value, 10))}
                   />
                 </div>
+                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span>Strongly Disagree</span>
+                  <span>Strongly Agree</span>
+                </div>
               </div>
 
               {/* Comfort Q4 */}
-              <div className="vstack gap-2">
+              <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>The remapped media (Daltonized view) looked more comfortable to view than the original.</span>
                   <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ4} / 5</span>
@@ -859,10 +871,14 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                     onChange={e => setComfortQ4(parseInt(e.target.value, 10))}
                   />
                 </div>
+                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span>Strongly Disagree</span>
+                  <span>Strongly Agree</span>
+                </div>
               </div>
 
               {/* Comfort Q5 */}
-              <div className="vstack gap-2">
+              <div className="vstack gap-3">
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I would use these active remapping settings for long screen/reading sessions.</span>
                   <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ5} / 5</span>
@@ -877,6 +893,10 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                     value={comfortQ5}
                     onChange={e => setComfortQ5(parseInt(e.target.value, 10))}
                   />
+                </div>
+                <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span>Strongly Disagree</span>
+                  <span>Strongly Agree</span>
                 </div>
               </div>
             </div>

@@ -282,12 +282,47 @@ export const LandingPage: React.FC = () => {
           </p>
 
           <div className="hstack gap-4 animate-slide-up" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('/hub')} className="btn btn-lg btn-primary">
+            <button
+              onClick={() => navigate('/upload')}
+              className="btn btn-lg btn-primary"
+              style={{
+                background: 'var(--primary-gradient)',
+                border: 'none',
+                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.3)',
+                transform: 'translateY(0)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(79, 70, 229, 0.45)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(79, 70, 229, 0.3)';
+              }}
+            >
               <span>Start Free</span>
               <FiArrowRight />
             </button>
-            <button onClick={() => navigate('/test-vision')} className="btn btn-lg btn-outline">
-              Take Vision Test
+            <button
+              onClick={() => navigate('/settings')}
+              className="btn btn-lg btn-outline"
+              style={{
+                backdropFilter: 'blur(8px)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'var(--border-secondary)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--primary)';
+                e.currentTarget.style.background = 'rgba(79, 70, 229, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-secondary)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              }}
+            >
+              Test Vision
             </button>
           </div>
         </div>

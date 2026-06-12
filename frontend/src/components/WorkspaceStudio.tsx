@@ -558,7 +558,7 @@ export const WorkspaceStudio: React.FC = () => {
           )}
 
           {/* Media Viewport */}
-          <div style={{ filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none', width: '100%' }}>
+          <div style={{ width: '100%' }}>
             
             {/* Image renderer */}
             {mediaType === 'image' && (
@@ -575,7 +575,17 @@ export const WorkspaceStudio: React.FC = () => {
                       {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
                     </span>
                     <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <img src={status?.download_url || (status?.download_url_original || '')} alt="Corrected remapped file" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isDirty ? 0.6 : 1 }} />
+                      <img 
+                        src={status?.download_url || (status?.download_url_original || '')} 
+                        alt="Corrected remapped file" 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain', 
+                          opacity: isDirty ? 0.6 : 1,
+                          filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                        }} 
+                      />
                       {isDirty && (
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
@@ -591,7 +601,13 @@ export const WorkspaceStudio: React.FC = () => {
                   <img
                     src={toggleActive === 'processed' ? (status?.download_url || (status?.download_url_original || '')) : (status?.download_url_original || '')}
                     alt="Single viewport view"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1 }}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'contain', 
+                      opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
+                      filter: toggleActive === 'processed' && selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                    }}
                   />
                   {toggleActive === 'processed' && isDirty && (
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -628,17 +644,35 @@ export const WorkspaceStudio: React.FC = () => {
                     <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
                       {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
                     </span>
-                    <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'black', width: '100%', height: '320px', display: 'flex', position: 'relative' }}>
+                    <div 
+                      id="processed-video-container"
+                      style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'black', width: '100%', height: '320px', display: 'flex', position: 'relative' }}
+                    >
                       <video
                         ref={processedVideoRef}
                         src={status?.download_url || (status?.download_url_original || '')}
                         controls
                         playsInline
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isDirty ? 0.6 : 1 }}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain', 
+                          opacity: isDirty ? 0.6 : 1,
+                          filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                        }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
                         onSeeking={() => syncPlayback('processed')}
                         onSeeked={() => syncPlayback('processed')}
+                        onMouseEnter={(e) => {
+                          // Allow native fullscreen but copy simulated filters if native fullscreen events occur
+                          const el = e.currentTarget;
+                          el.addEventListener('fullscreenchange', () => {
+                            if (document.fullscreenElement === el) {
+                              el.style.filter = selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none';
+                            }
+                          });
+                        }}
                       />
                       {isDirty && (
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
@@ -659,7 +693,21 @@ export const WorkspaceStudio: React.FC = () => {
                     autoPlay
                     muted
                     playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1 }}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'contain', 
+                      opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
+                      filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.addEventListener('fullscreenchange', () => {
+                        if (document.fullscreenElement === el) {
+                          el.style.filter = selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none';
+                        }
+                      });
+                    }}
                   />
                   {toggleActive === 'processed' && isDirty && (
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>

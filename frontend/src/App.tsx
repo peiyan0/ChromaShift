@@ -44,8 +44,11 @@ interface NavLinkProps {
 const NavLink = ({ to, label, onClick }: NavLinkProps) => {
   const location = useLocation();
   const isActive = location.pathname === to;
+  // Convert route into a safe ID selector target, e.g. /test-vision -> nav-test-vision
+  const idTarget = `nav-${to.substring(1).replace('/', '-')}`;
   return (
     <RouterLink
+      id={idTarget}
       to={to}
       onClick={onClick}
       className={`btn btn-sm ${isActive ? 'btn-secondary' : 'btn-ghost'}`}
@@ -97,9 +100,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const navLinks = [
-    { to: '/hub', label: 'Media Hub' },
-    { to: '/test-vision', label: 'Test Vision' },
     { to: '/upload', label: 'Upload' },
+    { to: '/hub', label: 'Media Hub' },
+    { to: '/test-vision', label: 'Visual Metrics' },
+    { to: '/survey', label: 'Usability Survey' },
     { to: '/settings', label: 'Vision Profile' },
   ];
 
@@ -298,7 +302,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="hstack gap-4" style={{ flexWrap: 'wrap' }}>
               <RouterLink to="/" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Home</RouterLink>
               <RouterLink to="/hub" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Media Hub</RouterLink>
-              <RouterLink to="/test-vision" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Vision Test</RouterLink>
+              <RouterLink to="/test-vision" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Visual Metrics</RouterLink>
             </div>
           </div>
           <div style={{
@@ -318,15 +322,54 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Promoted account dialog */}
       <PromoteModal isOpen={isPromoteOpen} onClose={() => setIsPromoteOpen(false)} />
+
+      {/* Floating Usability Test / Survey Button */}
+      <RouterLink 
+        to="/survey" 
+        className="btn btn-primary"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
+          background: 'var(--primary-gradient)',
+          border: 'none',
+          padding: '10px 20px',
+          fontSize: '0.85rem',
+          borderRadius: 'var(--radius-full)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          textDecoration: 'none',
+          color: 'white',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 12px 28px rgba(79, 70, 229, 0.5)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(79, 70, 229, 0.4)';
+        }}
+      >
+        <span>Help us test / Usability Survey</span>
+      </RouterLink>
     </div>
   );
 };
+
+import { SurveyWizard } from './components/SurveyWizard';
+
+import { OnboardingTour } from './components/OnboardingTour';
 
 // ─── Router ───────────────────────────────────────────────
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <OnboardingTour />
         <Routes>
           <Route path="/auth/login"    element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
@@ -351,6 +394,9 @@ function App() {
           } />
           <Route path="/workspace/:jobId" element={
             <ProtectedRoute><AppLayout><WorkspaceStudio /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/survey" element={
+            <ProtectedRoute><AppLayout><SurveyWizard performanceMetrics={{}} onComplete={() => {}} /></AppLayout></ProtectedRoute>
           } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
