@@ -23,7 +23,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
             supabase_secret = settings.SUPABASE_JWT_SECRET
             
             if supabase_secret and not is_placeholder(supabase_secret):
-                payload = jwt.decode(token, supabase_secret, algorithms=["HS256"])
+                payload = jwt.decode(token, supabase_secret, algorithms=["HS256"], options={"verify_aud": False})
                 is_supabase_jwt = True
             else:
                 raise JWTError("Invalid token signature")
@@ -68,5 +68,4 @@ def get_current_admin_user(current_user: models.User = Depends(get_current_activ
             detail="The user does not have enough privileges",
         )
     return current_user
-
 
