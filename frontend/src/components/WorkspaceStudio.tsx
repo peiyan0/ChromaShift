@@ -7,7 +7,7 @@ import api from '../services/api';
 import { aiPreviewService } from '../services/ai_preview';
 import { 
   FiArrowLeft, FiColumns, FiMaximize2, FiDownload, FiShare2, 
-  FiRefreshCw, FiAlertTriangle, FiAlertCircle 
+  FiRefreshCw, FiAlertTriangle, FiAlertCircle, FiExternalLink 
 } from 'react-icons/fi';
 
 export const WorkspaceStudio: React.FC = () => {
@@ -25,6 +25,16 @@ export const WorkspaceStudio: React.FC = () => {
   const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<'side-by-side' | 'toggle'>('side-by-side');
   const [toggleActive, setToggleActive] = useState<'original' | 'processed'>('processed');
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Dynamic Filtering State
   const [profile, setProfile] = useState<VisionProfile | null>(null);
@@ -664,44 +674,73 @@ export const WorkspaceStudio: React.FC = () => {
 
             {/* PDF renderer */}
             {mediaType === 'pdf' && (
-              displayMode === 'side-by-side' ? (
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-                  <div className="vstack gap-2" style={{ height: '580px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)', textAlign: 'center' }}>Original</span>
-                    <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <iframe
-                        src={`${status?.download_url_original}#toolbar=0`}
-                        width="100%"
-                        height="100%"
-                        style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
-                        title="Original PDF"
-                      />
-                    </div>
-                  </div>
-                  <div className="vstack gap-2" style={{ height: '580px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)', textAlign: 'center' }}>Calibrated PDF</span>
-                    <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <iframe
-                        src={`${status?.download_url}#toolbar=0`}
-                        width="100%"
-                        height="100%"
-                        style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
-                        title="Processed PDF"
-                      />
-                    </div>
+              isMobile ? (
+                <div className="vstack gap-4" style={{ padding: '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', alignItems: 'center', textAlign: 'center' }}>
+                  <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold' }}>Mobile Viewer Mode</div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
+                    Scrolling PDF files inside frames can be limited on mobile web browsers. Open the documents in a new tab to view, scroll, and zoom using your device's native PDF reader.
+                  </p>
+                  <div className="vstack gap-2" style={{ width: '100%', maxWidth: '300px' }}>
+                    <a 
+                      href={status?.download_url_original || '#'} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="btn btn-outline" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}
+                    >
+                      <FiExternalLink /> Original PDF
+                    </a>
+                    <a 
+                      href={status?.download_url || '#'} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="btn btn-primary" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}
+                    >
+                      <FiExternalLink /> Calibrated PDF
+                    </a>
                   </div>
                 </div>
               ) : (
-                <div style={{ height: '580px', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                  <iframe
-                    key={toggleActive}
-                    src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
-                    width="100%"
-                    height="100%"
-                    style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px' }}
-                    title="PDF Toggle Viewer"
-                  />
-                </div>
+                displayMode === 'side-by-side' ? (
+                  <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                    <div className="vstack gap-2" style={{ height: '580px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)', textAlign: 'center' }}>Original</span>
+                      <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <iframe
+                          src={`${status?.download_url_original}#toolbar=0`}
+                          width="100%"
+                          height="100%"
+                          style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                          title="Original PDF"
+                        />
+                      </div>
+                    </div>
+                    <div className="vstack gap-2" style={{ height: '580px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)', textAlign: 'center' }}>Calibrated PDF</span>
+                      <div style={{ height: '100%', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <iframe
+                          src={`${status?.download_url}#toolbar=0`}
+                          width="100%"
+                          height="100%"
+                          style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                          title="Processed PDF"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ height: '580px', width: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <iframe
+                      key={toggleActive}
+                      src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
+                      width="100%"
+                      height="100%"
+                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px' }}
+                      title="PDF Toggle Viewer"
+                    />
+                  </div>
+                )
               )
             )}
 
