@@ -251,7 +251,15 @@ def analyze_media_compliance(local_path: str, media_type: str, cvd_type: str) ->
     if media_type == "image":
         image = cv2.imread(local_path)
         if image is None:
-            raise ValueError(f"Could not read image at {local_path}")
+            try:
+                from PIL import Image as PILImage
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+                import numpy as np
+                pil_img = PILImage.open(local_path).convert('RGB')
+                image = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            except Exception as e:
+                raise ValueError(f"Could not read image at {local_path}: {e}")
         score, crit, warn, sampled = analyze_image_contrast(image)
         status = "pass" if score >= 90.0 else "fail"
         issues = generate_suggestions(cvd_type, crit, warn)
@@ -326,6 +334,13 @@ def generate_accessibility_report(local_path: str, media_type: str, cvd_type: st
         # Extract 6 dominant colors via OpenCV K-Means clustering
         if media_type == "image":
             img = cv2.imread(extract_path)
+            if img is None:
+                from PIL import Image as PILImage
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+                import numpy as np
+                pil_img = PILImage.open(extract_path).convert('RGB')
+                img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         elif media_type == "pdf":
             import pypdfium2 as pdfium
             pdf = pdfium.PdfDocument(extract_path)

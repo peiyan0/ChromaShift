@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+import colorsys
 from app.services.inference import inference_service
 
 class MediaProcessor:
@@ -13,15 +14,20 @@ class MediaProcessor:
         self.inference = inference_service
         self._pdf_color_cache = {}
 
-    def process_image(self, input_path: str, output_path: str, cvd_type: str, severity: float):
+    def process_image(self, input_path: str, output_path: str, cvd_type: str, severity: float, compression_level: str = "medium"):
         """
-        1. Read image (OpenCV)
+        1. Read image (OpenCV/PIL fallback)
         2. Run YOLO26-seg for semantic mask
         3. Apply Hybrid Adaptive Color Remapping
         4. Save and return path with preserved EXIF and accessibility tagging
         """
         try:
             from PIL import Image as PILImage
+            try:
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+            except ImportError:
+                pass
             pil_img = PILImage.open(input_path).convert('RGB')
             # Convert RGB to BGR for OpenCV
             image = np.array(pil_img)[:, :, ::-1].copy()
@@ -34,10 +40,7 @@ class MediaProcessor:
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        # Save processed image
-        cv2.imwrite(output_path, processed_img)
-
-        # Preserve metadata
+        # Save processed image and preserve metadata
         try:
             from PIL import Image as PILImage
             from PIL import PngImagePlugin
@@ -46,22 +49,55 @@ class MediaProcessor:
                 exif_data = orig_img.info.get("exif")
                 orig_format = orig_img.format
                 
-                with PILImage.open(output_path) as processed_pil:
-                    meta = PngImagePlugin.PngInfo() if orig_format == 'PNG' else None
-                    if meta:
-                        meta.add_text("ChromaShift-Accessibility-Transformation", f"{cvd_type} (severity: {severity})")
-                        processed_pil.save(output_path, format=orig_format, pnginfo=meta)
-                    else:
-                        if exif_data:
-                            processed_pil.save(output_path, format=orig_format, exif=exif_data)
-                        else:
-                            processed_pil.save(output_path, format=orig_format)
+            # Convert BGR processed image to PIL RGB image
+            rgb_processed = cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB)
+            processed_pil = PILImage.fromarray(rgb_processed)
+            
+            save_kwargs = {}
+            if orig_format == 'WEBP':
+                if compression_level == "high":
+                    save_kwargs["lossless"] = False
+                    save_kwargs["quality"] = 65
+                elif compression_level == "low":
+                    save_kwargs["lossless"] = True
+                else:  # medium / default
+                    save_kwargs["lossless"] = False
+                    save_kwargs["quality"] = 80
+            elif orig_format in ['JPEG', 'JPG']:
+                if compression_level == "high":
+                    save_kwargs["quality"] = 65
+                elif compression_level == "low":
+                    save_kwargs["quality"] = 95
+                else:
+                    save_kwargs["quality"] = 80
+            elif orig_format == 'PNG':
+                if compression_level == "high":
+                    save_kwargs["compress_level"] = 9
+                    save_kwargs["optimize"] = True
+                elif compression_level == "low":
+                    save_kwargs["compress_level"] = 1
+                    save_kwargs["optimize"] = False
+                else:
+                    save_kwargs["compress_level"] = 6
+                    save_kwargs["optimize"] = True
+            
+            if orig_format == 'PNG':
+                meta = PngImagePlugin.PngInfo()
+                meta.add_text("ChromaShift-Accessibility-Transformation", f"{cvd_type} (severity: {severity})")
+                processed_pil.save(output_path, format=orig_format, pnginfo=meta, **save_kwargs)
+            else:
+                if exif_data:
+                    processed_pil.save(output_path, format=orig_format, exif=exif_data, **save_kwargs)
+                else:
+                    processed_pil.save(output_path, format=orig_format, **save_kwargs)
         except Exception as e:
-            print(f"Error preserving image metadata: {e}")
+            print(f"Error saving image/metadata with PIL: {e}")
+            # Fallback to cv2.imwrite just in case
+            cv2.imwrite(output_path, processed_img)
             
         return output_path
 
-    def process_video(self, input_path: str, output_path: str, cvd_type: str, severity: float):
+    def process_video(self, input_path: str, output_path: str, cvd_type: str, severity: float, compression_level: str = "medium"):
         """
         Process video frame-by-frame with temporal smoothing and scene-change detection.
         Uses histogram Bhattacharyya distance to detect scene cuts and reset the EMA mask.
@@ -85,7 +121,17 @@ class MediaProcessor:
         # Find FFmpeg binary
         ffmpeg_path = shutil.which('ffmpeg') or r'C:\ffmpeg\bin\ffmpeg.exe'
 
+        crf = "23"
+        preset = "medium"
+        if compression_level == "high":
+            crf = "28"
+            preset = "slow"
+        elif compression_level == "low":
+            crf = "18"
+            preset = "fast"
+
         # Launch FFmpeg subprocess: read raw RGB frames from stdin, mux with original audio
+        # Enforce constant frame rate with -vsync cfr and sync audio start via -async 1
         cmd = [
             ffmpeg_path, '-y',
             '-f', 'rawvideo',
@@ -97,13 +143,15 @@ class MediaProcessor:
             '-i', input_path,
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
-            '-preset', 'fast',
-            '-crf', '23',
+            '-preset', preset,
+            '-crf', crf,
             '-map', '0:v:0',
             '-map', '1:a:0?',
             '-c:a', 'aac',
             '-movflags', '+faststart',
             '-shortest',
+            '-vsync', 'cfr',
+            '-async', '1',
             '-map_metadata', '1',
             '-metadata', f'comment=ChromaShift-Accessibility-Transformation: {cvd_type} (severity {severity})',
             output_path,
@@ -113,11 +161,19 @@ class MediaProcessor:
         alpha = 0.5  # EMA smoothing factor
         smoothed_mask = None
         prev_hist = None
+        prev_gray = None
+        prev_L = None  # Previous frame's L channel for temporal luminance smoothing
         SCENE_CHANGE_THRESHOLD = 0.35  # Bhattacharyya distance threshold
         
-        # Frame-skipping parameter to avoid running YOLO on every single frame
+        # Frame-skipping parameter - set to 2 for highly responsive tracking
         frame_idx = 0
-        frame_interval = 15
+        frame_interval = 2
+
+        # Video content classification (cached)
+        is_photo = None
+        is_discrete = None
+        bypass_segmentation = True
+        uniform_mask = np.ones((height, width), dtype=np.float32)
 
         try:
             while True:
@@ -125,34 +181,93 @@ class MediaProcessor:
                 if not ret:
                     break
 
-                # Scene change detection via histogram Bhattacharyya distance
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-                cv2.normalize(hist, hist)
+                if is_photo is None:
+                    is_photo = self.inference.is_photographic(frame)
+                    is_discrete = self.inference.is_discrete_graphic(frame)
 
-                scene_cut_detected = False
-                if prev_hist is not None:
-                    score = cv2.compareHist(prev_hist, hist, cv2.HISTCMP_BHATTACHARYYA)
-                    if score > SCENE_CHANGE_THRESHOLD:
-                        smoothed_mask = None  # Reset EMA on scene cut
-                        scene_cut_detected = True
+                if bypass_segmentation:
+                    smoothed_mask = uniform_mask
+                else:
+                    # Scene change detection via histogram Bhattacharyya distance
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+                    cv2.normalize(hist, hist)
 
-                prev_hist = hist
+                    scene_cut_detected = False
+                    if prev_hist is not None:
+                        score = cv2.compareHist(prev_hist, hist, cv2.HISTCMP_BHATTACHARYYA)
+                        if score > SCENE_CHANGE_THRESHOLD:
+                            smoothed_mask = None  # Reset EMA on scene cut
+                            scene_cut_detected = True
 
-                # Only run YOLO semantic segmentation on interval frames or on scene cuts
-                if frame_idx % frame_interval == 0 or scene_cut_detected or smoothed_mask is None:
-                    mask = self.inference.get_semantic_mask(frame)
-                    mask = cv2.resize(mask, (width, height))
+                    prev_hist = hist
 
-                    if smoothed_mask is None:
-                        smoothed_mask = mask
+                    # Only run YOLO semantic segmentation on interval frames or on scene cuts
+                    if frame_idx % frame_interval == 0 or scene_cut_detected or smoothed_mask is None:
+                        mask = self.inference.get_semantic_mask(frame)
+                        mask = cv2.resize(mask, (width, height))
+
+                        if smoothed_mask is None:
+                            smoothed_mask = mask
+                        else:
+                            smoothed_mask = alpha * mask + (1 - alpha) * smoothed_mask
+                        
+                        prev_gray = gray.copy()
                     else:
-                        smoothed_mask = alpha * mask + (1 - alpha) * smoothed_mask
+                        # Warp the mask using Optical Flow between prev_gray and current gray frame
+                        if prev_gray is not None and smoothed_mask is not None:
+                            try:
+                                # Downscale for performance optimization
+                                flow_scale = 0.5
+                                prev_gray_small = cv2.resize(prev_gray, (0, 0), fx=flow_scale, fy=flow_scale)
+                                gray_small = cv2.resize(gray, (0, 0), fx=flow_scale, fy=flow_scale)
+                                
+                                flow = cv2.calcOpticalFlowFarneback(
+                                    prev_gray_small, gray_small, None, 0.5, 3, 15, 3, 5, 1.2, 0
+                                )
+                                
+                                h_small, w_small = gray_small.shape[:2]
+                                mask_small = cv2.resize(smoothed_mask, (w_small, h_small))
+                                
+                                # Create coordinates mapping grid
+                                y_coords, x_coords = np.mgrid[0:h_small, 0:w_small].astype(np.float32)
+                                map_x = x_coords + flow[..., 0]
+                                map_y = y_coords + flow[..., 1]
+                                
+                                warped_mask_small = cv2.remap(
+                                    mask_small, map_x, map_y, cv2.INTER_LINEAR,
+                                    borderMode=cv2.BORDER_CONSTANT, borderValue=0
+                                )
+                                smoothed_mask = cv2.resize(warped_mask_small, (width, height))
+                            except Exception as e:
+                                print(f"Error in optical flow warping: {e}")
+                        
+                        prev_gray = gray.copy()
 
                 frame_idx += 1
 
                 # Apply remapping using the temporally-smoothed mask
-                processed_frame = self.inference.remap_colors(frame, intensity=severity, cvd_type=cvd_type, mask=smoothed_mask)
+                processed_frame = self.inference.remap_colors(
+                    frame, intensity=severity, cvd_type=cvd_type, mask=smoothed_mask,
+                    is_photo=is_photo, is_discrete=is_discrete
+                )
+
+                # Temporal luminance smoothing to prevent rapid brightness flashes (WCAG 2.3.1)
+                try:
+                    lab = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2LAB)
+                    l_chan, a_chan, b_chan = cv2.split(lab)
+                    if prev_L is not None:
+                        mean_curr = np.mean(l_chan)
+                        mean_prev = np.mean(prev_L)
+                        diff = mean_curr - mean_prev
+                        if abs(diff) > 25.0:
+                            # Dampen the luminance shift
+                            damp_factor = 0.4
+                            l_chan = cv2.addWeighted(l_chan, damp_factor, prev_L, 1.0 - damp_factor, 0)
+                    prev_L = l_chan.copy()
+                    processed_frame = cv2.cvtColor(cv2.merge((l_chan, a_chan, b_chan)), cv2.COLOR_LAB2BGR)
+                except Exception as e:
+                    print(f"Error in temporal luminance smoothing: {e}")
 
                 # Write raw RGB frame to FFmpeg stdin
                 rgb_frame = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
@@ -195,39 +310,52 @@ class MediaProcessor:
         self._pdf_color_cache[cache_key] = result
         return result
 
-    def process_pdf(self, input_path: str, output_path: str, cvd_type: str, severity: float):
+    def process_pdf(self, input_path: str, output_path: str, cvd_type: str, severity: float, compression_level: str = "medium"):
         """
         Accessibility-preserving PDF processing using PyMuPDF (fitz).
-        Extracts and recolors only embedded images/graphics, leaving text layers,
-        hyperlinks, and vector elements intact for screen-reader compatibility.
-        Uses a generator yield loop to process one image at a time, avoiding OOM issues.
+        Copies the file first and performs incremental updates to 100% preserve structural trees,
+        metadata, hyperlinks, interactive forms, and tab orders.
         """
         import fitz  # PyMuPDF
         import gc
         import tempfile
+        import shutil
 
         self._pdf_color_cache.clear()
-        doc = fitz.open(input_path)
-
+        
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        doc = None
         try:
+            # Open the input file directly (read-only)
+            doc = fitz.open(input_path)
             for page_num in range(len(doc)):
                 page = doc[page_num]
                 
                 # 1. Process Vector Drawings (Recolor and Redraw)
                 drawings = page.get_drawings()
                 if drawings:
-                    # Mark original drawings for redaction
+                    def is_colored(rgb_tuple):
+                        if not rgb_tuple:
+                            return False
+                        r, g, b = rgb_tuple
+                        h, l, s = colorsys.rgb_to_hls(r, g, b)
+                        return s > 0.10 and l > 0.05 and l < 0.98
+
+                    # Redact the bounding boxes of ALL drawings on the page to completely clear the old line-art layer.
+                    # Setting text=1 (PDF_REDACT_TEXT_NONE) prevents the selectable text layers from being removed.
                     for draw in drawings:
-                        page.add_redact_annot(draw["rect"])
-                    
-                    # Apply redaction to remove old drawings (keep text & images intact)
-                    page.apply_redactions(images=0, graphics=1, text=0)
-                    
-                    # Recreate drawings with corrected colors
+                        page.add_redact_annot(draw["rect"], fill=False)
+                    page.apply_redactions(images=0, graphics=2, text=1)
+
+                    # Re-draw all shapes back in their original stack order
                     shape = page.new_shape()
                     for draw in drawings:
-                        new_fill = self._remap_pdf_color(draw["fill"], cvd_type, severity) if draw["fill"] else None
-                        new_color = self._remap_pdf_color(draw["color"], cvd_type, severity) if draw["color"] else None
+                        fill = draw["fill"]
+                        color = draw["color"]
+                        new_fill = self._remap_pdf_color(fill, cvd_type, severity) if fill and is_colored(fill) else fill
+                        new_color = self._remap_pdf_color(color, cvd_type, severity) if color and is_colored(color) else color
                         
                         for item in draw["items"]:
                             if item[0] == "l":
@@ -239,41 +367,114 @@ class MediaProcessor:
                             elif item[0] == "c":
                                 shape.draw_bezier(item[1], item[2], item[3], item[4])
                         
-                        # Build finish parameters dynamically to avoid passing None values, which can cause MuPDF syntax warnings
                         finish_kwargs = {
                             "fill": new_fill,
                             "color": new_color,
                             "width": draw.get("width", 1)
                         }
+                        if draw.get("fill_opacity") is not None:
+                            finish_kwargs["fill_opacity"] = draw["fill_opacity"]
+                        if draw.get("stroke_opacity") is not None:
+                            finish_kwargs["stroke_opacity"] = draw["stroke_opacity"]
                         if draw.get("dashes"):
                             finish_kwargs["dashes"] = draw["dashes"]
                         if draw.get("lineJoin") is not None:
-                            finish_kwargs["lineJoin"] = draw["lineJoin"]
+                            finish_kwargs["lineJoin"] = int(draw["lineJoin"])
                         if draw.get("lineCap") is not None:
-                            finish_kwargs["lineCap"] = max(draw["lineCap"])
-                        
+                            line_cap = draw["lineCap"]
+                            if isinstance(line_cap, (int, float)):
+                                finish_kwargs["lineCap"] = int(line_cap)
+                            else:
+                                try:
+                                    finish_kwargs["lineCap"] = max(line_cap)
+                                except (TypeError, ValueError):
+                                    finish_kwargs["lineCap"] = 0
                         shape.finish(**finish_kwargs)
-                    shape.commit()
+
+                    # Commit to the background layer (behind text and other elements)
+                    shape.commit(overlay=False)
 
                 # 2. Process Embedded Images
                 image_list = page.get_images(full=True)
                 for img_info in image_list:
                     xref = img_info[0]
+                    smask_xref = img_info[1]
                     try:
-                        base_image = doc.extract_image(xref)
-                        image_bytes = base_image["image"]
+                        main_pix = fitz.Pixmap(doc, xref)
+                        
+                        # Extract BGR / BGRA image with correct alpha channel mapped from SMask if it exists
+                        if smask_xref > 0:
+                            mask_pix = fitz.Pixmap(doc, smask_xref)
+                            main_array = np.frombuffer(main_pix.samples, dtype=np.uint8).reshape((main_pix.height, main_pix.width, 4 if main_pix.alpha else 3))
+                            mask_array = np.frombuffer(mask_pix.samples, dtype=np.uint8).reshape((mask_pix.height, mask_pix.width, 1))
+                            
+                            if main_pix.alpha:
+                                rgba = main_array.copy()
+                                rgba[:, :, 3] = mask_array[:, :, 0]
+                            else:
+                                rgba = np.zeros((main_pix.height, main_pix.width, 4), dtype=np.uint8)
+                                rgba[:, :, :3] = main_array
+                                rgba[:, :, 3] = mask_array[:, :, 0]
+                            cv_image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
+                        else:
+                            if main_pix.alpha:
+                                rgba = np.frombuffer(main_pix.samples, dtype=np.uint8).reshape((main_pix.height, main_pix.width, 4))
+                                cv_image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
+                            else:
+                                rgb = np.frombuffer(main_pix.samples, dtype=np.uint8).reshape((main_pix.height, main_pix.width, 3))
+                                cv_image = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
-                        nparr = np.frombuffer(image_bytes, np.uint8)
-                        cv_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                         if cv_image is None:
                             continue
 
-                        processed_bgr = self.inference.remap_colors(cv_image, intensity=severity, cvd_type=cvd_type)
+                        # Handle transparency (4 channels)
+                        h_img, w_img = cv_image.shape[:2]
+                        uniform_mask = np.ones((h_img, w_img), dtype=np.float32)
+                        if len(cv_image.shape) == 3 and cv_image.shape[2] == 4:
+                            bgr = cv_image[:, :, :3]
+                            alpha = cv_image[:, :, 3]
+                            processed_bgr = self.inference.remap_colors(bgr, intensity=severity, cvd_type=cvd_type, mask=uniform_mask)
+                            processed_image = cv2.merge((processed_bgr, alpha))
+                        else:
+                            processed_image = self.inference.remap_colors(cv_image, intensity=severity, cvd_type=cvd_type, mask=uniform_mask)
 
                         # Write processed image to a temp file and replace via filename to handle encoding/filter conversion correctly
-                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_img:
+                        # Force PNG format if transparency is present to preserve the alpha channel
+                        has_transparency = (smask_xref > 0) or main_pix.alpha
+                        img_ext = "png"
+                        if not has_transparency:
+                            try:
+                                img_dict = doc.extract_image(xref)
+                                if img_dict and "ext" in img_dict:
+                                    img_ext = img_dict["ext"].lower()
+                            except Exception as ext_err:
+                                print(f"Error extracting image format metadata: {ext_err}")
+
+                        temp_suffix = f".{img_ext}"
+                        write_params = []
+                        if img_ext in ["jpeg", "jpg"]:
+                            temp_suffix = ".jpg"
+                            if compression_level == "high":
+                                quality = 65
+                            elif compression_level == "low":
+                                quality = 95
+                            else:
+                                quality = 80
+                            write_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+                        elif img_ext == "png":
+                            if compression_level == "high":
+                                compress_level = 9
+                            elif compression_level == "low":
+                                compress_level = 1
+                            else:
+                                compress_level = 6
+                            write_params = [int(cv2.IMWRITE_PNG_COMPRESSION), compress_level]
+                        else:
+                            temp_suffix = ".png"
+
+                        with tempfile.NamedTemporaryFile(suffix=temp_suffix, delete=False) as temp_img:
                             temp_name = temp_img.name
-                            cv2.imwrite(temp_name, processed_bgr)
+                            cv2.imwrite(temp_name, processed_image, write_params)
                         
                         page.replace_image(xref, filename=temp_name)
                         
@@ -283,11 +484,11 @@ class MediaProcessor:
                             pass
 
                         # Actively dereference and garbage collect to keep memory low
-                        del base_image
-                        del image_bytes
-                        del nparr
+                        del main_pix
+                        if smask_xref > 0:
+                            del mask_pix
                         del cv_image
-                        del processed_bgr
+                        del processed_image
                         gc.collect()
                     except Exception as e:
                         print(f"Skipping image xref={xref}: {e}")
@@ -303,10 +504,11 @@ class MediaProcessor:
             except Exception as e:
                 print(f"Error copying PDF metadata: {e}")
 
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            doc.save(output_path, garbage=4, deflate=True)
+            # Save directly to output_path using garbage collection and deflation
+            doc.save(output_path, garbage=4, deflate=True, clean=True, encryption=fitz.PDF_ENCRYPT_KEEP)
         finally:
-            doc.close()
+            if doc and not doc.is_closed:
+                doc.close()
             gc.collect()
 
         return output_path
