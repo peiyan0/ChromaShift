@@ -1,30 +1,128 @@
 # ChromaShift
 
-> **Empowering the chromatic digital divide.** An AI-powered suite designed to make digital media accessible to the 300 million individuals living with Color Vision Deficiency (CVD).
+> **Empowering the chromatic digital divide.** Beyond Basic Filters. Truly Smart Colorblind Accessibility for the 300 million individuals living with Color Vision Deficiency (CVD).
 
-**🔗 Live Preview:** [chroma-shift-py.vercel.app](https://chroma-shift-py.vercel.app/)
+**🔗 Live Preview:** [chromashift-py.vercel.app](https://chromashift-py.vercel.app/)  
+*(Try it instantly! The live demo includes pre-loaded sample images so you can test the daltonization effect in one click without creating an account or uploading your own photos.)*
 
----
+<div align="center">
+  <video src="./frontend/public/demo/Demo.mp4" width="800" autoplay loop muted playsinline></video>
+</div>
 
-## ✨ Key Features
+## The Problem: Basic Filters
+Standard accessibility tools treat everyone the same. They apply rigid, generic color filters (like "Protanopia" or "Deuteranopia" presets) across the entire screen. This often distorts natural lighting, ruins skin tones in photographs, breaks selectable text in PDFs, and relies purely on color to differentiate charts.
 
-- **🎯 Personalized Vision Calibration**: An interactive Bayesian optimization wizard that fine-tunes a unique transformation matrix for your specific color perception.
-- **🧠 Semantic Media Remapping**: 
-  - **Images & Static Docs**: High-fidelity server-side processing (YOLO26-seg cascade, NMS-free).
-  - **Videos**: Flicker-free temporal coherence with Optical Flow and keyframe-based YOLO26n-seg segmentation.
-  - **Live Camera & Local Video**: Real-time client-side semantic masking via YOLO26n-seg ONNX (every 15–20 frames, held between keyframes) with K-Means SLIC fallback — replacing the previous Laplacian edge approach.
-  - **Documents**: Structural PDF parsing and chart-aware recoloring.
-- **🛡️ WCAG 2.1 Audit & Accessibility Report**: Automated accessibility checks (SC 1.4.1, 1.4.3, 1.4.11) with actionable remediation feedback. Generate and export a detailed **Accessibility Report (JSON)** containing specific failing color pairs and calculated WCAG-compliant alternatives.
-- **🔐 Privacy & Security**: Strict data minimization and a 7-day auto-expiry policy. For full details on our security practices, please read [SECURITY.md](SECURITY.md).
+## The Solution: Smart Rendering
+ChromaShift introduces a **content-aware rendering engine**. It calibrates to your specific eyes and understands what you're looking at. By leveraging lightweight machine learning, it treats a photograph, a bar chart, and a text document exactly how they should be treated.
 
 ---
 
-## 🛠️ Tech Stack
+## Key Features & User Benefits
+
+- **Protects Natural Skin Tones**: While other filters turn faces green or grey, our YOLO semantic masking engine detects people and animals. It dynamically corrects the background while leaving skin tones natural.
+  <br/>
+  <img src="./frontend/public/demo/Protects%20Natural%20Tones.png" width="800" alt="Protects Natural Tones Demo" />
+- **Smart Charts & Graphs (WCAG 1.4.1 Compliant)**: Color isn't enough. ChromaShift detects discrete graphics and automatically injects physical textures (like dots or stripes) into charts, making data easy to read without guessing.
+  <br/>
+  <img src="./frontend/public/demo/Smart%20Charts%20%26%20Graphs.png" width="800" alt="Smart Charts Demo" />
+- **Non-Destructive PDF Vectors**: Unlike tools that rasterize documents into massive images, ChromaShift redraws vector paths in the background. Your text remains selectable, hyperlinks stay active, and screen readers continue to work perfectly.
+  <br/>
+  <img src="./frontend/public/demo/Non-Destructive%20PDF%20Vectors.png" width="800" alt="Non-Destructive PDF Demo" />
+- **Flicker-Free Video**: Enjoy smooth, color-corrected videos without the flashing and jittering caused by basic accessibility tools, thanks to Optical Flow and Temporal Smoothing.
+  <br/>
+  <video src="./frontend/public/demo/Flicker-Free%20Video.mp4" width="800" autoplay loop muted playsinline></video>
+- **Actionable WCAG Audits**: Don't just find out you failed an audit. ChromaShift generates detailed JSON reports with the exact, calculated hex codes developers need to fix contrast issues.
+- **Personalized Vision Calibration**: A quick interactive wizard tunes the screen to your specific eyes, rather than forcing you into a generic category.
+
+---
+
+## How it Works (The Workflow)
+
+ChromaShift intelligently routes media based on its structural content to provide the optimal reading experience:
+
+```mermaid
+flowchart TD
+    %% Styling
+    classDef dumb fill:#fce4e4,stroke:#cc0000,stroke-width:2px,color:#000
+    classDef smart fill:#e4f0fc,stroke:#0055cc,stroke-width:2px,color:#000
+    classDef neutral fill:#ffffff,stroke:#666,stroke-width:1px,color:#000
+    classDef success fill:#e4fce4,stroke:#00cc00,stroke-width:2px,color:#000
+    classDef fail fill:#ffe6e6,stroke:#ff0000,stroke-width:2px,color:#000
+
+    subgraph ChromaShift Pipeline ["ChromaShift Smart Rendering Engine"]
+        direction TD
+        A2[Input Media]:::neutral --> B2{Identify Content Type}:::smart
+        
+        B2 -- Photograph --> C2[YOLO Semantic Masking]:::smart
+        C2 --> D2[Protect Skin Tones &<br/>Recolor Background]:::success
+        
+        B2 -- Chart/Diagram --> E2[Dual-Encoding Textures]:::smart
+        E2 --> F2[Inject Patterns <br/>WCAG 1.4.1 Compliant]:::success
+        
+        B2 -- PDF Document --> G2[Read Vector Stack]:::smart
+        G2 --> H2[Redraw Shapes Only<br/>Preserve Text & Links]:::success
+        
+        B2 -- UI/Webpage --> I2[WCAG Audit]:::smart
+        I2 --> J2[Generate JSON Report with<br/>Compliant Hex Codes]:::success
+    end
+
+    subgraph Standard Pipeline ["Traditional Accessibility Tools (Basic)"]
+        direction TD
+        A1[Input Media]:::neutral --> B1[Apply Global Color Matrix]:::dumb
+        B1 --> C1[Rasterize PDFs to Images]:::dumb
+        B1 --> D1[Apply Generic Presets<br/>Protanopia/Deuteranopia]:::dumb
+        
+        C1 --> E1[Breaks Selectable Text<br/>& Screen Readers]:::fail
+        D1 --> F1[Ruins Skin Tones in Photos]:::fail
+        D1 --> G1[Still relies only on color for charts]:::fail
+    end
+```
+
+---
+
+## The Core Engine (The Technology)
+
+Under the hood, ChromaShift goes far beyond basic CSS `filter: hue-rotate()`. It uses legitimate, physiologically-based computer vision tensor math mixed with AI semantic segmentation.
+
+```mermaid
+flowchart TD
+    %% Styling
+    classDef math fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#000
+    classDef color fill:#e1bee7,stroke:#8e24aa,stroke-width:2px,color:#000
+    classDef ai fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+
+    subgraph ChromaShift Core Daltonization Engine
+        A[Original Image sRGB]:::color --> B[Linearize & Remove Gamma]:::math
+        B --> C[Transform to LMS Space<br/>Physiological Cone Simulation]:::math
+        
+        C --> D[Apply Personal Blindness Matrix<br/>Simulates Damaged Cone Response]:::math
+        
+        C --> E(( Subtract )):::math
+        D --> E
+        
+        E --> F[Extract 'Error' Matrix<br/>Invisible Color Data]:::math
+        
+        G[YOLOv8-Seg Model]:::ai --> H[Generate Semantic Mask<br/>Protect Skin/Faces]:::ai
+        
+        F --> I(( Tensor Multiply )):::math
+        H --> I
+        
+        I --> J[Error-to-Modulation Matrix<br/>Shift into Visible Wavelengths]:::math
+        
+        J --> K[Recombine & Convert to LAB Space]:::color
+        K --> L[CLAHE & Unsharp Mask<br/>on Lightness Channel Only]:::math
+        L --> M[Final Output sRGB]:::color
+    end
+```
+
+---
+
+## Tech Stack
 
 ### Frontend
 - **Framework**: React 18 + TypeScript
-- **Styling**: Chakra UI + Tailwind CSS + Framer Motion
-- **AI Runtime**: TensorFlow.js (WebGL daltonization) + ONNX Runtime Web (YOLO26n-seg segmentation)
+- **Styling**: Custom CSS Design Tokens + Native Variables + Framer Motion
+- **AI Runtime**: TensorFlow.js (WebGL daltonization) + ONNX Runtime Web (YOLO26n-seg via Hugging Face `peiyan2/cvd-onnx-models`)
 
 ### Backend
 - **Framework**: Python FastAPI (Async)
@@ -32,20 +130,17 @@
 - **Storage**: S3-compatible (MinIO)
 - **Media Processing**: OpenCV + FFmpeg + ONNX Runtime
 
-### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Security**: Trivy + OWASP ZAP scanning
-
 ---
 
-## 🚦 Getting Started
+## Getting Started (Local Development)
 
 ### Prerequisites
 - [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
 - [Node.js v20+](https://nodejs.org/)
 - [Python 3.12+ & Poetry](https://python-poetry.org/)
 
-### Run the platform in Docker
+### Run Locally with Docker
+For local development and testing, we use Docker to instantly spin up the required infrastructure (PostgreSQL, Redis, MinIO).
 
 1. **Clone the repository**:
    ```bash
@@ -62,26 +157,9 @@
    - **Frontend**: `http://localhost` (Port 80)
    - **Backend API**: `http://localhost:8000`
    - **Swagger UI**: `http://localhost:8000/docs`
-   ```
----
-
-## 🏗️ Architecture
-
-The platform uses a **three-tier hybrid architecture**:
-1.  **Frontend**: Handles real-time previews using YOLO26n-seg ONNX (with K-Means SLIC fallback) via ONNX Runtime Web and TF.js WebGL daltonization to provide instant feedback (< 3s).
-2.  **Backend API**: Orchestrates heavy-duty AI processing, compliance audits, and storage management.
-3.  **Storage Layer**: Maintains user profiles and media with strict lifecycle policies.
 
 ---
 
-## 📖 API Documentation
-
-Once the backend is running, you can access the interactive API documentation at:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-
----
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License.

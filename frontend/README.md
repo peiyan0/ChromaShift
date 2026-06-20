@@ -4,7 +4,7 @@ This is the frontend for the ChromaShift platform, built with React, TypeScript,
 
 ## Tech Stack
 - **Framework**: React 18 + TypeScript
-- **Styling**: Chakra UI + Tailwind CSS + Framer Motion
+- **Styling**: Custom CSS Design Tokens + Native Variables + Framer Motion
 - **AI Runtime**: TensorFlow.js (WebGL daltonization) + ONNX Runtime Web (YOLO26n-seg segmentation)
 
 ## Development
