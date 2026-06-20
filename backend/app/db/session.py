@@ -12,7 +12,9 @@ if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
 else:
     engine = create_engine(
         settings.SQLALCHEMY_DATABASE_URI,
-        poolclass=NullPool,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
         connect_args={
             "keepalives": 1,
             "keepalives_idle": 30,

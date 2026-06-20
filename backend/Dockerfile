@@ -38,4 +38,4 @@ COPY --chown=user . $HOME/app
 EXPOSE 7860
 
 # Run migrations and start the server
-CMD ["sh", "-c", "alembic upgrade head || echo 'Database migrations failed, starting server anyway...'; uvicorn app.main:app --host 0.0.0.0 --port 7860"]
+CMD ["sh", "-c", "alembic upgrade head || echo 'Database migrations failed, starting server anyway...'; uvicorn app.main:app --host 0.0.0.0 --port 7860 --workers 4"]
