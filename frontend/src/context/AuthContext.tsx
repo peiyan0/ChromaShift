@@ -29,19 +29,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
-  const fetchUserDetails = async (token: string) => {
+  const fetchUserDetails = async (token: string): Promise<boolean> => {
     try {
       const response = await axios.get(`${baseURL}auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsAdmin(response.data.is_superuser === true);
+      const isGuestUser = response.data.is_guest === true;
+      setIsGuest(isGuestUser);
+      localStorage.setItem('isGuest', isGuestUser ? 'true' : 'false');
+      return true;
     } catch (e: any) {
       if (e.response?.status === 404) {
         console.info("User database record does not exist yet (expected for new Supabase sign-ins).");
-      } else {
-        console.error("Could not fetch user profile details", e);
+        return true;
       }
+      console.error("Could not fetch user profile details", e);
       setIsAdmin(false);
+      return false;
     }
   };
 
@@ -50,29 +55,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 1. If Supabase is enabled, use Supabase session listener
       if (isSupabaseEnabled) {
         const { data: { session } } = await supabase.auth.getSession();
+        const localToken = localStorage.getItem('token');
+        const localGuestFlag = localStorage.getItem('isGuest');
+        const isCurrentlyCustomLoggedIn = localToken && localGuestFlag === 'false';
+
         if (session) {
           const token = session.access_token;
           const userIsAnonymous = session.user?.is_anonymous ?? false;
-          localStorage.setItem('token', token);
-          localStorage.setItem('isGuest', userIsAnonymous ? 'true' : 'false');
-          setIsAuthenticated(true);
-          setIsGuest(userIsAnonymous);
-          fetchUserDetails(token);
+          if (isCurrentlyCustomLoggedIn && userIsAnonymous) {
+            setIsAuthenticated(true);
+            setIsGuest(false);
+            fetchUserDetails(localToken);
+          } else {
+            localStorage.setItem('token', token);
+            localStorage.setItem('isGuest', userIsAnonymous ? 'true' : 'false');
+            setIsAuthenticated(true);
+            setIsGuest(userIsAnonymous);
+            fetchUserDetails(token);
+          }
         } else {
-          // Auto sign-in anonymously
-          try {
-            const { data, error } = await supabase.auth.signInAnonymously();
-            if (error) throw error;
-            if (data?.session) {
-              const token = data.session.access_token;
-              localStorage.setItem('token', token);
-              localStorage.setItem('isGuest', 'true');
-              setIsAuthenticated(true);
-              setIsGuest(true);
-              fetchUserDetails(token);
+          // If we are already custom logged in, do not overwrite it with anonymous sign-in
+          if (isCurrentlyCustomLoggedIn) {
+            setIsAuthenticated(true);
+            setIsGuest(false);
+            fetchUserDetails(localToken);
+          } else {
+            // Auto sign-in anonymously
+            try {
+              const { data, error } = await supabase.auth.signInAnonymously();
+              if (error) throw error;
+              if (data?.session) {
+                const token = data.session.access_token;
+                localStorage.setItem('token', token);
+                localStorage.setItem('isGuest', 'true');
+                setIsAuthenticated(true);
+                setIsGuest(true);
+                fetchUserDetails(token);
+              }
+            } catch (e) {
+              console.error("Supabase anonymous sign-in failed", e);
             }
-          } catch (e) {
-            console.error("Supabase anonymous sign-in failed", e);
           }
         }
         setIsInitializing(false);
@@ -119,10 +141,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const token = localStorage.getItem('token');
         const guestFlag = localStorage.getItem('isGuest');
         if (token) {
-          setIsAuthenticated(true);
-          setIsGuest(guestFlag === 'true');
-          fetchUserDetails(token);
-          setIsInitializing(false);
+          const success = await fetchUserDetails(token);
+          if (success) {
+            setIsAuthenticated(true);
+            setIsGuest(guestFlag === 'true');
+            setIsInitializing(false);
+          } else {
+            // Token is invalid or expired - clean it and get a fresh guest session
+            localStorage.removeItem('token');
+            localStorage.removeItem('isGuest');
+            try {
+              const response = await axios.post(`${baseURL}auth/guest`);
+              const guestToken = response.data.access_token;
+              localStorage.setItem('token', guestToken);
+              localStorage.setItem('isGuest', 'true');
+              setIsAuthenticated(true);
+              setIsGuest(true);
+              await fetchUserDetails(guestToken);
+            } catch (e) {
+              console.error("Could not automatically authenticate guest", e);
+            } finally {
+              setIsInitializing(false);
+            }
+          }
         } else {
           try {
             const response = await axios.post(`${baseURL}auth/guest`);
@@ -131,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem('isGuest', 'true');
             setIsAuthenticated(true);
             setIsGuest(true);
-            fetchUserDetails(guestToken);
+            await fetchUserDetails(guestToken);
           } catch (e) {
             console.error("Could not automatically authenticate guest", e);
           } finally {

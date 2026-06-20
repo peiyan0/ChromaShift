@@ -12,7 +12,7 @@ def cleanup_guest_accounts(db: Session, max_age_hours: int = 24) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
     
     guests = db.query(models.User).filter(
-        models.User.email.like("%@chromashift.guest")
+        models.User.username.like("guest_%")
     ).all()
     
     cleaned_count = 0

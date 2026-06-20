@@ -3,12 +3,12 @@ from typing import Optional
 
 # Auth Schemas
 class UserCreate(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 class UserResponse(BaseModel):
     id: str
-    email: EmailStr
+    username: str
     is_active: bool
     
     model_config = ConfigDict(from_attributes=True)
@@ -48,6 +48,7 @@ class MediaProcessRequest(BaseModel):
     # Optional overrides; defaults to user profile if not provided
     cvd_type: Optional[str] = None
     severity: Optional[float] = None
+    compression_level: Optional[str] = None
 
 class MediaProcessResponse(BaseModel):
     task_id: str
@@ -87,6 +88,7 @@ class ResearchDemographicSchema(BaseModel):
     color_glasses_frequency: Optional[str] = None
     web_app_comfort: Optional[str] = None
     device_use_frequency: Optional[str] = None
+    selected_mode: Optional[str] = None
 
 
 class VisionTaskPerformanceSchema(BaseModel):
@@ -111,6 +113,7 @@ class ResearchSessionPerformanceSchema(BaseModel):
     task3: Optional[VisionTaskPerformanceSchema] = None
     video: Optional[VideoTrackingPerformanceSchema] = None
     document: Optional[VisionTaskPerformanceSchema] = None
+    task6: Optional[VisionTaskPerformanceSchema] = None
 
 
 class ResearchSurveySchema(BaseModel):

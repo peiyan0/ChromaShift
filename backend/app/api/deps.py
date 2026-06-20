@@ -22,27 +22,27 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
             is_placeholder = lambda val: not val or any(p in val for p in ["your-supabase-jwt-secret", "replace_me"])
             supabase_secret = settings.SUPABASE_JWT_SECRET
             
-            if supabase_secret and not is_placeholder(supabase_secret):
-                payload = jwt.decode(token, supabase_secret, algorithms=["HS256"], options={"verify_aud": False})
-                is_supabase_jwt = True
-            else:
-                raise JWTError("Invalid token signature")
+            if not supabase_secret or is_placeholder(supabase_secret):
+                raise credentials_exception
+                
+            payload = jwt.decode(token, supabase_secret, algorithms=["HS256"], options={"verify_aud": False})
+            is_supabase_jwt = True
             
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
             
-        # Enforce that Supabase tokens have the correct audience claim
-        if is_supabase_jwt and payload.get("aud") != "authenticated":
+        # Enforce that Supabase tokens have the correct audience claim if present
+        aud = payload.get("aud")
+        if is_supabase_jwt and aud and aud not in ["authenticated", "anon"]:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
         
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
-        # Auto-provision user record if authenticated via Supabase JWT
-        email = payload.get("email") or f"{user_id}@supabase.user"
-        user = models.User(id=user_id, email=email, hashed_password="")
+        username = payload.get("email") or f"supabase_{user_id[:8]}"
+        user = models.User(id=user_id, username=username, hashed_password="")
         db.add(user)
         try:
             db.commit()
@@ -68,4 +68,33 @@ def get_current_admin_user(current_user: models.User = Depends(get_current_activ
             detail="The user does not have enough privileges",
         )
     return current_user
+
+
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
+
+def get_current_user_or_guest(
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme_optional)
+) -> models.User:
+    if not token:
+        # Fetch or create seed guest user
+        guest_user = db.query(models.User).filter(models.User.id == "guest").first()
+        if not guest_user:
+            guest_user = models.User(id="guest", username="guest", hashed_password="")
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        return guest_user
+        
+    try:
+        return get_current_user(db, token)
+    except Exception:
+        # Fallback to guest user on any token validation failure
+        guest_user = db.query(models.User).filter(models.User.id == "guest").first()
+        if not guest_user:
+            guest_user = models.User(id="guest", username="guest", hashed_password="")
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        return guest_user
 

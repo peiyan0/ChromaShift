@@ -27,7 +27,7 @@ class ComplianceReportResponse(BaseModel):
 async def run_compliance_check(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Run WCAG 2.1 analysis (SC 1.4.1, 1.4.3, 1.4.11) on processed media.
@@ -115,7 +115,7 @@ async def run_compliance_check(
 async def get_compliance_report(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Retrieve previously generated compliance report from database.
@@ -139,7 +139,7 @@ async def get_compliance_report(
 async def get_accessibility_report(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Export the detailed Accessibility Report (JSON) for a completed media job.

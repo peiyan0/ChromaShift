@@ -15,15 +15,15 @@ router = APIRouter()
 @router.post("/register", response_model=schemas.UserResponse)
 @limiter.limit("10/minute")
 def register_user(request: Request, user_in: schemas.UserCreate, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == user_in.email).first()
+    user = db.query(models.User).filter(models.User.username == user_in.username).first()
     if user:
         raise HTTPException(
             status_code=400,
-            detail="The user with this email already exists in the system.",
+            detail="The user with this username already exists in the system.",
         )
     
     hashed_password = get_password_hash(user_in.password)
-    user = models.User(email=user_in.email, hashed_password=hashed_password)
+    user = models.User(username=user_in.username, hashed_password=hashed_password)
     
     db.add(user)
     db.commit()
@@ -34,11 +34,11 @@ def register_user(request: Request, user_in: schemas.UserCreate, db: Session = D
 @router.post("/login", response_model=schemas.Token)
 @limiter.limit("20/minute")
 def login_access_token(request: Request, db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
         
@@ -52,12 +52,12 @@ def login_access_token(request: Request, db: Session = Depends(get_db), form_dat
 @limiter.limit("10/minute")
 def login_guest_user(request: Request, db: Session = Depends(get_db)):
     guest_uuid = str(uuid.uuid4())
-    guest_email = f"guest_{guest_uuid}@chromashift.guest"
+    guest_username = f"guest_{guest_uuid[:8]}"
     # Use a random UUID password for security
     guest_password = str(uuid.uuid4())
     hashed_password = get_password_hash(guest_password)
     
-    user = models.User(email=guest_email, hashed_password=hashed_password)
+    user = models.User(username=guest_username, hashed_password=hashed_password)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -65,38 +65,7 @@ def login_guest_user(request: Request, db: Session = Depends(get_db)):
     access_token = create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/promote", response_model=schemas.UserResponse)
-@limiter.limit("10/minute")
-def promote_guest_user(
-    request: Request,
-    user_in: schemas.UserCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(deps.get_current_user)
-):
-    is_guest = current_user.email.endswith("@chromashift.guest") or current_user.email.endswith("@supabase.user")
-    if not is_guest:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only guest accounts can be promoted."
-        )
-    
-    # Check if target email already exists
-    existing_user = db.query(models.User).filter(models.User.email == user_in.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The user with this email already exists in the system."
-        )
-    
-    # Update current guest record to permanent account
-    current_user.email = user_in.email
-    current_user.hashed_password = get_password_hash(user_in.password)
-    
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-    
-    return current_user
+
 
 @router.post("/cleanup", response_model=dict)
 def trigger_cleanup(
@@ -112,9 +81,9 @@ def trigger_cleanup(
 def get_me(current_user: models.User = Depends(deps.get_current_active_user)):
     return {
         "id": current_user.id,
-        "email": current_user.email,
+        "username": current_user.username,
         "is_superuser": getattr(current_user, "is_superuser", False),
-        "is_guest": current_user.email.endswith("@chromashift.guest")
+        "is_guest": current_user.username.startswith("guest_") or current_user.username.startswith("supabase_")
     }
 
 @router.delete("/me", response_model=dict)
@@ -140,7 +109,4 @@ def delete_current_user(
     db.delete(current_user)
     db.commit()
     return {"status": "success", "detail": "Account and associated data deleted successfully"}
-
-
-
 

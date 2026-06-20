@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Any
+from typing import List, Any, Optional
 import uuid
 import time
 import os
@@ -16,14 +16,36 @@ from app.services.media_processor import MediaProcessor
 router = APIRouter()
 processor = MediaProcessor()
 
-def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float, auto_loop: bool = True):
+def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: float, compression_level: str = "medium", auto_loop: bool = True):
     """
     Background task to process media using the AI models.
     """
     print(f"Background task started for job {job_id}")
     
+    # Query database to retrieve media_type for fallback
+    db = SessionLocal()
+    db_media_type = None
+    try:
+        job = db.query(MediaJob).filter(MediaJob.job_id == job_id).first()
+        if job:
+            db_media_type = job.media_type
+    except Exception as db_err:
+        print(f"Failed to query job media_type from database: {db_err}")
+    finally:
+        db.close()
+
     # 1. Setup paths
-    file_ext = os.path.splitext(s3_key)[1] if s3_key else ".jpg"
+    file_ext = os.path.splitext(s3_key)[1] if s3_key else ""
+    if not file_ext and db_media_type:
+        if db_media_type == "pdf":
+            file_ext = ".pdf"
+        elif db_media_type == "video":
+            file_ext = ".mp4"
+        elif db_media_type == "image":
+            file_ext = ".jpg"
+
+    if not file_ext:
+        file_ext = ".jpg"
     
     # Force processed video extension to .mp4 to ensure ffmpeg libx264/aac compatibility
     processed_ext = file_ext
@@ -49,7 +71,7 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         print(f"File downloaded for processing: {local_input}")
         
         # Determine media type for processing
-        media_type = "image"
+        media_type = db_media_type or "image"
         if file_ext.lower() in ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v']:
             media_type = "video"
         elif file_ext.lower() == '.pdf':
@@ -66,11 +88,11 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
         while iteration < max_iterations and not passed:
             iteration += 1
             if media_type == "image":
-                processor.process_image(local_input, local_output, cvd_type, current_severity)
+                processor.process_image(local_input, local_output, cvd_type, current_severity, compression_level)
             elif media_type == "video":
-                processor.process_video(local_input, local_output, cvd_type, current_severity)
+                processor.process_video(local_input, local_output, cvd_type, current_severity, compression_level)
             elif media_type == "pdf":
-                processor.process_pdf(local_input, local_output, cvd_type, current_severity)
+                processor.process_pdf(local_input, local_output, cvd_type, current_severity, compression_level)
             else:
                 import shutil
                 shutil.copy2(local_input, local_output)
@@ -178,12 +200,12 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
 async def upload_media(
     file: UploadFile = File(...),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Validate and store media to S3; Create database record; return job_id.
     """
-    allowed_types = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "application/pdf"]
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "application/pdf"]
     if file.content_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -209,6 +231,10 @@ async def upload_media(
         if file_size > 50 * 1024 * 1024:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
     elif file.content_type == "image/webp" and b"WEBP" in header[8:16]:
+        is_valid_sig = True
+        if file_size > 50 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
+    elif file.content_type == "image/avif" and (b"ftypavif" in header[4:12] or b"avif" in header[8:16]):
         is_valid_sig = True
         if file_size > 50 * 1024 * 1024:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image size exceeds 50MB limit")
@@ -302,7 +328,7 @@ async def process_media(
     request: schemas.MediaProcessRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Trigger server-side AI transformation asynchronously.
@@ -335,12 +361,15 @@ async def process_media(
     job.status = "processing"
     db.commit()
     
+    compression_level = request.compression_level or "medium"
+    
     background_tasks.add_task(
         background_process_media, 
         job_id=job.job_id, 
         s3_key=job.s3_key_original, 
         cvd_type=cvd_type, 
         severity=severity,
+        compression_level=compression_level,
         auto_loop=False
     )
     
@@ -353,7 +382,7 @@ async def process_media(
 async def get_media_status(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Poll actual processing status from the database.
@@ -406,7 +435,7 @@ async def get_media_status(
 async def get_download_url(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Return presigned S3 download URL for completed jobs.
@@ -433,7 +462,7 @@ async def get_download_url(
 async def generate_share_link(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Generate time-limited public share link for completed jobs.
@@ -457,12 +486,23 @@ async def generate_share_link(
 @router.get("/history", response_model=List[schemas.MediaHistoryResponse])
 async def get_media_history(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest),
+    job_ids: Optional[str] = None
 ) -> Any:
     """
     Return upload/processing history for the authenticated user's dashboard.
     """
-    jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id).order_by(MediaJob.created_at.desc()).all()
+    if current_user.id == "guest":
+        if not job_ids:
+            return []
+        job_id_list = [jid.strip() for jid in job_ids.split(",") if jid.strip()]
+        jobs = db.query(MediaJob).filter(MediaJob.job_id.in_(job_id_list), MediaJob.user_id == "guest").order_by(MediaJob.created_at.desc()).all()
+    else:
+        query = db.query(MediaJob).filter(MediaJob.user_id == current_user.id)
+        if job_ids:
+            job_id_list = [jid.strip() for jid in job_ids.split(",") if jid.strip()]
+            query = query.filter(MediaJob.job_id.in_(job_id_list))
+        jobs = query.order_by(MediaJob.created_at.desc()).all()
     
     result = []
     for job in jobs:
@@ -491,7 +531,7 @@ async def get_media_history(
 @router.delete("/clear-all")
 async def clear_all_media(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Delete all media jobs and physical S3 files for the authenticated user.
@@ -520,7 +560,7 @@ async def clear_all_media(
 async def delete_media_job(
     job_id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_or_guest)
 ) -> Any:
     """
     Delete a single media job and its physical files by job ID.

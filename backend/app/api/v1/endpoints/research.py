@@ -26,7 +26,8 @@ def submit_research(
             prior_tool_use=demo.prior_tool_use,
             color_glasses_frequency=demo.color_glasses_frequency,
             web_app_comfort=demo.web_app_comfort,
-            device_use_frequency=demo.device_use_frequency
+            device_use_frequency=demo.device_use_frequency,
+            selected_mode=demo.selected_mode
         )
         db.add(participant)
         db.commit()
@@ -39,6 +40,7 @@ def submit_research(
         task3 = perf.task3 or schemas.VisionTaskPerformanceSchema()
         video = perf.video or schemas.VideoTrackingPerformanceSchema()
         doc = perf.document or schemas.VisionTaskPerformanceSchema()
+        task6 = perf.task6 or schemas.VisionTaskPerformanceSchema()
 
         session_record = models.VisionTestSession(
             participant_id=participant.id,
@@ -68,7 +70,12 @@ def submit_research(
             document_original_time=doc.original_time,
             document_original_correct=doc.original_correct,
             document_corrected_time=doc.corrected_time,
-            document_corrected_correct=doc.corrected_correct
+            document_corrected_correct=doc.corrected_correct,
+
+            task6_original_time=task6.original_time,
+            task6_original_correct=task6.original_correct,
+            task6_corrected_time=task6.corrected_time,
+            task6_corrected_correct=task6.corrected_correct
         )
         db.add(session_record)
 
@@ -198,10 +205,10 @@ def get_research_analytics(
         p_uuid = db.query(models.ResearchParticipant.participant_uuid).filter(
             models.ResearchParticipant.id == s.participant_id
         ).scalar()
-        
         if s.interview_open_feedback or s.interview_frustrating_aspects or s.interview_helpful_aspects:
             feedbacks.append({
                 "participant_uuid": p_uuid[:8] if p_uuid else "unknown",
+                "transitions_feedback": s.interview_visual_transitions,
                 "wizard_feedback": s.interview_wizard_onboarding,
                 "comfort_feedback": s.interview_naturalness,
                 "frustrating": s.interview_frustrating_aspects,
@@ -245,6 +252,16 @@ def get_research_analytics(
         if ses.document_original_correct is not None: task_times["doc_orig_acc"].append(1.0 if ses.document_original_correct else 0.0)
         if ses.document_corrected_correct is not None: task_times["doc_corr_acc"].append(1.0 if ses.document_corrected_correct else 0.0)
 
+        # Task 6 (Orchard Photo MCQ)
+        if hasattr(ses, 'task6_original_time') and ses.task6_original_time is not None: 
+            task_times.setdefault("task6_orig", []).append(ses.task6_original_time)
+        if hasattr(ses, 'task6_corrected_time') and ses.task6_corrected_time is not None: 
+            task_times.setdefault("task6_corr", []).append(ses.task6_corrected_time)
+        if hasattr(ses, 'task6_original_correct') and ses.task6_original_correct is not None: 
+            task_times.setdefault("task6_orig_acc", []).append(1.0 if ses.task6_original_correct else 0.0)
+        if hasattr(ses, 'task6_corrected_correct') and ses.task6_corrected_correct is not None: 
+            task_times.setdefault("task6_corr_acc", []).append(1.0 if ses.task6_corrected_correct else 0.0)
+
     # Compute Averages
     def get_avg(lst):
         return sum(lst) / len(lst) if lst else 0.0
@@ -279,7 +296,52 @@ def get_research_analytics(
             "avg_corrected_time": get_avg(task_times["doc_corr"]),
             "avg_original_accuracy": get_avg(task_times["doc_orig_acc"]),
             "avg_corrected_accuracy": get_avg(task_times["doc_corr_acc"])
+        },
+        "task6": {
+            "avg_original_time": get_avg(task_times.get("task6_orig", [])),
+            "avg_corrected_time": get_avg(task_times.get("task6_corr", [])),
+            "avg_original_accuracy": get_avg(task_times.get("task6_orig_acc", [])),
+            "avg_corrected_accuracy": get_avg(task_times.get("task6_corr_acc", []))
         }
+    }
+
+    # === Out of Survey / Platform Stats ===
+    total_users = db.query(models.User).count()
+    
+    # Vision Profiles split
+    profiles = db.query(models.VisionProfile).all()
+    profile_splits = {}
+    severity_sum = 0.0
+    for p in profiles:
+        profile_splits[p.cvd_type] = profile_splits.get(p.cvd_type, 0) + 1
+        severity_sum += p.severity
+    avg_severity = severity_sum / len(profiles) if profiles else 0.0
+    
+    # Media jobs
+    total_jobs = db.query(models.MediaJob).count()
+    completed_jobs = db.query(models.MediaJob).filter(models.MediaJob.status == "completed").count()
+    media_type_splits_raw = db.query(
+        models.MediaJob.media_type,
+        func.count(models.MediaJob.id)
+    ).group_by(models.MediaJob.media_type).all()
+    media_type_splits = {m_type: count for m_type, count in media_type_splits_raw}
+    
+    # Compliance reports
+    total_reports = db.query(models.ComplianceReport).count()
+    avg_compliance_score = db.query(func.avg(models.ComplianceReport.score)).scalar() or 0.0
+    pass_reports = db.query(models.ComplianceReport).filter(models.ComplianceReport.status == "pass").count()
+    
+    platform_stats = {
+        "total_users": total_users,
+        "total_vision_profiles": len(profiles),
+        "avg_profile_severity": avg_severity,
+        "vision_profile_types": profile_splits,
+        "total_media_jobs": total_jobs,
+        "completed_media_jobs": completed_jobs,
+        "media_type_distributions": media_type_splits,
+        "total_compliance_reports": total_reports,
+        "avg_compliance_score": float(avg_compliance_score),
+        "pass_compliance_reports": pass_reports,
     }
 
     return {
@@ -305,7 +367,8 @@ def get_research_analytics(
             "remapped_comfort": get_avg(comfort_remapped),
             "long_reading": get_avg(comfort_reading)
         },
-        "interview_feedback": feedbacks[:15] # Top 15 logs
+        "interview_feedback": feedbacks[:15], # Top 15 logs
+        "platform_stats": platform_stats
     }
 
 @router.get("/participants", response_model=List[Dict[str, Any]])
@@ -320,9 +383,15 @@ def get_research_participants(
             "uuid": p.participant_uuid,
             "age": p.age,
             "gender": p.gender,
+            "occupation": p.occupation,
+            "education_level": p.education_level,
             "cvd_type": p.cvd_type,
             "is_diagnosed": p.is_diagnosed,
             "prior_tool_use": p.prior_tool_use,
+            "color_glasses_frequency": p.color_glasses_frequency,
+            "web_app_comfort": p.web_app_comfort,
+            "device_use_frequency": p.device_use_frequency,
+            "selected_mode": p.selected_mode,
             "created_at": p.created_at.isoformat() if p.created_at else None
         })
     return res

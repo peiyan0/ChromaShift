@@ -67,8 +67,9 @@ export const mediaService = {
     return response.data;
   },
 
-  getHistory: async (): Promise<MediaHistoryResponse[]> => {
-    const response = await api.get('/media/history');
+  getHistory: async (jobIds?: string[]): Promise<MediaHistoryResponse[]> => {
+    const params = jobIds && jobIds.length > 0 ? { job_ids: jobIds.join(',') } : {};
+    const response = await api.get('/media/history', { params });
     return response.data;
   },
 

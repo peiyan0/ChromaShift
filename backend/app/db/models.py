@@ -10,7 +10,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
@@ -93,6 +93,7 @@ class ResearchParticipant(Base):
     color_glasses_frequency = Column(String, nullable=True)
     web_app_comfort = Column(String, nullable=True)
     device_use_frequency = Column(String, nullable=True)
+    selected_mode = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     sessions = relationship("VisionTestSession", back_populates="participant", cascade="all, delete-orphan")
@@ -130,12 +131,17 @@ class VisionTestSession(Base):
     video_corrected_time = Column(Float, nullable=True)
     video_corrected_clicks = Column(Integer, default=0)
     video_corrected_accuracy = Column(Float, default=0.0)
-
     # Task 5 (PDF Document Comprehension)
     document_original_time = Column(Float, nullable=True)
     document_original_correct = Column(Boolean, nullable=True)
     document_corrected_time = Column(Float, nullable=True)
     document_corrected_correct = Column(Boolean, nullable=True)
+
+    # Task 6 (Orchard Photo MCQ)
+    task6_original_time = Column(Float, nullable=True)
+    task6_original_correct = Column(Boolean, nullable=True)
+    task6_corrected_time = Column(Float, nullable=True)
+    task6_corrected_correct = Column(Boolean, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
