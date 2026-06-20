@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LogoIcon } from '../../components/LogoIcon';
 
 const Register = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -21,10 +21,10 @@ const Register = () => {
     setIsLoading(true);
     setMessage(null);
     try {
-      await api.post('/auth/register', { email, password });
+      await api.post('/auth/register', { username, password });
       setMessage({
         type: 'success',
-        text: 'Account created! Check your email to verify your account.'
+        text: 'Account created!'
       });
       setTimeout(() => {
         navigate('/auth/login');
@@ -117,15 +117,15 @@ const Register = () => {
           {/* Form */}
           <form onSubmit={handleRegister} className="vstack gap-4" style={{ width: '100%' }}>
             <div className="form-group">
-              <label className="label" htmlFor="email">Email address</label>
+              <label className="label" htmlFor="username">Username</label>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
                 className="input"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Enter a username"
               />
             </div>
 

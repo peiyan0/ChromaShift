@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiEye, FiZap, FiShield, FiArrowRight, FiVideo, FiFileText } from 'react-icons/fi';
+import { FiEye, FiZap, FiShield, FiArrowRight, FiVideo, FiFileText, FiSliders } from 'react-icons/fi';
 import { CausticsCanvas } from './backgrounds/CausticsCanvas';
 
 // ─── Animated number counter ──────────────────────────────
@@ -79,8 +79,21 @@ export const LandingPage: React.FC = () => {
   const [contrast, setContrast] = useState(1.0);
   const [saturation, setSaturation] = useState(1.0);
   const [sliderPosition, setSliderPosition] = useState(50);
-  const [activeDemoImage, setActiveDemoImage] = useState('/pie_chart.png');
+  const [activeDemoImage, setActiveDemoImage] = useState('/financial_pie_chart.png');
   const [matrixValues, setMatrixValues] = useState('1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0');
+  const [isCalibrated, setIsCalibrated] = useState(false);
+
+  useEffect(() => {
+    const cached = localStorage.getItem('chromashift_cvd_profile');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.cvd_type) {
+          setIsCalibrated(true);
+        }
+      } catch (_) {}
+    }
+  }, []);
 
   useEffect(() => {
     const rgb2lms = [
@@ -190,36 +203,41 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   const demoImages = [
-    { key: '/pie_chart.png',             label: 'Pie Chart' },
-    { key: '/multi_line_comparison.webp', label: 'Line Graph' },
-    { key: '/heatmap.webp',              label: 'Heatmap' },
+    { key: '/financial_pie_chart.png',             label: 'Pie Chart' },
+    { key: '/financial_multi_line.webp', label: 'Line Graph' },
+    { key: '/temperature_heatmap.png',              label: 'Heatmap' },
   ];
 
   const technicalCredibility = [
     {
       icon: FiZap,
-      title: 'Hardware-Accelerated Engine',
-      body: 'YOLO26-seg runs edge deployment inference alongside real-time WebGL and WebAssembly (WASM) rendering backends.',
+      title: 'Real-Time Color Correction',
+      body: 'Runs instantly on your computer using local browser processing for fast, private remapping.',
     },
     {
       icon: FiVideo,
-      title: 'Optical Flow Video Pipelines',
-      body: 'YOLO26n-seg keyframe analysis + Optical Flow temporal smoothing ensures zero drops and a flicker-free visual experience.',
+      title: 'Flicker-Free Viewing',
+      body: 'Enjoy smooth, color-corrected videos without the flashing and jittering caused by basic tools.',
     },
     {
       icon: FiFileText,
-      title: 'Text-Preserving PDFs',
-      body: 'Object-level extraction selectively recolors charts and infographics while preserving 100% vector text layers.',
+      title: 'Preserves Selectable Text',
+      body: 'Color-corrects documents without rasterizing them, so your screen readers and links still work.',
     },
     {
       icon: FiEye,
-      title: 'Unified LMS Color Math',
-      body: 'Operates in physiologically-accurate linear LMS space with sRGB linearization, gamma-correction stages, and linearRGB SVG interpolation.',
+      title: 'Protects Skin Tones',
+      body: 'While other filters turn faces green or grey, our smart engine only corrects what needs correcting.',
     },
     {
       icon: FiShield,
-      title: 'WCAG 2.1 Auto-Loop',
-      body: 'Iterative loop recursively adjusts parameters until SC 1.4.1, 1.4.3, and 1.4.11 AA contrast thresholds are fully satisfied.',
+      title: 'Smart Charts & Graphs',
+      body: 'Adds physical patterns to data charts so you don\'t rely only on color to read them.',
+    },
+    {
+      icon: FiSliders,
+      title: 'Personalized Vision Tuning',
+      body: 'A quick interactive wizard tunes the screen to your specific eyes, rather than generic presets.',
     },
   ];
 
@@ -278,7 +296,7 @@ export const LandingPage: React.FC = () => {
             maxWidth: '640px',
             margin: '0 auto 40px auto'
           }}>
-            Over 300 million people experience color differently. ChromaShift utilizes an intelligent, local AI model to calibrate and remap digital media specifically for your eyes.
+            Most tools just slap a color filter over your screen. ChromaShift understands what you're looking at—protecting skin tones, preserving text, and tuning exactly to your eyes.
           </p>
 
           <div className="hstack gap-4 animate-slide-up" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -342,6 +360,68 @@ export const LandingPage: React.FC = () => {
         }}>
           <span>Learn how it works</span>
           <span style={{ animation: 'slide-up 1.5s infinite ease-in-out', fontSize: '1.1rem' }}>↓</span>
+        </div>
+      </section>
+
+      {/* ── Quick-Start Roadmap ── */}
+      <section className="container" style={{ maxWidth: '960px', marginTop: '-40px', padding: '0 24px', zIndex: 2, position: 'relative' }}>
+        <div className="card-solid animate-slide-up" style={{
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '32px',
+          boxShadow: 'var(--shadow-lg)'
+        }}>
+          <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--fw-bold)', marginBottom: '24px', textAlign: 'center' }}>
+            Your 3-Step Setup Guide
+          </h3>
+          <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+            {/* Step 1 */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', opacity: isCalibrated ? 0.8 : 1 }}>
+              <div className="hstack gap-2">
+                <span className="badge badge-primary" style={{ borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>1</span>
+                <strong>Color Profile Calibration</strong>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                {isCalibrated ? 'Calibration completed successfully!' : 'Not set up yet. Take a short 2-minute visual test.'}
+              </p>
+              {!isCalibrated ? (
+                <button onClick={() => navigate('/settings')} className="btn btn-sm btn-primary" style={{ alignSelf: 'flex-start' }}>
+                  Calibrate Now
+                </button>
+              ) : (
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 'bold' }}>✓ Active filter remapping loaded</span>
+              )}
+            </div>
+
+            {/* Step 2 */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
+              <div className="hstack gap-2">
+                <span className="badge badge-primary" style={{ borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>2</span>
+                <strong>Upload & Recolour</strong>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Upload any chart, graph, map, or video to process.
+              </p>
+              <button onClick={() => navigate('/upload')} className="btn btn-sm btn-outline" style={{ alignSelf: 'flex-start' }}>
+                Upload Media
+              </button>
+            </div>
+
+            {/* Step 3 */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
+              <div className="hstack gap-2">
+                <span className="badge badge-primary" style={{ borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>3</span>
+                <strong>View & Compare</strong>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Open files in the Media Hub workspace to compare original and corrected colors side-by-side.
+              </p>
+              <button onClick={() => navigate('/hub')} className="btn btn-sm btn-outline" style={{ alignSelf: 'flex-start' }}>
+                Open Media Hub
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -562,10 +642,10 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* HUD badges */}
-            <div className="badge badge-success" style={{ position: 'absolute', left: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'rgba(0, 0, 0, 0.65)', border: 'none', color: 'white' }}>
+            <div className="badge badge-success" style={{ position: 'absolute', left: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'rgba(0, 0, 0, 0.65)', border: 'none', color: 'white', padding: '6px 12px' }}>
               Original
             </div>
-            <div className="badge badge-primary" style={{ position: 'absolute', right: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'var(--primary)', border: 'none', color: 'white' }}>
+            <div className="badge badge-primary" style={{ position: 'absolute', right: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'var(--primary)', border: 'none', color: 'white', padding: '6px 12px' }}>
               Calibrated
             </div>
 
@@ -604,11 +684,11 @@ export const LandingPage: React.FC = () => {
               position: 'relative',
               backgroundColor: 'black'
             }}>
-              <span className="badge badge-primary" style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 6, fontSize: '0.65rem' }}>
+              <span className="badge badge-primary" style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 6, fontSize: '0.65rem', padding: '6px 12px' }}>
                 WebGL Engine
               </span>
               <video
-                src="/chart_infographic.mp4"
+                src="/infographic_motion.mp4"
                 controls
                 autoPlay
                 loop
@@ -655,10 +735,10 @@ export const LandingPage: React.FC = () => {
       }}>
         <div className="container vstack gap-12">
           <div style={{ textAlign: 'center' }}>
-            <span className="badge badge-success" style={{ marginBottom: '16px', padding: '6px 12px' }}>Security & Sovereignty</span>
+            <span className="badge badge-success" style={{ marginBottom: '16px', padding: '6px 12px' }}>Security & Privacy</span>
             <h2>Privacy by Design</h2>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '8px auto 0 auto' }}>
-              We design software for visual independence. That means absolute data minimization at every layer.
+              We protect your data. Your files are processed locally and stored anonymously.
             </p>
           </div>
 
@@ -668,18 +748,18 @@ export const LandingPage: React.FC = () => {
             {[
               {
                 icon: FiShield,
-                title: '7-Day Auto-Expiry',
-                body: 'All processed media artifacts uploaded to the hub are completely purged from storage after 7 days.'
+                title: '7-Day Auto-Delete',
+                body: 'All uploaded media files are automatically and permanently deleted after 7 days.'
               },
               {
                 icon: FiZap,
-                title: 'Local-First GPU Engine',
-                body: 'Calibrating your eyes and processing live visual feeds runs inside your browser using TensorFlow.js.'
+                title: 'Local Processing',
+                body: 'Color correction runs directly inside your browser so your files never leave your device.'
               },
               {
                 icon: FiEye,
                 title: 'Anonymous Profiles',
-                body: 'We store numbers for matrix calibration, never names or personal medical information.'
+                body: 'We save only color calibration values, never names or personal info.'
               }
             ].map((item, index) => (
               <div key={index} className="card-solid" style={{

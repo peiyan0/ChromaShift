@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import { mediaService, type MediaHistoryResponse } from '../services/media';
 import { ComplianceReportModal } from './ComplianceReportModal';
+import { useAuth } from '../context/AuthContext';
 
 const StudioIcon = ({ size = 16 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
@@ -21,6 +22,7 @@ const AuditIcon = ({ size = 16 }) => (
 
 export const DashboardHistory: FC = () => {
   const navigate = useNavigate();
+  const { isGuest } = useAuth();
   
   // App states
   const [history, setHistory] = useState<MediaHistoryResponse[]>([]);
@@ -66,10 +68,22 @@ export const DashboardHistory: FC = () => {
   }, []);
 
   useEffect(() => {
+    // Try to load from session cache first for instant layout preview
+    const cachedHistory = sessionStorage.getItem('chromashift_history_cache');
+    if (cachedHistory) {
+      try {
+        setHistory(JSON.parse(cachedHistory));
+        setIsLoading(false); // Disable loading spinner immediately if cache is available
+      } catch (_) {}
+    }
+
     const fetchHistory = async () => {
       try {
-        const data = await mediaService.getHistory();
+        const isGuestUser = isGuest || !localStorage.getItem('token');
+        const guestJobs = isGuestUser ? JSON.parse(localStorage.getItem('chromashift_guest_jobs') || '[]') : [];
+        const data = await mediaService.getHistory(guestJobs);
         setHistory(data);
+        sessionStorage.setItem('chromashift_history_cache', JSON.stringify(data));
       } catch (error) {
         console.error("Failed to fetch history", error);
       } finally {
@@ -77,7 +91,7 @@ export const DashboardHistory: FC = () => {
       }
     };
     fetchHistory();
-  }, []);
+  }, [isGuest]);
 
   const triggerNotification = (type: 'success' | 'error' | 'info', text: string) => {
     setNotification({ type, text });
@@ -145,7 +159,9 @@ export const DashboardHistory: FC = () => {
     setIsDeleting(true);
     try {
       await mediaService.deleteMedia(jobToDelete);
-      setHistory(prev => prev.filter(item => item.job_id !== jobToDelete));
+      const updated = history.filter(item => item.job_id !== jobToDelete);
+      setHistory(updated);
+      sessionStorage.setItem('chromashift_history_cache', JSON.stringify(updated));
       triggerNotification('success', 'File deleted. Media cleared from active storage.');
     } catch (error) {
       console.error("Deletion failed", error);
@@ -161,6 +177,7 @@ export const DashboardHistory: FC = () => {
     try {
       const res = await mediaService.clearAllMedia();
       setHistory([]);
+      sessionStorage.removeItem('chromashift_history_cache');
       triggerNotification('success', res.message || 'Uploads Cleared. Processed media files purged.');
     } catch (error) {
       console.error("Failed to purge uploads", error);
@@ -286,7 +303,7 @@ export const DashboardHistory: FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
               <h2 style={{ fontFamily: 'var(--font-heading)' }}>Media Hub</h2>
-              <p style={{ fontSize: '0.85rem' }}>Manage, preview, and audit your CVD-remapped files</p>
+              <p style={{ fontSize: '0.85rem' }}>Manage media files.</p>
             </div>
             
             <div className="hstack gap-3" style={{ flexWrap: 'wrap' }}>

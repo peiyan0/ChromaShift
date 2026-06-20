@@ -27,6 +27,15 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [fps, setFps] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Settings ref for real-time requestAnimationFrame access
   const settingsRef = useRef({
@@ -36,7 +45,6 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     isProcessing: false,
   });
 
-  const videoUrlRef = useRef<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const animationFrameIdRef = useRef<number | null>(null);
@@ -56,10 +64,8 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
 
   useEffect(() => {
     // Generate object URL for the local video file
-    videoUrlRef.current = URL.createObjectURL(file);
-    if (videoRef.current) {
-      videoRef.current.src = videoUrlRef.current;
-    }
+    const url = URL.createObjectURL(file);
+    setVideoUrl(url);
 
     const setupTF = async () => {
       try {
@@ -94,9 +100,7 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     initProcessor();
 
     return () => {
-      if (videoUrlRef.current) {
-        URL.revokeObjectURL(videoUrlRef.current);
-      }
+      URL.revokeObjectURL(url);
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
@@ -321,6 +325,8 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
       video.play().then(() => {
         setIsPlaying(true);
         startRenderLoop();
+      }).catch(err => {
+        console.error("Safari play error:", err);
       });
     }
   };
@@ -387,6 +393,8 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
     video.play().then(() => {
       setIsPlaying(true);
       startRenderLoop();
+    }).catch(err => {
+      console.error("Safari export play error:", err);
     });
   };
 
@@ -441,14 +449,16 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
       <div 
         style={{
           background: 'var(--primary-gradient)',
-          padding: '16px 24px',
+          padding: isMobile ? '16px 16px' : '16px 24px',
           color: 'white',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}
       >
-        <div className="hstack gap-3">
+        <div className="hstack gap-3" style={{ flexWrap: 'wrap' }}>
           <FiCpu size={24} style={{ color: '#fbbf24' }} />
           <div className="vstack" style={{ alignItems: 'flex-start' }}>
             <h3 style={{ margin: 0, color: 'white', fontFamily: 'var(--font-heading)', fontSize: '1.05rem' }}>Local GPU Video Remapper</h3>
@@ -464,7 +474,7 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
         </button>
       </div>
 
-      <div style={{ padding: '24px' }} className="vstack gap-6">
+      <div style={{ padding: isMobile ? '16px' : '24px' }} className="vstack gap-6">
         
         {errorMsg && (
           <div className="badge badge-error" style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-sm)', textTransform: 'none', display: 'flex', gap: '8px' }}>
@@ -518,11 +528,12 @@ export const ClientSideVideoProcessor: React.FC<ClientSideVideoProcessorProps> =
               {/* Native video tag */}
               <video
                 ref={videoRef}
+                src={videoUrl || undefined}
                 playsInline
                 muted
                 preload="auto"
                 crossOrigin="anonymous"
-                style={{ display: 'none' }}
+                style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none' }}
                 onEnded={() => {
                   setIsPlaying(false);
                   if (!isProcessing) stopRenderLoop();

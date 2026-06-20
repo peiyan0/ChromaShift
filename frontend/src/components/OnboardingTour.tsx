@@ -18,48 +18,73 @@ export const OnboardingTour: React.FC = () => {
     {
       target: 'header',
       title: 'Welcome to ChromaShift!',
-      content: 'Let\'s take a quick tour to show you how to calibrate and view media correctly.',
+      content: 'Let\'s set up your personalized color filters in a few quick steps.',
       route: '/'
     },
     {
       target: 'nav-settings',
-      title: '1. Diagnose Vision',
-      content: 'Click "Test Vision" to diagnose your color vision parameters and save your personalized vision corrections profile.',
-      route: '/'
+      title: '1. Color Profile',
+      content: 'Take a quick test to calibrate colors specifically for your eyes.',
+      route: '/settings'
     },
     {
       target: 'nav-upload',
-      title: '2. Upload Files',
-      content: 'Go to the "Upload" tab to process images, videos, or PDF documents locally using our segment-aware AI.',
-      route: '/'
+      title: '2. Upload Media',
+      content: 'Upload any image or video to adjust its colors instantly.',
+      route: '/upload'
     },
     {
       target: 'nav-hub',
-      title: '3. View Processed Files',
-      content: 'Access your calibrated assets at any time in the "Media Hub" dashboard.',
-      route: '/'
+      title: '3. Media Hub',
+      content: 'Access all your adjusted files and reports in one place.',
+      route: '/hub'
     },
     {
-      target: 'nav-test-vision',
+      target: 'nav-metrics',
       title: '4. Visual Metrics',
-      content: 'Review quantitative data checks, color diagnostic patterns, and performance metrics inside "Visual Metrics".',
-      route: '/'
+      content: 'Test your speed and accuracy with and without filters.',
+      route: '/test-vision'
     },
     {
       target: 'nav-survey',
-      title: '5. Usability Survey & Feedback',
-      content: 'Submit demographic details, SUS confidence scores, and task ratings using the "Usability Survey" tab.',
-      route: '/'
+      title: '5. Usability Survey',
+      content: 'Provide your final feedback on the platform.',
+      route: '/survey'
     }
   ];
 
   useEffect(() => {
-    const hasCompletedTour = localStorage.getItem('chromashift_onboarding_completed');
-    if (!hasCompletedTour && location.pathname === '/') {
+    const checkTour = () => {
+      const hasCompletedTour = localStorage.getItem('chromashift_onboarding_completed');
+      if (!hasCompletedTour) {
+        const stepIndex = steps.findIndex(
+          s => s.route === location.pathname || (s.route === '/auth/login' && location.pathname === '/auth/register')
+        );
+        if (stepIndex !== -1) {
+          setCurrentStep(stepIndex);
+          setVisible(true);
+        } else {
+          setVisible(false);
+        }
+      }
+    };
+
+    checkTour();
+
+    const handleStartTour = () => {
+      localStorage.removeItem('chromashift_onboarding_completed');
       setCurrentStep(0);
       setVisible(true);
-    }
-  }, [location.pathname]);
+      if (location.pathname !== '/') {
+        navigate('/');
+      }
+    };
+
+    window.addEventListener('chromashift_start_tour', handleStartTour);
+    return () => {
+      window.removeEventListener('chromashift_start_tour', handleStartTour);
+    };
+  }, [location.pathname, navigate]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {

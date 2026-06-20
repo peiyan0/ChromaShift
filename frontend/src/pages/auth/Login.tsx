@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LogoIcon } from '../../components/LogoIcon';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -22,7 +22,7 @@ const Login = () => {
     setMessage(null);
     try {
       const formData = new URLSearchParams();
-      formData.append('username', email);
+      formData.append('username', username);
       formData.append('password', password);
       const response = await api.post('/auth/login', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -120,15 +120,15 @@ const Login = () => {
           {/* Form */}
           <form onSubmit={handleLogin} className="vstack gap-4" style={{ width: '100%' }}>
             <div className="form-group">
-              <label className="label" htmlFor="email">Email address</label>
+              <label className="label" htmlFor="username">Username</label>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
                 className="input"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Enter your username"
               />
             </div>
 

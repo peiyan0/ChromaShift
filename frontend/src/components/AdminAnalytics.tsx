@@ -15,6 +15,44 @@ export const AdminAnalytics: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [cvdFilter, setCvdFilter] = useState<string>('all');
+
+  const filteredParticipants = participants.filter((p) => {
+    const matchesSearch = p.uuid.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (p.occupation && p.occupation.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCvd = cvdFilter === 'all' || p.cvd_type?.toLowerCase() === cvdFilter.toLowerCase();
+    return matchesSearch && matchesCvd;
+  });
+
+  const handleExportCSV = () => {
+    if (participants.length === 0) return;
+    const headers = ['UUID', 'Age', 'Gender', 'Occupation', 'Education Level', 'CVD Type', 'Diagnosed', 'Prior Tool', 'Glasses Freq', 'App Comfort', 'Device Freq', 'Date'];
+    const rows = participants.map(p => [
+      p.uuid,
+      p.age,
+      p.gender,
+      p.occupation || 'N/A',
+      p.education_level || 'N/A',
+      p.cvd_type,
+      p.is_diagnosed,
+      p.prior_tool_use,
+      p.color_glasses_frequency || 'N/A',
+      p.web_app_comfort || 'N/A',
+      p.device_use_frequency || 'N/A',
+      new Date(p.created_at).toLocaleDateString()
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `chromashift_registry_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerNotification('success', 'CSV Registry exported successfully!');
+  };
 
   const triggerNotification = (type: 'success' | 'error', text: string) => {
     setNotification({ type, text });
@@ -191,9 +229,14 @@ export const AdminAnalytics: React.FC = () => {
               </h2>
             </div>
           </div>
-          <button className="btn btn-outline" onClick={fetchAnalytics}>
-            <FiRefreshCw /> Sync Telemetry
-          </button>
+          <div className="hstack gap-3" style={{ flexWrap: 'wrap' }}>
+            <button className="btn btn-outline" onClick={handleExportCSV}>
+              Export Registry to CSV
+            </button>
+            <button className="btn btn-outline" onClick={fetchAnalytics}>
+              <FiRefreshCw /> Sync Telemetry
+            </button>
+          </div>
         </div>
 
         <div className="divider" />
@@ -248,7 +291,7 @@ export const AdminAnalytics: React.FC = () => {
         </div>
 
         {/* Level 2: Performance Delta (Stopwatch speedups) */}
-        <div className="card-solid vstack gap-4" style={{ width: '100%', border: '1px solid var(--border-primary)' }}>
+        <div className="card-solid vstack gap-4" style={{ width: '100%', border: '1px solid var(--border-primary)', padding: 'var(--space-6)' }}>
           <div className="hstack gap-2" style={{ color: 'var(--primary)', fontWeight: '700' }}>
             <FiClock />
             <span style={{ fontSize: '0.875rem', textTransform: 'uppercase' }}>Programmatic Speed & Accuracy Gains (Original vs. Corrected)</span>
@@ -266,7 +309,9 @@ export const AdminAnalytics: React.FC = () => {
           >
             {Object.keys(data.task_performance).map((taskKey) => {
               const task = data.task_performance[taskKey];
-              const speedup = task.avg_original_time > 0 ? (task.avg_original_time / task.avg_corrected_time).toFixed(1) : '1.0';
+              const speedup = (task.avg_original_time > 0 && task.avg_corrected_time > 0)
+                ? (task.avg_original_time / task.avg_corrected_time).toFixed(1)
+                : '1.0';
               
               let label = '';
               if (taskKey === 'task1') label = 'Line Graph';
@@ -274,6 +319,7 @@ export const AdminAnalytics: React.FC = () => {
               else if (taskKey === 'task3') label = 'Node Alerts';
               else if (taskKey === 'video') label = 'Video Tracking';
               else if (taskKey === 'document') label = 'PDF Shading';
+              else if (taskKey === 'task6') label = 'Fruit Spotting';
 
               return (
                 <div 
@@ -309,6 +355,134 @@ export const AdminAnalytics: React.FC = () => {
             })}
           </div>
         </div>
+
+        {/* Level 2.5: Visual Comfort Dimensions Assessment */}
+        <div className="card-solid vstack gap-4" style={{ width: '100%', border: '1px solid var(--border-primary)', padding: 'var(--space-6)' }}>
+          <div className="hstack gap-2" style={{ color: 'var(--color-success)', fontWeight: '700' }}>
+            <FiHeart />
+            <span style={{ fontSize: '0.875rem', textTransform: 'uppercase' }}>Visual Comfort Assessment Ratings (1.0 to 5.0)</span>
+          </div>
+
+          <div className="divider" style={{ margin: 'var(--space-2) 0' }} />
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 'var(--space-4)',
+              width: '100%'
+            }}
+          >
+            {[
+              { label: 'Overall Session Comfort', value: data.visual_comfort.dry_eyes_comfort, icon: '😊' },
+              { label: 'Eye Strain & Fatigue (Inverse)', value: data.visual_comfort.strain_fatigue, icon: '👁️' },
+              { label: 'Headaches (Inverse)', value: data.visual_comfort.headaches, icon: '🤕' },
+              { label: 'Remapped Media Comfort', value: data.visual_comfort.remapped_comfort, icon: '🎨' },
+              { label: 'Long Reading Durations', value: data.visual_comfort.long_reading, icon: '📖' }
+            ].map((comfort, i) => (
+              <div 
+                key={i} 
+                className="card vstack gap-2"
+                style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  padding: 'var(--space-4)',
+                  alignItems: 'center',
+                  textAlign: 'center'
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>{comfort.icon}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>{comfort.label}</span>
+                <strong style={{ fontSize: '1.5rem', color: 'var(--text-primary)' }}>
+                  {comfort.value?.toFixed(1)} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>/ 5.0</span>
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Level 2.6: Platform Usage & S3 Compliance Telemetry */}
+        {data.platform_stats && (
+          <div className="card-solid vstack gap-4" style={{ width: '100%', border: '1px solid var(--border-primary)', padding: 'var(--space-6)' }}>
+            <div className="hstack gap-2" style={{ color: 'var(--primary)', fontWeight: '700' }}>
+              <FiSettings />
+              <span style={{ fontSize: '0.875rem', textTransform: 'uppercase' }}>Platform Usage & S3 Compliance Telemetry (Out of Survey)</span>
+            </div>
+
+            <div className="divider" style={{ margin: 'var(--space-2) 0' }} />
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 'var(--space-4)',
+                width: '100%'
+              }}
+            >
+              {/* Users & Profiles */}
+              <div className="card vstack gap-2" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>User Accounts</span>
+                <div className="vstack gap-1" style={{ fontSize: '0.85rem' }}>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Registered Accounts:</span>
+                    <strong>{data.platform_stats.total_users}</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Active Calibration Profiles:</span>
+                    <strong>{data.platform_stats.total_vision_profiles}</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Avg Profile Severity:</span>
+                    <strong>{(data.platform_stats.avg_profile_severity * 100).toFixed(0)}%</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Media Processing */}
+              <div className="card vstack gap-2" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Media Processing</span>
+                <div className="vstack gap-1" style={{ fontSize: '0.85rem' }}>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Uploads (Jobs):</span>
+                    <strong>{data.platform_stats.total_media_jobs}</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Processed (Completed):</span>
+                    <strong>{data.platform_stats.completed_media_jobs}</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Images/Videos/PDFs:</span>
+                    <strong>
+                      {data.platform_stats.media_type_distributions.image || 0} / {data.platform_stats.media_type_distributions.video || 0} / {data.platform_stats.media_type_distributions.pdf || 0}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Compliance Stats */}
+              <div className="card vstack gap-2" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>S3 Compliance Auditing</span>
+                <div className="vstack gap-1" style={{ fontSize: '0.85rem' }}>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Audits Generated:</span>
+                    <strong>{data.platform_stats.total_compliance_reports}</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Average Compliance Score:</span>
+                    <strong>{data.platform_stats.avg_compliance_score?.toFixed(1)}%</strong>
+                  </div>
+                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Audit Pass Rate:</span>
+                    <strong>
+                      {data.platform_stats.total_compliance_reports > 0 
+                        ? `${Math.round((data.platform_stats.pass_compliance_reports / data.platform_stats.total_compliance_reports) * 100)}%` 
+                        : '100%'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Level 3: Workloads (NASA TLX) & Demographics Splits */}
         <div
@@ -462,7 +636,7 @@ export const AdminAnalytics: React.FC = () => {
                 >
                   <div>
                     <strong style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 'var(--space-1)' }}>Flicker/Transitions:</strong>
-                    <span style={{ color: 'var(--text-primary)' }}>{f.wizard_feedback || 'No comments'}</span>
+                    <span style={{ color: 'var(--text-primary)' }}>{f.transitions_feedback || 'No comments'}</span>
                   </div>
                   <div>
                     <strong style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 'var(--space-1)' }}>Color Fidelity:</strong>
@@ -479,7 +653,7 @@ export const AdminAnalytics: React.FC = () => {
                 </div>
                 <div style={{ borderTop: '1px dashed var(--border-primary)', paddingTop: 'var(--space-2)', fontSize: '0.75rem' }}>
                   <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: 'var(--space-1)' }}>Surprise Discoveries & Recommendations:</strong>
-                  <span style={{ color: 'var(--color-success)', fontStyle: 'italic' }}>"{f.general || 'No recommendations'}"</span>
+                  <span style={{ color: 'var(--color-success)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>"{f.general || 'No recommendations'}"</span>
                 </div>
               </div>
             ))}
@@ -495,6 +669,47 @@ export const AdminAnalytics: React.FC = () => {
 
           <div className="divider" style={{ margin: '0' }} />
 
+          {/* Search and Filter Row */}
+          <div className="hstack gap-4" style={{ flexWrap: 'wrap', width: '100%', padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)', margin: 'var(--space-4) 0' }}>
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <input
+                type="text"
+                placeholder="Search by UUID or occupation..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+            </div>
+            <div>
+              <select
+                value={cvdFilter}
+                onChange={(e) => setCvdFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  width: '180px'
+                }}
+              >
+                <option value="all">All CVD Types</option>
+                <option value="normal">Normal Vision</option>
+                <option value="deuteran">Deuteran</option>
+                <option value="protan">Protan</option>
+                <option value="tritan">Tritan</option>
+                <option value="unsure">Unsure / None</option>
+              </select>
+            </div>
+          </div>
+
           <div style={{ overflowX: 'auto', width: '100%' }}>
             <table 
               style={{ 
@@ -509,14 +724,17 @@ export const AdminAnalytics: React.FC = () => {
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Participant UUID</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Age</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Gender</th>
+                  <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Occupation</th>
+                  <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Education</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>CVD Type</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Diagnosed Status</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Prior Tool</th>
+                  <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Mode</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-secondary)', fontWeight: '700' }}>Intake Date</th>
                 </tr>
               </thead>
               <tbody>
-                {participants.map((p) => (
+                {filteredParticipants.map((p) => (
                   <tr 
                     key={p.uuid} 
                     style={{ borderBottom: '1px solid var(--border-primary)', transition: 'background-color var(--transition-fast)' }}
@@ -530,9 +748,16 @@ export const AdminAnalytics: React.FC = () => {
                     </td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)' }}>{p.age}</td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)', textTransform: 'capitalize' }}>{p.gender}</td>
+                    <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)' }}>{p.occupation || 'N/A'}</td>
+                    <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)' }}>{p.education_level || 'N/A'}</td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)', textTransform: 'capitalize' }}>{p.cvd_type}</td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)' }}>{p.is_diagnosed}</td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)', textTransform: 'capitalize' }}>{p.prior_tool_use}</td>
+                    <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-primary)' }}>
+                      <span className={`badge ${p.selected_mode === 'sandbox' ? 'badge-secondary' : 'badge-primary'}`} style={{ textTransform: 'capitalize', fontSize: '0.7rem', padding: '2px 6px' }}>
+                        {p.selected_mode || 'study'}
+                      </span>
+                    </td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                       {new Date(p.created_at).toLocaleDateString()}
                     </td>

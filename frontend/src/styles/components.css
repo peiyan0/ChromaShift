@@ -295,3 +295,190 @@
   border-bottom: 1px solid var(--border-glass);
   transition: background-color var(--transition-normal);
 }
+/* Responsive Layout overrides */
+.main-layout {
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 1024px) {
+  .main-layout {
+    flex-direction: row;
+  }
+}
+
+.sidebar-container {
+  width: 100%;
+  position: static;
+  height: auto;
+  border-bottom: 1px solid var(--border-primary);
+  border-right: none;
+}
+@media (min-width: 1024px) {
+  .sidebar-container {
+    width: auto;
+    position: sticky;
+    top: 64px;
+    height: calc(100vh - 64px);
+    border-bottom: none;
+    border-right: 1px solid var(--border-primary);
+  }
+}
+
+.workflow-sidebar-content {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--bg-secondary);
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-content {
+    flex-direction: column;
+    width: 280px;
+    min-width: 240px;
+    height: 100%;
+    padding: 24px 16px;
+  }
+}
+
+.workflow-sidebar-step {
+  flex: 0 0 auto;
+  width: auto;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-step {
+    width: 100%;
+  }
+}
+
+.workflow-sidebar-title {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-title {
+    display: block;
+  }
+}
+
+.workflow-sidebar-footer {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-footer {
+    display: block;
+    margin-top: auto;
+  }
+}
+
+.workflow-sidebar-content::-webkit-scrollbar {
+  display: none;
+}
+.workflow-sidebar-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.workflow-sidebar-steps {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  flex: 1;
+}
+
+@media (min-width: 1024px) {
+  .workflow-sidebar-steps {
+    flex-direction: column;
+  }
+}
+
+/* Compact mobile overrides for sidebar */
+.workflow-sidebar-desc {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-desc {
+    display: block;
+  }
+}
+
+.workflow-sidebar-step {
+  padding: 8px 12px !important;
+  gap: 8px !important;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-step {
+    padding: 12px 16px !important;
+    gap: 12px !important;
+  }
+}
+
+.workflow-sidebar-label {
+  font-size: 0.75rem !important;
+}
+@media (min-width: 1024px) {
+  .workflow-sidebar-label {
+    font-size: 0.85rem !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .workflow-sidebar-content {
+    padding: 12px 8px;
+    overflow-x: hidden;
+  }
+  .workflow-sidebar-steps {
+    justify-content: space-between;
+    gap: 4px;
+    flex-wrap: wrap;
+    overflow-x: hidden;
+    width: 100%;
+  }
+}
+/* Hide labels entirely on mobile for a clean, non-scrolling icon progress bar */
+@media (max-width: 1023px) {
+  .workflow-sidebar-label {
+    display: none !important;
+  }
+  .workflow-sidebar-content {
+    padding: 12px 16px !important;
+    overflow: hidden !important;
+  }
+  .workflow-sidebar-steps {
+    justify-content: space-around !important;
+    gap: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+  }
+  .workflow-sidebar-step {
+    padding: 8px !important;
+    gap: 0 !important;
+  }
+}
+/* Update mobile sidebar: Icon above text to fit all 5 steps tightly on screen */
+@media (max-width: 1023px) {
+  .workflow-sidebar-label {
+    display: block !important;
+    font-size: 0.65rem !important;
+    white-space: normal !important;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .workflow-sidebar-content {
+    padding: 12px 8px !important;
+  }
+  .workflow-sidebar-steps {
+    justify-content: space-between !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+  }
+  .workflow-sidebar-step {
+    flex-direction: column !important;
+    padding: 8px 4px !important;
+    gap: 6px !important;
+    width: 20% !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: center !important;
+  }
+}

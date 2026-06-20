@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiTrendingUp, FiLock, FiMail, FiX } from 'react-icons/fi';
+import { FiTrendingUp, FiLock, FiUser, FiX } from 'react-icons/fi';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,10 +9,12 @@ interface PromoteModalProps {
 }
 
 export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isUsernameFocused, setIsUsernameFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const { promote } = useAuth();
 
   if (!isOpen) return null;
@@ -24,7 +26,7 @@ export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) =
     try {
       // Call backend promote endpoint
       await api.post('/auth/promote', {
-        email,
+        username,
         password,
       });
 
@@ -142,24 +144,28 @@ export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) =
 
           <div className="vstack gap-4">
             <div className="form-group">
-              <label className="label" htmlFor="email-input">Email Address</label>
+              <label className="label" htmlFor="username-input">Username</label>
               <div className="hstack gap-2" style={{
-                border: '1px solid var(--border-primary)',
+                border: isUsernameFocused ? '1px solid var(--primary)' : '1px solid var(--border-primary)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '0 12px',
                 backgroundColor: 'var(--bg-secondary)',
-                width: '100%'
+                width: '100%',
+                boxShadow: isUsernameFocused ? '0 0 0 3px var(--primary-glow)' : 'none',
+                transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)'
               }}>
-                <FiMail size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <FiUser size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                 <input
-                  id="email-input"
-                  type="email"
+                  id="username-input"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a username"
                   className="input"
-                  style={{ border: 'none', backgroundColor: 'transparent', padding: '10px 0' }}
+                  style={{ border: 'none', backgroundColor: 'transparent', padding: '10px 0', outline: 'none', boxShadow: 'none' }}
+                  onFocus={() => setIsUsernameFocused(true)}
+                  onBlur={() => setIsUsernameFocused(false)}
                 />
               </div>
             </div>
@@ -167,11 +173,13 @@ export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) =
             <div className="form-group">
               <label className="label" htmlFor="password-input">Password</label>
               <div className="hstack gap-2" style={{
-                border: '1px solid var(--border-primary)',
+                border: isPasswordFocused ? '1px solid var(--primary)' : '1px solid var(--border-primary)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '0 12px',
                 backgroundColor: 'var(--bg-secondary)',
-                width: '100%'
+                width: '100%',
+                boxShadow: isPasswordFocused ? '0 0 0 3px var(--primary-glow)' : 'none',
+                transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)'
               }}>
                 <FiLock size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                 <input
@@ -183,7 +191,9 @@ export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) =
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
                   className="input"
-                  style={{ border: 'none', backgroundColor: 'transparent', padding: '10px 0' }}
+                  style={{ border: 'none', backgroundColor: 'transparent', padding: '10px 0', outline: 'none', boxShadow: 'none' }}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
                 />
               </div>
             </div>
@@ -207,7 +217,7 @@ export const PromoteModal: React.FC<PromoteModalProps> = ({ isOpen, onClose }) =
           color: 'var(--text-muted)',
           textAlign: 'center'
         }}>
-          By promoting, all current guest files and profiles are immediately bound to this email.
+          By promoting, all current guest files and profiles are immediately bound to this username.
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ import api from '../services/api';
 import { aiPreviewService } from '../services/ai_preview';
 import { 
   FiArrowLeft, FiColumns, FiMaximize2, FiDownload, FiShare2, 
-  FiRefreshCw, FiAlertTriangle, FiAlertCircle, FiExternalLink 
+  FiRefreshCw, FiAlertTriangle, FiAlertCircle, FiExternalLink, FiTrash2
 } from 'react-icons/fi';
 
 export const WorkspaceStudio: React.FC = () => {
@@ -21,9 +21,87 @@ export const WorkspaceStudio: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSharing, setIsSharing] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<'side-by-side' | 'toggle'>('side-by-side');
+  
+  // Processing status messages
+  const processingMessages = [
+    "Uploading file securely to cloud storage...",
+    "Analyzing image structure and color matrices...",
+    "Applying Daltonization color transformation algorithms...",
+    "Optimizing contrast for accessibility...",
+    "Finalizing image processing...",
+    "Generating compliance report..."
+  ];
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
+  useEffect(() => {
+    if (status?.status === 'processing' || status?.status === 'uploaded') {
+      const interval = setInterval(() => {
+        setLoadingMessageIndex(prev => (prev + 1) % processingMessages.length);
+      }, 3500);
+      return () => clearInterval(interval);
+    }
+  }, [status?.status]);
+  
+  // Image Zoom & Pan States
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 4));
+  const handleZoomOut = () => {
+    setZoomLevel(prev => {
+      const next = Math.max(prev - 0.25, 1);
+      if (next === 1) setPanOffset({ x: 0, y: 0 });
+      return next;
+    });
+  };
+  const resetZoom = () => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel <= 1) return;
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    setPanOffset({
+      x: e.clientX - dragStart.current.x,
+      y: e.clientY - dragStart.current.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (zoomLevel <= 1 || e.touches.length !== 1) return;
+    setIsDragging(true);
+    const touch = e.touches[0];
+    dragStart.current = { x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || zoomLevel <= 1 || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setPanOffset({
+      x: touch.clientX - dragStart.current.x,
+      y: touch.clientY - dragStart.current.y
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
   const [toggleActive, setToggleActive] = useState<'original' | 'processed'>('processed');
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
@@ -49,9 +127,12 @@ export const WorkspaceStudio: React.FC = () => {
   const processedVideoRef = useRef<HTMLVideoElement>(null);
   const isSyncing = useRef<boolean>(false);
   const [aiMaskStatus, setAiMaskStatus] = useState<string>('pending');
+  const maskInitiated = useRef<boolean>(false);
 
   useEffect(() => {
     if (jobId) {
+      maskInitiated.current = false;
+      setAiMaskStatus('pending');
       loadWorkspace();
     }
   }, [jobId]);
@@ -112,7 +193,8 @@ export const WorkspaceStudio: React.FC = () => {
       const statusRes = await mediaService.getMediaStatus(jobId);
       setStatus(statusRes);
       
-      if (statusRes.download_url_original) {
+      if (statusRes.download_url_original && !maskInitiated.current) {
+        maskInitiated.current = true;
         setAiMaskStatus('generating');
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -246,6 +328,21 @@ export const WorkspaceStudio: React.FC = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!jobId) return;
+    if (!window.confirm("Are you sure you want to permanently delete this uploaded file? This action cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await mediaService.deleteMedia(jobId);
+      triggerNotification('success', 'File deleted. Media cleared from active storage.');
+      navigate('/hub');
+    } catch (err) {
+      triggerNotification('error', 'Failed to delete file');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleExportReport = async () => {
     if (!jobId) return;
     try {
@@ -306,6 +403,21 @@ export const WorkspaceStudio: React.FC = () => {
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
           Our server-side pipeline is applying semantic corrections for your vision deficiency. This will complete in a moment.
         </p>
+        <div 
+          style={{ 
+            fontSize: '0.8rem', 
+            color: 'var(--primary)', 
+            fontWeight: '600', 
+            fontStyle: 'italic',
+            backgroundColor: 'var(--primary-glow)',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px dashed var(--primary)',
+            animation: 'pulse 2s infinite ease-in-out'
+          }}
+        >
+          {processingMessages[loadingMessageIndex]}
+        </div>
         <button onClick={() => loadWorkspace()} className="btn btn-outline">
           <FiRefreshCw size={14} />
           <span>Check Status</span>
@@ -328,6 +440,18 @@ export const WorkspaceStudio: React.FC = () => {
       </div>
     );
   }
+
+  const getFilterStyle = (isProcessed: boolean) => {
+    if (!isProcessed) return 'none';
+    if (selectedPreviewCvd !== 'profile') {
+      return `url(#sim-${selectedPreviewCvd})`;
+    }
+    
+    const contrast = profile?.contrast_multiplier !== undefined ? profile.contrast_multiplier : 1.0;
+    const saturate = profile?.saturation_multiplier !== undefined ? profile.saturation_multiplier : 1.0;
+    
+    return `contrast(${contrast}) saturate(${saturate})`;
+  };
 
   return (
     <>
@@ -357,14 +481,14 @@ export const WorkspaceStudio: React.FC = () => {
       {/* Hidden simulator SVG filters */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true" focusable="false">
         <defs>
-          <filter id="sim-deuteranopia">
-            <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0" />
+          <filter id="sim-deuteranopia" colorInterpolationFilters="linearRGB">
+            <feColorMatrix type="matrix" values="0.41563 0.58437 0 0 0  0.41563 0.58437 0 0 0  -0.04239 0.04239 1 0 0  0 0 0 1 0" />
           </filter>
-          <filter id="sim-protanopia">
-            <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0" />
+          <filter id="sim-protanopia" colorInterpolationFilters="linearRGB">
+            <feColorMatrix type="matrix" values="0.06857 0.93143 0 0 0  0.06857 0.93143 0 0 0  0.01365 -0.01365 1 0 0  0 0 0 1 0" />
           </filter>
-          <filter id="sim-tritanopia">
-            <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0" />
+          <filter id="sim-tritanopia" colorInterpolationFilters="linearRGB">
+            <feColorMatrix type="matrix" values="1 -0.02323 0.02323 0 0  0 1.0003 -0.0003 0 0  0 1.0003 -0.0003 0 0  0 0 0 1 0" />
           </filter>
         </defs>
       </svg>
@@ -391,8 +515,8 @@ export const WorkspaceStudio: React.FC = () => {
             <FiArrowLeft size={18} />
           </button>
           
-          <div className="vstack gap-1" style={{ alignItems: 'flex-start' }}>
-            <div className="hstack gap-2">
+          <div className="vstack gap-1" style={{ alignItems: 'flex-start', flex: 1, minWidth: '200px' }}>
+            <div className="hstack gap-2" style={{ flexWrap: 'wrap' }}>
               <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{fileName}</strong>
               <span className="badge badge-primary" style={{ padding: '4px 8px' }}>{mediaType.toUpperCase()}</span>
               {aiMaskStatus === 'complete' && <span className="badge badge-success" style={{ fontSize: '0.6rem', padding: '4px 8px' }}>AI Mask Active</span>}
@@ -402,34 +526,70 @@ export const WorkspaceStudio: React.FC = () => {
           </div>
         </div>
 
-        {/* View Mode Toggle Buttons */}
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
-          <button
-            onClick={() => setDisplayMode('side-by-side')}
-            className="btn btn-sm"
-            style={{
-              backgroundColor: displayMode === 'side-by-side' ? 'var(--bg-primary)' : 'transparent',
-              border: displayMode === 'side-by-side' ? '1px solid var(--border-primary)' : 'none',
-              color: 'var(--text-primary)',
-              boxShadow: displayMode === 'side-by-side' ? 'var(--shadow-sm)' : 'none'
-            }}
-          >
-            <FiColumns size={14} />
-            <span>Side-by-Side</span>
-          </button>
-          <button
-            onClick={() => setDisplayMode('toggle')}
-            className="btn btn-sm"
-            style={{
-              backgroundColor: displayMode === 'toggle' ? 'var(--bg-primary)' : 'transparent',
-              border: displayMode === 'toggle' ? '1px solid var(--border-primary)' : 'none',
-              color: 'var(--text-primary)',
-              boxShadow: displayMode === 'toggle' ? 'var(--shadow-sm)' : 'none'
-            }}
-          >
-            <FiMaximize2 size={14} />
-            <span>Overlay Toggle</span>
-          </button>
+        {/* View Mode Toggle & Action Buttons Container */}
+        <div className="hstack gap-3" style={{ flexWrap: 'wrap' }}>
+          {/* View Mode Toggle Buttons */}
+          <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+            <button
+              onClick={() => setDisplayMode('side-by-side')}
+              className="btn btn-sm"
+              style={{
+                backgroundColor: displayMode === 'side-by-side' ? 'var(--bg-primary)' : 'transparent',
+                border: displayMode === 'side-by-side' ? '1px solid var(--border-primary)' : 'none',
+                color: 'var(--text-primary)',
+                boxShadow: displayMode === 'side-by-side' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              <FiColumns size={14} />
+              <span>Side-by-Side</span>
+            </button>
+            <button
+              onClick={() => setDisplayMode('toggle')}
+              className="btn btn-sm"
+              style={{
+                backgroundColor: displayMode === 'toggle' ? 'var(--bg-primary)' : 'transparent',
+                border: displayMode === 'toggle' ? '1px solid var(--border-primary)' : 'none',
+                color: 'var(--text-primary)',
+                boxShadow: displayMode === 'toggle' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              <FiMaximize2 size={14} />
+              <span>Overlay Toggle</span>
+            </button>
+          </div>
+
+          {/* Action Buttons: Download, Share, Delete */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleDownload}
+              className="btn btn-sm btn-outline"
+              title="Download file"
+            >
+              <FiDownload size={14} />
+              <span>Download</span>
+            </button>
+            
+            <button
+              onClick={handleShare}
+              disabled={isSharing}
+              className="btn btn-sm btn-outline"
+              title="Copy share link"
+            >
+              {isSharing ? <FiRefreshCw size={14} className="animate-spin" /> : <FiShare2 size={14} />}
+              <span>{isSharing ? 'Sharing...' : 'Share'}</span>
+            </button>
+
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="btn btn-sm btn-outline"
+              style={{ color: 'var(--color-error)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              title="Delete file permanently"
+            >
+              {isDeleting ? <FiRefreshCw size={14} className="animate-spin" /> : <FiTrash2 size={14} />}
+              <span>Delete</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -445,7 +605,7 @@ export const WorkspaceStudio: React.FC = () => {
           className="card-solid"
           style={{
             gridColumn: displayMode === 'side-by-side' ? 'span 12' : 'span 8',
-            padding: '24px',
+            padding: isMobile ? '12px' : '24px',
             border: '1px solid var(--border-primary)',
             boxShadow: 'var(--shadow-sm)',
             display: 'flex',
@@ -562,62 +722,165 @@ export const WorkspaceStudio: React.FC = () => {
             
             {/* Image renderer */}
             {mediaType === 'image' && (
-              displayMode === 'side-by-side' ? (
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Original</span>
-                    <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <img src={status?.download_url_original || ''} alt="Original uploaded file" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                    </div>
-                  </div>
-                  <div className="vstack gap-2" style={{ alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                      {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
-                    </span>
-                    <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <img 
-                        src={status?.download_url || (status?.download_url_original || '')} 
-                        alt="Corrected remapped file" 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'contain', 
-                          opacity: isDirty ? 0.6 : 1,
-                          filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
-                        }} 
-                      />
-                      {isDirty && (
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
-                            Apply Changes
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  <img
-                    src={toggleActive === 'processed' ? (status?.download_url || (status?.download_url_original || '')) : (status?.download_url_original || '')}
-                    alt="Single viewport view"
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'contain', 
-                      opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
-                      filter: toggleActive === 'processed' && selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
-                    }}
-                  />
-                  {toggleActive === 'processed' && isDirty && (
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
-                        Apply Changes
+              <div className="vstack gap-4" style={{ width: '100%', alignItems: 'center' }}>
+                {/* Zoom Toolbar */}
+                <div 
+                  className="hstack" 
+                  style={{ 
+                    justifyContent: 'center', 
+                    gap: '12px', 
+                    padding: '6px 16px', 
+                    backgroundColor: 'var(--bg-secondary)', 
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid var(--border-primary)',
+                    boxShadow: 'var(--shadow-sm)',
+                    marginBottom: 'var(--space-2)'
+                  }}
+                >
+                  <button 
+                    onClick={handleZoomOut} 
+                    className="btn btn-sm btn-outline" 
+                    disabled={zoomLevel <= 1}
+                    style={{ padding: '4px 12px', minWidth: '32px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                  >
+                    -
+                  </button>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', minWidth: '48px', textAlign: 'center' }}>
+                    {Math.round(zoomLevel * 100)}%
+                  </span>
+                  <button 
+                    onClick={handleZoomIn} 
+                    className="btn btn-sm btn-outline" 
+                    disabled={zoomLevel >= 4}
+                    style={{ padding: '4px 12px', minWidth: '32px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                  >
+                    +
+                  </button>
+                  {zoomLevel > 1 && (
+                    <>
+                      <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-primary)' }} />
+                      <button 
+                        onClick={resetZoom} 
+                        className="btn btn-sm btn-ghost" 
+                        style={{ fontSize: '0.8rem', color: 'var(--color-error)', padding: '4px 8px' }}
+                      >
+                        Reset
                       </button>
-                    </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        (Drag image to pan)
+                      </span>
+                    </>
                   )}
                 </div>
-              )
+
+                {/* Viewports */}
+                {displayMode === 'side-by-side' ? (
+                  <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', width: '100%' }}>
+                    <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Original</span>
+                      <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                        <img 
+                          src={status?.download_url_original || ''} 
+                          alt="Original uploaded file" 
+                          onMouseDown={handleMouseDown}
+                          onMouseMove={handleMouseMove}
+                          onMouseUp={handleMouseUp}
+                          onMouseLeave={handleMouseUp}
+                          onTouchStart={handleTouchStart}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          onTouchCancel={handleTouchEnd}
+                          draggable={false}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain',
+                            transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                            transformOrigin: 'center center',
+                            cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                            userSelect: 'none'
+                          }} 
+                        />
+                      </div>
+                    </div>
+                    <div className="vstack gap-2" style={{ alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                        {isDirty ? 'Preview (Unsaved Changes)' : 'Calibrated View'}
+                      </span>
+                      <div style={{ border: isDirty ? '1px solid var(--color-warning)' : '1px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                        <img 
+                          src={status?.download_url || (status?.download_url_original || '')} 
+                          alt="Corrected remapped file" 
+                          onMouseDown={handleMouseDown}
+                          onMouseMove={handleMouseMove}
+                          onMouseUp={handleMouseUp}
+                          onMouseLeave={handleMouseUp}
+                          onTouchStart={handleTouchStart}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          onTouchCancel={handleTouchEnd}
+                          draggable={false}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain', 
+                            opacity: isDirty ? 0.6 : 1,
+                            filter: getFilterStyle(true),
+                            transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                            transformOrigin: 'center center',
+                            cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                            userSelect: 'none'
+                          }} 
+                        />
+                        {isDirty && !isDragging && (
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                            <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                              Apply Changes
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: 'var(--bg-secondary)', width: '100%', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <img
+                      src={toggleActive === 'processed' ? (status?.download_url || (status?.download_url_original || '')) : (status?.download_url_original || '')}
+                      alt="Single viewport view"
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      onTouchCancel={handleTouchEnd}
+                      draggable={false}
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'contain', 
+                        opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
+                        filter: getFilterStyle(toggleActive === 'processed'),
+                        transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                        transformOrigin: 'center center',
+                        cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                        userSelect: 'none'
+                      }}
+                    />
+                    {toggleActive === 'processed' && isDirty && !isDragging && (
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                        <button onClick={handleReprocess} className="btn btn-sm btn-primary" style={{ backgroundColor: 'var(--color-warning)' }}>
+                          Apply Changes
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Video renderer */}
@@ -658,7 +921,7 @@ export const WorkspaceStudio: React.FC = () => {
                           height: '100%', 
                           objectFit: 'contain', 
                           opacity: isDirty ? 0.6 : 1,
-                          filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                          filter: getFilterStyle(true)
                         }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
@@ -669,7 +932,7 @@ export const WorkspaceStudio: React.FC = () => {
                           const el = e.currentTarget;
                           el.addEventListener('fullscreenchange', () => {
                             if (document.fullscreenElement === el) {
-                              el.style.filter = selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none';
+                               el.style.filter = getFilterStyle(true);
                             }
                           });
                         }}
@@ -698,13 +961,13 @@ export const WorkspaceStudio: React.FC = () => {
                       height: '100%', 
                       objectFit: 'contain', 
                       opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
-                      filter: selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none'
+                      filter: getFilterStyle(toggleActive === 'processed')
                     }}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget;
                       el.addEventListener('fullscreenchange', () => {
                         if (document.fullscreenElement === el) {
-                          el.style.filter = selectedPreviewCvd !== 'profile' ? `url(#sim-${selectedPreviewCvd})` : 'none';
+                          el.style.filter = getFilterStyle(toggleActive === 'processed');
                         }
                       });
                     }}
@@ -723,7 +986,7 @@ export const WorkspaceStudio: React.FC = () => {
             {/* PDF renderer */}
             {mediaType === 'pdf' && (
               isMobile ? (
-                <div className="vstack gap-4" style={{ padding: '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', alignItems: 'center', textAlign: 'center' }}>
+                <div className="vstack gap-4" style={{ padding: isMobile ? '16px 12px' : '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', alignItems: 'center', textAlign: 'center' }}>
                   <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold' }}>Mobile Viewer Mode</div>
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
                     Scrolling PDF files inside frames can be limited on mobile web browsers. Open the documents in a new tab to view, scroll, and zoom using your device's native PDF reader.
@@ -759,7 +1022,7 @@ export const WorkspaceStudio: React.FC = () => {
                           src={`${status?.download_url_original}#toolbar=0`}
                           width="100%"
                           height="100%"
-                          style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                          style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(false) }}
                           title="Original PDF"
                         />
                       </div>
@@ -771,7 +1034,7 @@ export const WorkspaceStudio: React.FC = () => {
                           src={`${status?.download_url}#toolbar=0`}
                           width="100%"
                           height="100%"
-                          style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px' }}
+                          style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(true) }}
                           title="Processed PDF"
                         />
                       </div>
@@ -784,7 +1047,7 @@ export const WorkspaceStudio: React.FC = () => {
                       src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                       width="100%"
                       height="100%"
-                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px' }}
+                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(toggleActive === 'processed') }}
                       title="PDF Toggle Viewer"
                     />
                   </div>

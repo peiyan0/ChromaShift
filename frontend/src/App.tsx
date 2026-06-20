@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -11,13 +11,15 @@ import { DashboardHistory } from './components/DashboardHistory';
 import { DragDropUpload } from './components/DragDropUpload';
 import { CalibrationWizard } from './components/CalibrationWizard';
 import { WorkspaceStudio } from './components/WorkspaceStudio';
-import { PromoteModal } from './components/PromoteModal';
 import { VisionTest } from './components/VisionTest';
 import { AdminAnalytics } from './components/AdminAnalytics';
 import { LandingPage } from './components/LandingPage';
 import { LogoIcon } from './components/LogoIcon';
+import { AboutPage } from './components/AboutPage';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { WorkflowSidebar } from './components/WorkflowSidebar';
 
-import { FiSun, FiMoon, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
+import { FiSun, FiMoon, FiMenu, FiX, FiLogOut, FiInfo } from 'react-icons/fi';
 
 // ─── Logo Mark ───────────────────────────────────────────
 const Logo = () => (
@@ -86,7 +88,8 @@ const ThemeToggle = () => {
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const { logout, isGuest, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+  const location = useLocation();
+  const showSidebar = location.pathname !== '/' && location.pathname !== '/about' && location.pathname !== '/privacy' && !location.pathname.startsWith('/auth');
 
   // Close mobile menu on resize
   useEffect(() => {
@@ -99,12 +102,41 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isSurveyComplete, setIsSurveyComplete] = useState(false);
+
+  useEffect(() => {
+    const checkStatus = () => {
+      const cached = localStorage.getItem('chromashift_cvd_profile');
+      let calibrated = false;
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.cvd_type) {
+            calibrated = true;
+          }
+        } catch (_) {}
+      }
+      setIsCalibrated(calibrated);
+      
+      const surveyDone = localStorage.getItem('chromashift_survey_completed') === 'true';
+      setIsSurveyComplete(surveyDone);
+    };
+    checkStatus();
+    window.addEventListener('storage', checkStatus);
+    window.addEventListener('chromashift_calibrated', checkStatus);
+    return () => {
+      window.removeEventListener('storage', checkStatus);
+      window.removeEventListener('chromashift_calibrated', checkStatus);
+    };
+  }, []);
+
   const navLinks = [
     { to: '/upload', label: 'Upload' },
     { to: '/hub', label: 'Media Hub' },
     { to: '/test-vision', label: 'Visual Metrics' },
-    { to: '/survey', label: 'Usability Survey' },
-    { to: '/settings', label: 'Vision Profile' },
+    { to: '/survey', label: isSurveyComplete ? 'Usability Survey ✓' : 'Usability Survey' },
+    { to: '/settings', label: isCalibrated ? 'Vision Profile ✓' : 'Vision Profile' },
   ];
 
   return (
@@ -130,13 +162,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           zIndex: 101
         }}>
           <span>🎨 Guest session — calibration auto-prunes in 24 hours.</span>
-          <button
-            onClick={() => setIsPromoteOpen(true)}
-            className="btn btn-sm btn-outline"
-            style={{ color: 'white', borderColor: 'rgba(255, 255, 255, 0.4)', background: 'rgba(255, 255, 255, 0.1)' }}
-          >
-            Save Account
-          </button>
         </div>
       )}
 
@@ -159,7 +184,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               <NavLink key={link.to} to={link.to} label={link.label} />
             ))}
             {isAdmin && (
-              <NavLink to="/admin/analytics" label="🛡 Admin" />
+              <NavLink to="/admin/analytics" label="Admin" />
             )}
           </nav>
 
@@ -170,14 +195,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="hstack gap-2" style={{ display: 'none' }} className-desktop="hstack">
               <span style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-primary)' }} />
               {isGuest ? (
-                <>
-                  <button onClick={() => setIsPromoteOpen(true)} className="btn btn-sm btn-primary">
-                    Save Progress
-                  </button>
-                  <RouterLink to="/auth/login" className="btn btn-sm btn-ghost">
-                    Log In
-                  </RouterLink>
-                </>
+                <RouterLink id="nav-login" to="/auth/login" className="btn btn-sm btn-ghost">
+                  Log In
+                </RouterLink>
               ) : (
                 <button onClick={logout} className="btn btn-sm btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <FiLogOut size={14} />
@@ -240,23 +260,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <span style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
           <div className="vstack gap-2">
             {isGuest ? (
-              <>
-                <button
-                  onClick={() => { setMobileOpen(false); setIsPromoteOpen(true); }}
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
-                >
-                  Save Account
-                </button>
-                <RouterLink
-                  to="/auth/login"
-                  className="btn btn-outline"
-                  onClick={() => setMobileOpen(false)}
-                  style={{ width: '100%' }}
-                >
-                  Log In
-                </RouterLink>
-              </>
+              <RouterLink
+                to="/auth/login"
+                className="btn btn-outline"
+                onClick={() => setMobileOpen(false)}
+                style={{ width: '100%' }}
+              >
+                Log In
+              </RouterLink>
             ) : (
               <button
                 onClick={() => { setMobileOpen(false); logout(); }}
@@ -272,8 +283,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       )}
 
       {/* Main Content Area */}
-      <main id="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div className="container" style={{ paddingTop: '32px', paddingBottom: '64px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <main id="main-content" className="main-layout" style={{ flex: 1 }}>
+        {showSidebar && (
+          <div className="sidebar-container" style={{ flexShrink: 0, zIndex: 10 }}>
+            <WorkflowSidebar />
+          </div>
+        )}
+        <div className="container" style={{ paddingTop: '32px', paddingBottom: '64px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {children}
         </div>
       </main>
@@ -303,6 +319,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               <RouterLink to="/" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Home</RouterLink>
               <RouterLink to="/hub" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Media Hub</RouterLink>
               <RouterLink to="/test-vision" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Visual Metrics</RouterLink>
+              <RouterLink to="/about" className="btn-ghost" style={{ fontSize: '0.85rem' }}>About</RouterLink>
+              <RouterLink to="/privacy" className="btn-ghost" style={{ fontSize: '0.85rem' }}>Privacy</RouterLink>
             </div>
           </div>
           <div style={{
@@ -320,8 +338,43 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </footer>
 
-      {/* Promoted account dialog */}
-      <PromoteModal isOpen={isPromoteOpen} onClose={() => setIsPromoteOpen(false)} />
+
+
+      {/* Floating Restart Tour Button */}
+      <button 
+        onClick={() => window.dispatchEvent(new Event('chromashift_start_tour'))}
+        className="btn btn-outline"
+        style={{
+          position: 'fixed',
+          bottom: '80px',
+          right: '24px',
+          zIndex: 9999,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          backdropFilter: 'blur(8px)',
+          backgroundColor: 'var(--bg-glass)',
+          border: '1px solid var(--border-secondary)',
+          padding: '8px 16px',
+          fontSize: '0.8rem',
+          borderRadius: 'var(--radius-full)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          transition: 'transform 0.2s ease, background-color 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.backgroundColor = 'var(--bg-glass)';
+        }}
+      >
+        <FiInfo size={14} />
+        <span>Quick Start</span>
+      </button>
 
       {/* Floating Usability Test / Survey Button */}
       <RouterLink 
@@ -354,7 +407,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           e.currentTarget.style.boxShadow = '0 8px 24px rgba(79, 70, 229, 0.4)';
         }}
       >
-        <span>Help us test / Usability Survey</span>
+        <span>Help us test</span>
       </RouterLink>
     </div>
   );
@@ -381,10 +434,10 @@ function App() {
             <ProtectedRoute><AppLayout><DashboardHistory /></AppLayout></ProtectedRoute>
           } />
           <Route path="/upload" element={
-            <ProtectedRoute><AppLayout><DragDropUpload /></AppLayout></ProtectedRoute>
+            <AppLayout><DragDropUpload /></AppLayout>
           } />
           <Route path="/settings" element={
-            <ProtectedRoute><AppLayout><CalibrationWizard /></AppLayout></ProtectedRoute>
+            <AppLayout><CalibrationWizard /></AppLayout>
           } />
           <Route path="/test-vision" element={
             <ProtectedRoute><AppLayout><VisionTest /></AppLayout></ProtectedRoute>
@@ -393,10 +446,16 @@ function App() {
             <ProtectedRoute><AppLayout><AdminAnalytics /></AppLayout></ProtectedRoute>
           } />
           <Route path="/workspace/:jobId" element={
-            <ProtectedRoute><AppLayout><WorkspaceStudio /></AppLayout></ProtectedRoute>
+            <AppLayout><WorkspaceStudio /></AppLayout>
+          } />
+          <Route path="/about" element={
+            <AppLayout><AboutPage /></AppLayout>
+          } />
+          <Route path="/privacy" element={
+            <AppLayout><PrivacyPolicyPage /></AppLayout>
           } />
           <Route path="/survey" element={
-            <ProtectedRoute><AppLayout><SurveyWizard performanceMetrics={{}} onComplete={() => {}} /></AppLayout></ProtectedRoute>
+            <ProtectedRoute><AppLayout><SurveyWizardWrapper /></AppLayout></ProtectedRoute>
           } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -405,5 +464,16 @@ function App() {
     </AuthProvider>
   );
 }
+
+const SurveyWizardWrapper = () => {
+  const navigate = useNavigate();
+  return (
+    <SurveyWizard 
+      performanceMetrics={{}} 
+      onComplete={() => navigate('/hub')} 
+      onBackToApp={() => navigate('/hub')}
+    />
+  );
+};
 
 export default App;

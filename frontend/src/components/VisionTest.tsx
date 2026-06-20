@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FC } from 'react';
 import { FiTrendingUp, FiCheckCircle, FiPlay, FiRefreshCw, FiGrid, FiClock, FiActivity, FiFileText } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { profileService } from '../services/profile';
+import { mediaService } from '../services/media';
 import { SurveyWizard } from './SurveyWizard';
 
 // Types for testing state
@@ -52,6 +53,10 @@ export const VisionTest: FC = () => {
   
   // ================= TASK 5 (TABLE EXTRACTION) STATE =================
   const [selectedTableRows, setSelectedTableRows] = useState<number[]>([]);
+
+  // ================= TASK 6 (ORCHARD PHOTO) STATE =================
+  const [processedOrchardUrl, setProcessedOrchardUrl] = useState<string | null>(null);
+  const [isProcessingOrchard, setIsProcessingOrchard] = useState<boolean>(false);
 
   const triggerNotification = (type: 'success' | 'error' | 'warning', text: string) => {
     setNotification({ type, text });
@@ -177,6 +182,63 @@ export const VisionTest: FC = () => {
     loadProfile();
   }, []);
 
+  // Pre-process Orchard Image during Test or Intermission
+  useEffect(() => {
+    if ((testPhase === 'test_original' || testPhase === 'intermission') && !processedOrchardUrl && !isProcessingOrchard) {
+      const processOrchard = async () => {
+        setIsProcessingOrchard(true);
+        try {
+          let profile = null;
+          const cached = localStorage.getItem('chromashift_cvd_profile');
+          if (cached) {
+            try { profile = JSON.parse(cached); } catch (e) {}
+          }
+          if (!profile) {
+            try {
+              profile = await profileService.getProfile();
+            } catch (e) {
+              console.warn("Could not fetch profile, using defaults");
+            }
+          }
+          const type = profile?.cvd_type || profile?.type || 'deuteranopia';
+          const severity = profile?.severity || 1.0;
+          
+          const imagePath = testMode === 'official' ? '/nature_orchard_2.jpg' : '/nature_orchard.png';
+          const imageName = testMode === 'official' ? 'nature_orchard_2.jpg' : 'nature_orchard.png';
+          const mimeType = testMode === 'official' ? 'image/jpeg' : 'image/png';
+          
+          const response = await fetch(imagePath);
+          const blob = await response.blob();
+          const file = new File([blob], imageName, { type: mimeType });
+          
+          const uploadRes = await mediaService.uploadMedia(file);
+          const jobId = uploadRes.job_id;
+          
+          await mediaService.processMedia(jobId, { cvd_type: type, severity });
+          
+          let attempts = 0;
+          while (attempts < 20) {
+            const statusRes = await mediaService.getMediaStatus(jobId);
+            if (statusRes.status === 'completed' && statusRes.download_url) {
+              setProcessedOrchardUrl(statusRes.download_url);
+              break;
+            } else if (statusRes.status === 'error' || statusRes.status === 'failed') {
+              console.error('Failed to process orchard image');
+              break;
+            }
+            await new Promise(r => setTimeout(r, 1000));
+            attempts++;
+          }
+        } catch (err) {
+          console.error("Error processing orchard image:", err);
+        } finally {
+          setIsProcessingOrchard(false);
+        }
+      };
+      processOrchard();
+    }
+  }, [testPhase, testMode, processedOrchardUrl, isProcessingOrchard]);
+
   // Timer helper utilities
   const startTimer = () => {
     timerRef.current = performance.now();
@@ -191,13 +253,17 @@ export const VisionTest: FC = () => {
   // Flow diagram single transition task
   const startFlowDiagramTask = () => {
     setFlowTransitionComplete(false);
-    setFlowNodeColor('#c62828'); // Start Red
+    setFlowNodeColor(testMode === 'official' ? '#ef6c00' : '#c62828'); // Start Orange / Red
     startTimer();
     
     // Animate a transition after 1.5 seconds
     setTimeout(() => {
       const isOriginal = testPhase === 'test_original';
-      setFlowNodeColor(isOriginal ? '#8d6e63' : '#2e7d32');
+      if (testMode === 'official') {
+        setFlowNodeColor(isOriginal ? '#c62828' : '#2e7d32'); // Red / Green
+      } else {
+        setFlowNodeColor(isOriginal ? '#8d6e63' : '#2e7d32'); // Brown / Green
+      }
       setFlowTransitionComplete(true);
     }, 1500);
   };
@@ -232,6 +298,7 @@ export const VisionTest: FC = () => {
   const handleStartOriginalPhase = () => {
     setOriginalResults([]);
     setCorrectedResults([]);
+    setProcessedOrchardUrl(null); // Reset pre-processed image URL
     setCurrentTaskIndex(0);
     setSelectedValue("");
     setTestPhase('test_original');
@@ -245,8 +312,8 @@ export const VisionTest: FC = () => {
     startTimer();
   };
 
-  // Image Questions
-  const task1Data = {
+  // Image Questions (Sandbox Mode)
+  const sandboxTask1Data = {
     original: {
       question: "Examine the sales line chart. What is the value of the RED line in Quarter 3 (Q3)?",
       options: ["$20k", "$45k", "$30k", "$55k"],
@@ -259,7 +326,7 @@ export const VisionTest: FC = () => {
     }
   };
 
-  const task2Data = {
+  const sandboxTask2Data = {
     original: {
       question: "Examine the project status board. Which phase is currently DELAYED (indicated by Red status)?",
       options: ["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
@@ -272,11 +339,69 @@ export const VisionTest: FC = () => {
     }
   };
 
+  const sandboxTask6Data = {
+    original: {
+      question: "Examine the orchard image. How many red apples can you spot in the tree foliage?",
+      options: ["4", "5", "6", "8"],
+      correct: "6"
+    },
+    corrected: {
+      question: "Examine the orchard image. How many red apples can you spot in the tree foliage?",
+      options: ["4", "5", "6", "8"],
+      correct: "6"
+    }
+  };
+
+  // Official Mode Datasets (Research Study)
+  const officialTask1Data = {
+    original: {
+      question: "Examine the sales line chart. What is the value of the RED line in Quarter 2 (Q2)?",
+      options: ["$15k", "$30k", "$45k", "$60k"],
+      correct: "$15k"
+    },
+    corrected: {
+      question: "Examine the sales line chart. What is the value of the GREEN line in Quarter 3 (Q3)?",
+      options: ["$15k", "$30k", "$45k", "$60k"],
+      correct: "$15k"
+    }
+  };
+
+  const officialTask2Data = {
+    original: {
+      question: "Examine the project status board. Which phase is currently ON TRACK (indicated by Green status)?",
+      options: ["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
+      correct: "Phase 3"
+    },
+    corrected: {
+      question: "Examine the project status board. Which phase is currently PAUSED (indicated by Yellow status)?",
+      options: ["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
+      correct: "Phase 2"
+    }
+  };
+
+  const officialTask6Data = {
+    original: {
+      question: "Examine the citrus orchard image. How many orange tangerines can you spot on the branch?",
+      options: ["5", "6", "7", "8"],
+      correct: "6"
+    },
+    corrected: {
+      question: "Examine the citrus orchard image. How many orange tangerines can you spot on the branch?",
+      options: ["5", "6", "7", "8"],
+      correct: "6"
+    }
+  };
+
+  // Helper selectors
+  const task1Data = testMode === 'official' ? officialTask1Data : sandboxTask1Data;
+  const task2Data = testMode === 'official' ? officialTask2Data : sandboxTask2Data;
+  const task6Data = testMode === 'official' ? officialTask6Data : sandboxTask6Data;
+
   // Task 3: Server Grid Click
   const handleHeatmapClick = (row: number, col: number) => {
     const timeTaken = stopTimer();
     const isOriginal = testPhase === 'test_original';
-    const isCorrect = isOriginal ? (row === 2 && col === 1) : (row === 0 && col === 3);
+    const isCorrect = testMode === 'official' ? (row === 0 && col === 3) : (row === 2 && col === 1);
 
     const result: TaskResult = {
       accuracy: isCorrect,
@@ -294,14 +419,14 @@ export const VisionTest: FC = () => {
     startFlowDiagramTask();
   };
 
-  // Multiple Choice Submission (Tasks 1, 2, and 5)
+  // Multiple Choice Submission (Tasks 1, 2, 5, and 6)
   const handleNextTaskMC = () => {
     if (currentTaskIndex === 4 && selectedTableRows.length === 0) {
       triggerNotification('warning', 'Please select at least one valid row.');
       return;
     }
     
-    if (currentTaskIndex < 2 && !selectedValue) {
+    if ((currentTaskIndex < 2 || currentTaskIndex === 5) && !selectedValue) {
       triggerNotification('warning', 'Please select an option to submit your answer.');
       return;
     }
@@ -316,9 +441,11 @@ export const VisionTest: FC = () => {
     } else if (currentTaskIndex === 1) {
       isCorrect = isOriginal ? (selectedValue === task2Data.original.correct) : (selectedValue === task2Data.corrected.correct);
     } else if (currentTaskIndex === 4) {
-      const correctRows = isOriginal ? [1, 4] : [2, 5];
+      const correctRows = testMode === 'official' ? [2, 5] : [1, 4];
       isCorrect = (selectedTableRows.length === correctRows.length) && 
                   correctRows.every(r => selectedTableRows.includes(r));
+    } else if (currentTaskIndex === 5) {
+      isCorrect = isOriginal ? (selectedValue === task6Data.original.correct) : (selectedValue === task6Data.corrected.correct);
     }
 
     const result: TaskResult = {
@@ -326,11 +453,55 @@ export const VisionTest: FC = () => {
       time: timeTaken
     };
 
+    const compileMetrics = (orig: TaskResult[], corr: TaskResult[]) => {
+      if (orig.length < 6 || corr.length < 6) return null;
+      return {
+        task1: {
+          original_time: orig[0].time,
+          original_correct: orig[0].accuracy,
+          corrected_time: corr[0].time,
+          corrected_correct: corr[0].accuracy
+        },
+        task2: {
+          original_time: orig[1].time,
+          original_correct: orig[1].accuracy,
+          corrected_time: corr[1].time,
+          corrected_correct: corr[1].accuracy
+        },
+        task3: {
+          original_time: orig[2].time,
+          original_correct: orig[2].accuracy,
+          corrected_time: corr[2].time,
+          corrected_correct: corr[2].accuracy
+        },
+        video: {
+          original_time: orig[3].time,
+          original_clicks: orig[3].clicks || 0,
+          original_accuracy: orig[3].clickAccuracy || 0.0,
+          corrected_time: corr[3].time,
+          corrected_clicks: corr[3].clicks || 0,
+          corrected_accuracy: corr[3].clickAccuracy || 0.0
+        },
+        document: {
+          original_time: orig[4].time,
+          original_correct: orig[4].accuracy,
+          corrected_time: corr[4].time,
+          corrected_correct: corr[4].accuracy
+        },
+        task6: {
+          original_time: orig[5].time,
+          original_correct: orig[5].accuracy,
+          corrected_time: corr[5].time,
+          corrected_correct: corr[5].accuracy
+        }
+      };
+    };
+
     if (isOriginal) {
       const updated = [...originalResults, result];
       setOriginalResults(updated);
       
-      if (currentTaskIndex === 4) {
+      if (currentTaskIndex === 5) {
         setTestPhase('intermission');
       } else {
         setSelectedValue("");
@@ -340,10 +511,17 @@ export const VisionTest: FC = () => {
     } else {
       const updated = [...correctedResults, result];
       setCorrectedResults(updated);
-
-      if (currentTaskIndex === 4) {
+      if (currentTaskIndex === 5) {
+        // Compile performance metrics for both modes and save to session storage
+        const compiled = compileMetrics(originalResults, updated);
+        if (compiled) {
+          sessionStorage.setItem('chromashift_pending_performance_metrics', JSON.stringify(compiled));
+          sessionStorage.setItem('chromashift_pending_test_mode', testMode);
+          localStorage.setItem('chromashift_metrics_done', 'true');
+          window.dispatchEvent(new Event('storage'));
+        }
         setTestPhase('results');
-        triggerNotification('success', testMode === 'official' ? 'Timed Tasks Completed!' : 'Playground Phase Complete!');
+        triggerNotification('success', 'Timed Tasks Completed! Loading Results Dashboard...');
       } else {
         setSelectedValue("");
         setCurrentTaskIndex(prev => prev + 1);
@@ -354,7 +532,7 @@ export const VisionTest: FC = () => {
 
   // Compile unified research payload structure for the survey wizard submission
   const getCompiledPerformanceMetrics = () => {
-    if (originalResults.length < 5 || correctedResults.length < 5) return null;
+    if (originalResults.length < 6 || correctedResults.length < 6) return null;
     return {
       task1: {
         original_time: originalResults[0].time,
@@ -387,6 +565,12 @@ export const VisionTest: FC = () => {
         original_correct: originalResults[4].accuracy,
         corrected_time: correctedResults[4].time,
         corrected_correct: correctedResults[4].accuracy
+      },
+      task6: {
+        original_time: originalResults[5].time,
+        original_correct: originalResults[5].accuracy,
+        corrected_time: correctedResults[5].time,
+        corrected_correct: correctedResults[5].accuracy
       }
     };
   };
@@ -493,11 +677,27 @@ export const VisionTest: FC = () => {
             
             <div className="vstack gap-2">
               <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                ChromaShift Visual Analytics
+                Visual Metrics
               </h2>
               <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
-                Measure how our real-time color remapping filters increase your visual speed and target accuracy. Choose between Playground Sandbox or Official Research Session.
+                Test your color vision speed and accuracy. Choose a mode below to start.
               </p>
+              <div 
+                style={{ 
+                  fontSize: '0.85rem', 
+                  color: 'var(--primary)', 
+                  fontWeight: '600', 
+                  maxWidth: '600px', 
+                  margin: 'var(--space-2) auto 0 auto', 
+                  backgroundColor: 'var(--primary-glow)', 
+                  padding: '10px 16px', 
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px dashed var(--primary)',
+                  lineHeight: '1.4'
+                }}
+              >
+                💡 <strong>Recommendation:</strong> Play the <strong>Playground Sandbox</strong> first to get familiar with the tasks before starting the <strong>Official Usability Study</strong>.
+              </div>
             </div>
 
             <div className="divider" style={{ margin: '0' }} />
@@ -524,7 +724,7 @@ export const VisionTest: FC = () => {
                   <span className="badge badge-primary" style={{ alignSelf: 'flex-start', padding: '6px 12px' }}>Vision Playground</span>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Playground Sandbox</h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    A free sandbox session to test yourself on Line graphs, Heatmaps, Video Tracking, and PDF Documents. Records stopwatch completion speeds locally without saving data to the backend.
+                    Practice the 6 visual tasks with immediate feedback. No data is saved on the server.
                   </p>
                 </div>
                 <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '0.85rem', marginTop: 'auto' }}>
@@ -545,7 +745,7 @@ export const VisionTest: FC = () => {
                   <span className="badge badge-primary" style={{ alignSelf: 'flex-start', borderColor: 'var(--primary)', color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '6px 12px' }}>Research Study Session</span>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>Official Usability Study</h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    A structured testing session. Guides you through demographics intake, interactive calibration, visual timed tests, and SUS/NASA-TLX usability forms. Saves results securely in the admin database.
+                    A guided testing session. Results are saved securely to help evaluate platform accessibility.
                   </p>
                 </div>
                 <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '0.85rem', marginTop: 'auto' }}>
@@ -602,10 +802,10 @@ export const VisionTest: FC = () => {
 
             <div className="vstack gap-2">
               <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                {testMode === 'official' ? 'Visual Metrics' : 'Visual Testing Playground'}
+                {testMode === 'official' ? 'Visual Testing' : 'Visual Playground'}
               </h2>
               <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
-                Solve tasks in two consecutive phases: Phase 1 with <strong>Original Colors</strong>, followed by Phase 2 with <strong>Corrected Colors</strong> dynamically remapped by the GPU.
+                Complete the tasks in two phases: Phase 1 with <strong>Original Colors</strong>, and Phase 2 with <strong>Corrected Colors</strong>.
               </p>
             </div>
 
@@ -624,46 +824,57 @@ export const VisionTest: FC = () => {
               <div className="card vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                 <div className="hstack gap-2" style={{ color: 'var(--primary)', fontWeight: '700' }}>
                   <FiTrendingUp />
-                  <span style={{ fontSize: '0.85rem' }}>5 Multi-Media Tasks</span>
+                  <span style={{ fontSize: '0.85rem' }}>6 Visual Tasks</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  Examine static line charts, project status dashboards, 4x4 heatmaps, moving target video canvases, and academic maps.
+                  Identify details in charts, tables, maps, videos, and scenes.
                 </p>
               </div>
 
               <div className="card vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                 <div className="hstack gap-2" style={{ color: 'var(--color-warning)', fontWeight: '700' }}>
                   <FiClock />
-                  <span style={{ fontSize: '0.85rem' }}>Interactive Stopwatch</span>
+                  <span style={{ fontSize: '0.85rem' }}>Timed Exercises</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  High-resolution stopwatch timing captures response speeds and reaction offsets automatically.
+                  Measure your speed and accuracy under each color phase.
                 </p>
               </div>
 
               <div className="card vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                 <div className="hstack gap-2" style={{ color: 'var(--primary)', fontWeight: '700' }}>
                   <FiCheckCircle />
-                  <span style={{ fontSize: '0.85rem' }}>Visual Efficiency Report</span>
+                  <span style={{ fontSize: '0.85rem' }}>Performance Report</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  Displays side-by-side McKinsey graphs mapping speedups and accuracy improvements instantly.
+                  Get a final report comparing original vs. corrected performance.
                 </p>
               </div>
             </div>
 
-            <button 
-              className="btn btn-primary btn-lg"
-              style={{
-                background: 'var(--primary-gradient)',
-                fontWeight: '800',
-                boxShadow: 'var(--shadow-md)',
-                padding: '1rem 2.5rem'
-              }}
-              onClick={handleStartOriginalPhase}
-            >
-              <FiPlay /> Start Phase 1 (Original Colors)
-            </button>
+            <div className="hstack gap-4" style={{ justifyContent: 'center', width: '100%', flexWrap: 'wrap' }}>
+              <button 
+                className="btn btn-ghost"
+                style={{
+                  padding: '1rem 2rem'
+                }}
+                onClick={() => setTestPhase('selection')}
+              >
+                Go Back
+              </button>
+              <button 
+                className="btn btn-primary btn-lg"
+                style={{
+                  background: 'var(--primary-gradient)',
+                  fontWeight: '800',
+                  boxShadow: 'var(--shadow-md)',
+                  padding: '1rem 2.5rem'
+                }}
+                onClick={handleStartOriginalPhase}
+              >
+                <FiPlay /> Start Phase 1 (Original Colors)
+              </button>
+            </div>
           </div>
         )}
 
@@ -681,15 +892,16 @@ export const VisionTest: FC = () => {
                   {testPhase === 'test_original' ? 'Phase 1: Original Colors' : 'Phase 2: Corrected Colors (Active)'}
                 </span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                  {currentTaskIndex === 0 && "Task 1 of 5: Line Graph Legibility"}
-                  {currentTaskIndex === 1 && "Task 2 of 5: Color-Dependent Bar Status"}
-                  {currentTaskIndex === 2 && "Task 3 of 5: Interactive Server Node Alert"}
-                  {currentTaskIndex === 3 && "Task 4 of 5: Dynamic Video Target Tracking"}
-                  {currentTaskIndex === 4 && "Task 5 of 5: PDF Map Shading Comprehension"}
+                  {currentTaskIndex === 0 && "Task 1 of 6: Line Graph Legibility"}
+                  {currentTaskIndex === 1 && "Task 2 of 6: Color-Dependent Bar Status"}
+                  {currentTaskIndex === 2 && "Task 3 of 6: Interactive Server Node Alert"}
+                  {currentTaskIndex === 3 && "Task 4 of 6: Dynamic Video Target Tracking"}
+                  {currentTaskIndex === 4 && "Task 5 of 6: PDF Map Shading Comprehension"}
+                  {currentTaskIndex === 5 && "Task 6 of 6: Natural Scene Fruit Spotting"}
                 </h3>
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>
-                Progress: {Math.round(((currentTaskIndex) / 5) * 100)}%
+                Progress: {Math.round(((currentTaskIndex) / 6) * 100)}%
               </span>
             </div>
             
@@ -707,7 +919,7 @@ export const VisionTest: FC = () => {
               <div
                 style={{
                   height: '100%',
-                  width: `${(currentTaskIndex / 5) * 100}%`,
+                  width: `${(currentTaskIndex / 6) * 100}%`,
                   backgroundColor: 'var(--primary)',
                   borderRadius: 'var(--radius-full)',
                   transition: 'width var(--transition-normal)'
@@ -725,104 +937,180 @@ export const VisionTest: FC = () => {
                 width: '100%'
               }}
             >
-              {/* Left Column: Confusion Visual element (remaps with GPU daltonize filter) */}
               <div 
                 style={{
                   padding: 'var(--space-6)',
                   border: '1px solid var(--border-primary)',
                   borderRadius: 'var(--radius-lg)',
                   backgroundColor: 'var(--bg-secondary)',
-                  boxShadow: 'var(--shadow-sm)',
-                  filter: testPhase === 'test_corrected' ? 'url(#vision-daltonize-filter)' : 'none'
+                  boxShadow: 'var(--shadow-sm)'
                 }}
               >
                 {/* TASK 1: Line Chart */}
                 {currentTaskIndex === 0 && (
-                  <div style={{ height: '260px', width: '100%', position: 'relative' }}>
-                    <svg viewBox="0 0 400 200" width="100%" height="100%">
-                      <line x1="40" y1="20" x2="380" y2="20" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="60" x2="380" y2="60" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="100" x2="380" y2="100" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="140" x2="380" y2="140" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="180" x2="380" y2="180" stroke="var(--border-secondary)" strokeWidth="1.5" />
-                      <line x1="40" y1="20" x2="40" y2="180" stroke="var(--border-secondary)" strokeWidth="1.5" />
+                  <div style={{ height: '260px', width: '100%', position: 'relative', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none' }}>
+                    <svg viewBox="0 0 400 200" width="100%" height="100%" style={{ backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '10px' }}>
+                      <line x1="40" y1="20" x2="380" y2="20" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="60" x2="380" y2="60" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="100" x2="380" y2="100" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="140" x2="380" y2="140" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="180" x2="380" y2="180" stroke="#cbd5e1" strokeWidth="1.5" />
+                      <line x1="40" y1="20" x2="40" y2="180" stroke="#cbd5e1" strokeWidth="1.5" />
 
-                      <text x="30" y="24" fill="var(--text-secondary)" fontSize="9" textAnchor="end">$60k</text>
-                      <text x="30" y="64" fill="var(--text-secondary)" fontSize="9" textAnchor="end">$45k</text>
-                      <text x="30" y="104" fill="var(--text-secondary)" fontSize="9" textAnchor="end">$30k</text>
-                      <text x="30" y="144" fill="var(--text-secondary)" fontSize="9" textAnchor="end">$15k</text>
-                      <text x="30" y="184" fill="var(--text-secondary)" fontSize="9" textAnchor="end">$0k</text>
+                      <text x="30" y="24" fill="#475569" fontSize="9" textAnchor="end">$60k</text>
+                      <text x="30" y="64" fill="#475569" fontSize="9" textAnchor="end">$45k</text>
+                      <text x="30" y="104" fill="#475569" fontSize="9" textAnchor="end">$30k</text>
+                      <text x="30" y="144" fill="#475569" fontSize="9" textAnchor="end">$15k</text>
+                      <text x="30" y="184" fill="#475569" fontSize="9" textAnchor="end">$0k</text>
 
-                      <text x="90" y="195" fill="var(--text-secondary)" fontSize="9" textAnchor="middle">Q1</text>
-                      <text x="180" y="195" fill="var(--text-secondary)" fontSize="9" textAnchor="middle">Q2</text>
-                      <text x="270" y="195" fill="var(--text-secondary)" fontSize="9" textAnchor="middle">Q3</text>
-                      <text x="350" y="195" fill="var(--text-secondary)" fontSize="9" textAnchor="middle">Q4</text>
+                      <text x="90" y="195" fill="#475569" fontSize="9" textAnchor="middle">Q1</text>
+                      <text x="180" y="195" fill="#475569" fontSize="9" textAnchor="middle">Q2</text>
+                      <text x="270" y="195" fill="#475569" fontSize="9" textAnchor="middle">Q3</text>
+                      <text x="350" y="195" fill="#475569" fontSize="9" textAnchor="middle">Q4</text>
 
                       {/* expenses line (Green) */}
-                      <path d="M 90 140 L 180 100 L 270 100 L 350 60" fill="none" stroke="#2e7d32" strokeWidth="3" />
-                      <circle cx="90" cy="140" r="4" fill="#2e7d32" />
-                      <circle cx="180" cy="100" r="4" fill="#2e7d32" />
-                      <circle cx="270" cy="100" r="4" fill="#2e7d32" />
-                      <circle cx="350" cy="60" r="4" fill="#2e7d32" />
+                      {testMode === 'official' ? (
+                        <>
+                          <path d="M 90 100 L 180 60 L 270 140 L 350 20" fill="none" stroke="#2e7d32" strokeWidth="3" />
+                          <circle cx="90" cy="100" r="4" fill="#2e7d32" />
+                          <circle cx="180" cy="60" r="4" fill="#2e7d32" />
+                          <circle cx="270" cy="140" r="4" fill="#2e7d32" />
+                          <circle cx="350" cy="20" r="4" fill="#2e7d32" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M 90 140 L 180 100 L 270 100 L 350 60" fill="none" stroke="#2e7d32" strokeWidth="3" />
+                          <circle cx="90" cy="140" r="4" fill="#2e7d32" />
+                          <circle cx="180" cy="100" r="4" fill="#2e7d32" />
+                          <circle cx="270" cy="100" r="4" fill="#2e7d32" />
+                          <circle cx="350" cy="60" r="4" fill="#2e7d32" />
+                        </>
+                      )}
 
                       {/* Revenue line (Red) */}
-                      <path d="M 90 100 L 180 140 L 270 60 L 350 20" fill="none" stroke="#c62828" strokeWidth="3" />
-                      <circle cx="90" cy="100" r="4" fill="#c62828" />
-                      <circle cx="180" cy="140" r="4" fill="#c62828" />
-                      <circle cx="270" cy="60" r="4" fill="#c62828" />
-                      <circle cx="350" cy="20" r="4" fill="#c62828" />
+                      {testMode === 'official' ? (
+                        <>
+                          <path d="M 90 60 L 180 140 L 270 100 L 350 100" fill="none" stroke="#c62828" strokeWidth="3" />
+                          <circle cx="90" cy="60" r="4" fill="#c62828" />
+                          <circle cx="180" cy="140" r="4" fill="#c62828" />
+                          <circle cx="270" cy="100" r="4" fill="#c62828" />
+                          <circle cx="350" cy="100" r="4" fill="#c62828" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M 90 100 L 180 140 L 270 60 L 350 20" fill="none" stroke="#c62828" strokeWidth="3" />
+                          <circle cx="90" cy="100" r="4" fill="#c62828" />
+                          <circle cx="180" cy="140" r="4" fill="#c62828" />
+                          <circle cx="270" cy="60" r="4" fill="#c62828" />
+                          <circle cx="350" cy="20" r="4" fill="#c62828" />
+                        </>
+                      )}
 
                       {/* Line 3: Budget - BROWN */}
-                      <path d="M 90 60 L 180 60 L 270 140 L 350 100" fill="none" stroke="#8d6e63" strokeWidth="3" />
-                      <circle cx="90" cy="60" r="4" fill="#8d6e63" />
-                      <circle cx="180" cy="60" r="4" fill="#8d6e63" />
-                      <circle cx="270" cy="140" r="4" fill="#8d6e63" />
-                      <circle cx="350" cy="100" r="4" fill="#8d6e63" />
+                      {testMode === 'official' ? (
+                        <>
+                          <path d="M 90 140 L 180 100 L 270 20 L 350 60" fill="none" stroke="#8d6e63" strokeWidth="3" />
+                          <circle cx="90" cy="140" r="4" fill="#8d6e63" />
+                          <circle cx="180" cy="100" r="4" fill="#8d6e63" />
+                          <circle cx="270" cy="20" r="4" fill="#8d6e63" />
+                          <circle cx="350" cy="60" r="4" fill="#8d6e63" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M 90 60 L 180 60 L 270 140 L 350 100" fill="none" stroke="#8d6e63" strokeWidth="3" />
+                          <circle cx="90" cy="60" r="4" fill="#8d6e63" />
+                          <circle cx="180" cy="60" r="4" fill="#8d6e63" />
+                          <circle cx="270" cy="140" r="4" fill="#8d6e63" />
+                          <circle cx="350" cy="100" r="4" fill="#8d6e63" />
+                        </>
+                      )}
 
                       {/* Line 4: Projected - OLIVE */}
-                      <path d="M 90 100 L 180 20 L 270 100 L 350 140" fill="none" stroke="#9e9d24" strokeWidth="3" />
-                      <circle cx="90" cy="100" r="4" fill="#9e9d24" />
-                      <circle cx="180" cy="20" r="4" fill="#9e9d24" />
-                      <circle cx="270" cy="100" r="4" fill="#9e9d24" />
-                      <circle cx="350" cy="140" r="4" fill="#9e9d24" />
+                      {testMode === 'official' ? (
+                        <>
+                          <path d="M 90 20 L 180 20 L 270 60 L 350 140" fill="none" stroke="#9e9d24" strokeWidth="3" />
+                          <circle cx="90" cy="20" r="4" fill="#9e9d24" />
+                          <circle cx="180" cy="20" r="4" fill="#9e9d24" />
+                          <circle cx="270" cy="60" r="4" fill="#9e9d24" />
+                          <circle cx="350" cy="140" r="4" fill="#9e9d24" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M 90 100 L 180 20 L 270 100 L 350 140" fill="none" stroke="#9e9d24" strokeWidth="3" />
+                          <circle cx="90" cy="100" r="4" fill="#9e9d24" />
+                          <circle cx="180" cy="20" r="4" fill="#9e9d24" />
+                          <circle cx="270" cy="100" r="4" fill="#9e9d24" />
+                          <circle cx="350" cy="140" r="4" fill="#9e9d24" />
+                        </>
+                      )}
                     </svg>
                   </div>
                 )}
 
                 {/* TASK 2: Bar Chart */}
                 {currentTaskIndex === 1 && (
-                  <div style={{ height: '260px', width: '100%' }}>
-                    <svg viewBox="0 0 400 200" width="100%" height="100%">
-                      <line x1="40" y1="40" x2="380" y2="40" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="75" x2="380" y2="75" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="110" x2="380" y2="110" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="145" x2="380" y2="145" stroke="var(--border-primary)" strokeWidth="1" />
-                      <line x1="40" y1="180" x2="380" y2="180" stroke="var(--border-secondary)" strokeWidth="1.5" />
-                      <line x1="40" y1="40" x2="40" y2="180" stroke="var(--border-secondary)" strokeWidth="1.5" />
+                  <div style={{ height: '260px', width: '100%', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none' }}>
+                    <svg viewBox="0 0 400 200" width="100%" height="100%" style={{ backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '10px' }}>
+                      <line x1="40" y1="40" x2="380" y2="40" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="75" x2="380" y2="75" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="110" x2="380" y2="110" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="145" x2="380" y2="145" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="40" y1="180" x2="380" y2="180" stroke="#cbd5e1" strokeWidth="1.5" />
+                      <line x1="40" y1="40" x2="40" y2="180" stroke="#cbd5e1" strokeWidth="1.5" />
 
-                      <rect x="45" y="12" width="8" height="8" fill="#388e3c" rx="2" />
-                      <text x="58" y="19" fill="var(--text-primary)" fontSize="8" fontWeight="bold">On Track</text>
-                      <rect x="125" y="12" width="8" height="8" fill="#d32f2f" rx="2" />
-                      <text x="138" y="19" fill="var(--text-primary)" fontSize="8" fontWeight="bold">Delayed</text>
-                      <rect x="205" y="12" width="8" height="8" fill="#ef6c00" rx="2" />
-                      <text x="218" y="19" fill="var(--text-primary)" fontSize="8" fontWeight="bold">At Risk</text>
-                      <rect x="285" y="12" width="8" height="8" fill="#fbc02d" rx="2" />
-                      <text x="298" y="19" fill="var(--text-primary)" fontSize="8" fontWeight="bold">Paused</text>
+                      {testMode === 'official' ? (
+                        <>
+                          <rect x="45" y="12" width="8" height="8" fill="#d32f2f" rx="2" />
+                          <text x="58" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">Delayed</text>
+                          <rect x="125" y="12" width="8" height="8" fill="#fbc02d" rx="2" />
+                          <text x="138" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">Paused</text>
+                          <rect x="205" y="12" width="8" height="8" fill="#388e3c" rx="2" />
+                          <text x="218" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">On Track</text>
+                          <rect x="285" y="12" width="8" height="8" fill="#ef6c00" rx="2" />
+                          <text x="298" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">At Risk</text>
+                        </>
+                      ) : (
+                        <>
+                          <rect x="45" y="12" width="8" height="8" fill="#388e3c" rx="2" />
+                          <text x="58" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">On Track</text>
+                          <rect x="125" y="12" width="8" height="8" fill="#d32f2f" rx="2" />
+                          <text x="138" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">Delayed</text>
+                          <rect x="205" y="12" width="8" height="8" fill="#ef6c00" rx="2" />
+                          <text x="218" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">At Risk</text>
+                          <rect x="285" y="12" width="8" height="8" fill="#fbc02d" rx="2" />
+                          <text x="298" y="19" fill="#0f172a" fontSize="8" fontWeight="bold">Paused</text>
+                        </>
+                      )}
 
-                      <text x="30" y="44" fill="var(--text-secondary)" fontSize="9" textAnchor="end">100%</text>
-                      <text x="30" y="79" fill="var(--text-secondary)" fontSize="9" textAnchor="end">75%</text>
-                      <text x="30" y="114" fill="var(--text-secondary)" fontSize="9" textAnchor="end">50%</text>
-                      <text x="30" y="149" fill="var(--text-secondary)" fontSize="9" textAnchor="end">25%</text>
-                      <text x="30" y="184" fill="var(--text-secondary)" fontSize="9" textAnchor="end">0%</text>
+                      <text x="30" y="44" fill="#475569" fontSize="9" textAnchor="end">100%</text>
+                      <text x="30" y="79" fill="#475569" fontSize="9" textAnchor="end">75%</text>
+                      <text x="30" y="114" fill="#475569" fontSize="9" textAnchor="end">50%</text>
+                      <text x="30" y="149" fill="#475569" fontSize="9" textAnchor="end">25%</text>
+                      <text x="30" y="184" fill="#475569" fontSize="9" textAnchor="end">0%</text>
 
-                      <rect x="70" y="60" width="40" height="120" fill="#388e3c" rx="4" />
-                      <text x="90" y="195" fill="var(--text-primary)" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 1</text>
-                      <rect x="150" y="60" width="40" height="120" fill="#d32f2f" rx="4" />
-                      <text x="170" y="195" fill="var(--text-primary)" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 2</text>
-                      <rect x="230" y="60" width="40" height="120" fill="#ef6c00" rx="4" />
-                      <text x="250" y="195" fill="var(--text-primary)" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 3</text>
-                      <rect x="310" y="60" width="40" height="120" fill="#fbc02d" rx="4" />
-                      <text x="330" y="195" fill="var(--text-primary)" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 4</text>
+                      {testMode === 'official' ? (
+                        <>
+                          <rect x="70" y="40" width="40" height="140" fill="#d32f2f" rx="4" />
+                          <text x="90" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 1</text>
+                          <rect x="150" y="100" width="40" height="80" fill="#fbc02d" rx="4" />
+                          <text x="170" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 2</text>
+                          <rect x="230" y="20" width="40" height="160" fill="#388e3c" rx="4" />
+                          <text x="250" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 3</text>
+                          <rect x="310" y="70" width="40" height="110" fill="#ef6c00" rx="4" />
+                          <text x="330" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 4</text>
+                        </>
+                      ) : (
+                        <>
+                          <rect x="70" y="60" width="40" height="120" fill="#388e3c" rx="4" />
+                          <text x="90" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 1</text>
+                          <rect x="150" y="60" width="40" height="120" fill="#d32f2f" rx="4" />
+                          <text x="170" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 2</text>
+                          <rect x="230" y="60" width="40" height="120" fill="#ef6c00" rx="4" />
+                          <text x="250" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 3</text>
+                          <rect x="310" y="60" width="40" height="120" fill="#fbc02d" rx="4" />
+                          <text x="330" y="195" fill="#0f172a" fontSize="9" textAnchor="middle" fontWeight="bold">Phase 4</text>
+                        </>
+                      )}
                     </svg>
                   </div>
                 )}
@@ -840,14 +1128,18 @@ export const VisionTest: FC = () => {
                         gap: '10px',
                         maxWidth: '260px',
                         width: '100%',
-                        margin: '0 auto'
+                        margin: '0 auto',
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
                       }}
                     >
                       {Array.from({ length: 4 }).map((_, rIdx) => 
                         Array.from({ length: 4 }).map((_, cIdx) => {
-                          const isOriginal = testPhase === 'test_original';
-                          const isAlert = isOriginal ? (rIdx === 2 && cIdx === 1) : (rIdx === 0 && cIdx === 3);
-                          const cellColor = isAlert ? '#c62828' : ((rIdx + cIdx) % 3 === 0 ? '#ef6c00' : '#2e7d32');
+                          const isAlert = testMode === 'official' ? (rIdx === 0 && cIdx === 3) : (rIdx === 2 && cIdx === 1);
+                          const cellColor = isAlert 
+                            ? '#c62828' 
+                            : (testMode === 'official' 
+                              ? ((rIdx * cIdx + 1) % 3 === 0 ? '#ef6c00' : '#2e7d32') 
+                              : ((rIdx + cIdx) % 3 === 0 ? '#ef6c00' : '#2e7d32'));
                           return (
                             <div 
                               key={`${rIdx}-${cIdx}`}
@@ -890,16 +1182,17 @@ export const VisionTest: FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
                       }}
                     >
                       <div className="hstack gap-6" style={{ alignItems: 'center' }}>
-                        {/* Fixed Initial Node (Red) */}
+                        {/* Fixed Initial Node (Red / Orange) */}
                         <div 
                           style={{
                             width: '60px',
                             height: '60px',
-                            backgroundColor: '#c62828',
+                            backgroundColor: testMode === 'official' ? '#ef6c00' : '#c62828',
                             borderRadius: 'var(--radius-full)',
                             boxShadow: 'var(--shadow-md)',
                             display: 'flex',
@@ -962,7 +1255,8 @@ export const VisionTest: FC = () => {
                         backgroundColor: 'var(--bg-primary)',
                         borderRadius: 'var(--radius-md)',
                         border: '1px solid var(--border-primary)',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
                       }}
                     >
                       <div className="vstack" style={{ width: '100%' }}>
@@ -982,17 +1276,21 @@ export const VisionTest: FC = () => {
                         </div>
                         {/* Table Rows (6 rows) */}
                         {Array.from({ length: 6 }).map((_, idx) => {
-                          const isOriginal = testPhase === 'test_original';
+                          const isOfficial = testMode === 'official';
                           let rowBg = '#8d6e63'; // default noise
-                          if (isOriginal) {
-                            if (idx === 1 || idx === 4) rowBg = '#2e7d32'; // valid
-                            else if (idx === 0 || idx === 3) rowBg = '#c62828'; // noise
+                          
+                          if (isOfficial) {
+                            if (idx === 2 || idx === 5) rowBg = '#c62828'; // Failure target
+                            else if (idx === 1 || idx === 4) rowBg = '#2e7d32'; // Green noise
                           } else {
-                            if (idx === 2 || idx === 5) rowBg = '#c62828'; // valid
-                            else if (idx === 1 || idx === 4) rowBg = '#2e7d32'; // noise
+                            if (idx === 1 || idx === 4) rowBg = '#2e7d32'; // Success target
+                            else if (idx === 0 || idx === 3) rowBg = '#c62828'; // Red noise
                           }
 
                           const isSelected = selectedTableRows.includes(idx);
+                          const rowId = isOfficial ? 5000 + idx : 1000 + idx;
+                          const processNames = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'];
+                          const rowName = isOfficial ? `TASK_${processNames[idx]}` : `PROC_${String.fromCharCode(65 + idx)}`;
 
                           return (
                             <div 
@@ -1015,8 +1313,8 @@ export const VisionTest: FC = () => {
                                 );
                               }}
                             >
-                              <span style={{ flex: 1, fontSize: '0.875rem', color: 'white', fontWeight: '700' }}>#{1000 + idx}</span>
-                              <span style={{ flex: 2, fontSize: '0.875rem', color: 'white' }}>PROC_{String.fromCharCode(65 + idx)}</span>
+                              <span style={{ flex: 1, fontSize: '0.875rem', color: 'white', fontWeight: '700' }}>#{rowId}</span>
+                              <span style={{ flex: 2, fontSize: '0.875rem', color: 'white' }}>{rowName}</span>
                               <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', color: 'white' }}>
                                 {isSelected && <FiCheckCircle size={16} />}
                               </div>
@@ -1025,6 +1323,33 @@ export const VisionTest: FC = () => {
                         })}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* TASK 6: Orchard Image */}
+                {currentTaskIndex === 5 && (
+                  <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                    {testPhase === 'test_corrected' && isProcessingOrchard && (
+                      <div style={{ position: 'absolute', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10, borderRadius: 'var(--radius-md)' }}>
+                        <span style={{ color: 'white', fontWeight: 'bold' }}>Processing with AI Backend...</span>
+                      </div>
+                    )}
+                    <img 
+                      src={testPhase === 'test_corrected' && processedOrchardUrl ? processedOrchardUrl : (testMode === 'official' ? "/nature_orchard_2.jpg" : "/nature_orchard.png")} 
+                      onLoad={() => {
+                        if (currentTaskIndex === 5) {
+                          startTimer();
+                        }
+                      }}
+                      alt="Orchard Fruit Spotting" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '260px', 
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-md)',
+                        objectFit: 'contain'
+                      }} 
+                    />
                   </div>
                 )}
               </div>
@@ -1041,20 +1366,25 @@ export const VisionTest: FC = () => {
                   <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.4' }}>
                     {currentTaskIndex === 0 && (testPhase === 'test_original' ? task1Data.original.question : task1Data.corrected.question)}
                     {currentTaskIndex === 1 && (testPhase === 'test_original' ? task2Data.original.question : task2Data.corrected.question)}
-                    {currentTaskIndex === 2 && "Click on the single status node in critical alert (Red). Warning (Orange) and normal (Green) nodes surround it."}
-                    {currentTaskIndex === 3 && "Transition Rule: Only Accept (Red → Green) transitions. Evaluate the transition when it completes."}
-                    {currentTaskIndex === 4 && (testPhase === 'test_original' 
-                      ? "Select all rows indicating 'Success' status (Green backgrounds)." 
-                      : "Select all rows indicating 'Failure' status (Red backgrounds).")}
+                    {currentTaskIndex === 2 && "Click on the single status node in critical alert (Red)."}
+                    {currentTaskIndex === 3 && (testMode === 'official' 
+                      ? "Transition Rule: Only Accept (Orange → Green) transitions. Evaluate the transition when it completes." 
+                      : "Transition Rule: Only Accept (Red → Green) transitions. Evaluate the transition when it completes.")}
+                    {currentTaskIndex === 4 && (testMode === 'official' 
+                      ? "Select all rows indicating 'Failure' status (Red backgrounds)." 
+                      : "Select all rows indicating 'Success' status (Green backgrounds).")}
+                    {currentTaskIndex === 5 && (testPhase === 'test_original' ? task6Data.original.question : task6Data.corrected.question)}
                   </h4>
                 </div>
 
                 {/* Task Choice selections */}
-                {currentTaskIndex < 2 && (
+                {(currentTaskIndex < 2 || currentTaskIndex === 5) && (
                   <div className="vstack gap-3" style={{ width: '100%' }}>
                     {(currentTaskIndex === 0 ? 
                       (testPhase === 'test_original' ? task1Data.original.options : task1Data.corrected.options) : 
-                      (testPhase === 'test_original' ? task2Data.original.options : task2Data.corrected.options)
+                      currentTaskIndex === 1 ?
+                      (testPhase === 'test_original' ? task2Data.original.options : task2Data.corrected.options) :
+                      (testPhase === 'test_original' ? task6Data.original.options : task6Data.corrected.options)
                     ).map((opt) => {
                       const isSelected = selectedValue === opt;
                       return (
@@ -1159,14 +1489,14 @@ export const VisionTest: FC = () => {
                           onClick={() => handleFlowDecision('accept')}
                           style={{ width: '100%', backgroundColor: 'var(--color-success)' }}
                         >
-                          ACCEPT (Valid Rule)
+                          ACCEPT
                         </button>
                         <button 
                           className="btn btn-outline btn-lg" 
                           onClick={() => handleFlowDecision('reject')}
                           style={{ width: '100%', color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
                         >
-                          REJECT (Invalid Rule)
+                          REJECT
                         </button>
                       </div>
                     )}
@@ -1399,7 +1729,7 @@ export const VisionTest: FC = () => {
               }}
             >
               <h4 style={{ fontSize: '0.95rem', color: 'var(--primary)', fontWeight: '800', margin: '0' }}>
-                🚀 Utility Metrics Takeaway
+                Utility Metrics Takeaway
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto', lineHeight: '1.4' }}>
                 {corrAccuracy > origAccuracy && origTime > corrTime ? (
@@ -1413,60 +1743,47 @@ export const VisionTest: FC = () => {
             </div>
 
             {/* Bottom Actions */}
-            {testMode === 'official' && !participantUuid ? (
-              <div 
-                className={windowWidth <= 480 ? "vstack gap-3" : "hstack"} 
-                style={{ 
-                  justifyContent: 'center', 
-                  alignItems: 'stretch',
-                  marginTop: 'var(--space-4)',
-                  width: windowWidth <= 480 ? '100%' : 'auto' 
-                }}
-              >
-                <button
-                  className="btn btn-primary btn-lg"
-                  style={{
-                    background: 'var(--primary-gradient)',
-                    fontWeight: '800',
-                    padding: '1rem 2.5rem',
-                    boxShadow: 'var(--shadow-lg)',
-                    width: windowWidth <= 480 ? '100%' : 'auto',
-                    whiteSpace: 'normal',
-                    height: 'auto',
-                    textAlign: 'center'
-                  }}
-                  onClick={() => setTestPhase('research_post')}
-                >
-                  Continue to Usability Survey & Feedback
-                </button>
-              </div>
-            ) : (
-              <div 
-                className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-4"} 
-                style={{ 
-                  justifyContent: 'center', 
-                  alignItems: 'stretch',
-                  marginTop: 'var(--space-4)',
+            <div 
+              className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-4"} 
+              style={{ 
+                justifyContent: 'center', 
+                alignItems: 'stretch',
+                marginTop: 'var(--space-4)',
+                width: windowWidth <= 480 ? '100%' : 'auto',
+                flexDirection: windowWidth <= 480 ? 'column' : 'row'
+              }}
+            >
+              <button
+                className="btn btn-primary btn-lg"
+                style={{
+                  background: 'var(--primary-gradient)',
+                  fontWeight: '800',
+                  padding: '1rem 2.5rem',
+                  boxShadow: 'var(--shadow-lg)',
                   width: windowWidth <= 480 ? '100%' : 'auto',
-                  flexDirection: windowWidth <= 480 ? 'column' : 'row'
+                  whiteSpace: 'normal',
+                  height: 'auto',
+                  textAlign: 'center'
                 }}
+                onClick={() => navigate('/survey')}
               >
-                <button 
-                  className="btn btn-primary btn-lg" 
-                  onClick={() => navigate('/')}
-                  style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
-                >
-                  Back to Dashboard
-                </button>
-                <button
-                  className="btn btn-outline btn-lg"
-                  onClick={() => setTestPhase('selection')}
-                  style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
-                >
-                  <FiRefreshCw /> Change Test Mode
-                </button>
-              </div>
-            )}
+                Continue to Usability Survey & Feedback
+              </button>
+              <button 
+                className="btn btn-outline btn-lg" 
+                onClick={() => navigate('/')}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
+                Back to Dashboard
+              </button>
+              <button
+                className="btn btn-outline btn-lg"
+                onClick={() => setTestPhase('selection')}
+                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+              >
+                <FiRefreshCw /> Change Test Mode
+              </button>
+            </div>
           </div>
         )}
 

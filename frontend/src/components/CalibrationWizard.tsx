@@ -3,11 +3,6 @@ import { profileService, type VisionProfile } from '../services/profile';
 import { FiSliders, FiCheckCircle, FiTrash2, FiPlay } from 'react-icons/fi';
 
 // SVG Icons for clean, zero-dependency rendering
-const SparkleIcon = () => (
-  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-    <path d="M12 2l2.4 6.4L21 10.8l-5.4 4.8L17 22l-5-4.2-5 4.2 1.4-6.4L3 10.8l6.6-2.4z" />
-  </svg>
-);
 const CheckIcon = () => (
   <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--color-success)' }}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -76,6 +71,7 @@ export const CalibrationWizard: FC = () => {
   const canvasRefA = useRef<HTMLCanvasElement>(null);
   const canvasRefB = useRef<HTMLCanvasElement>(null);
   const canvasRefPreview = useRef<HTMLCanvasElement>(null);
+  const hasAutoSaved = useRef(false);
 
   // Load existing profile on mount (for baseline defaults)
   useEffect(() => {
@@ -398,12 +394,16 @@ export const CalibrationWizard: FC = () => {
   const selectOptimalPair = (currHyps: Hypothesis[]): [Hypothesis, Hypothesis] => {
     const sorted = [...currHyps].sort((a, b) => b.probability - a.probability);
     const top1 = sorted[0];
-    if (Math.random() < 0.7) {
-      return [top1, sorted[1]];
+    
+    // Filter to same CVD type to prevent cross-type color layout diagnostic bias
+    const sameTypeHyps = sorted.filter(h => h.type === top1.type);
+    
+    if (Math.random() < 0.7 && sameTypeHyps.length > 1) {
+      return [top1, sameTypeHyps[1]];
     } else {
-      const startIdx = Math.floor(sorted.length / 2);
-      const randomLower = sorted[startIdx + Math.floor(Math.random() * (sorted.length - startIdx))];
-      return [top1, randomLower];
+      const startIdx = Math.floor(sameTypeHyps.length / 2);
+      const randomLower = sameTypeHyps[startIdx + Math.floor(Math.random() * (sameTypeHyps.length - startIdx))];
+      return [top1, randomLower || top1];
     }
   };
 
@@ -605,6 +605,7 @@ export const CalibrationWizard: FC = () => {
     
     // Always store locally first to guarantee guest session / offline compatibility works
     localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
+    window.dispatchEvent(new Event('chromashift_calibrated'));
     
     try {
       await profileService.updateProfile(payload);
@@ -621,6 +622,40 @@ export const CalibrationWizard: FC = () => {
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (step === 'welcome' || step === 'calibration') {
+      hasAutoSaved.current = false;
+    }
+    if (step === 'results' && diagnosedProfile && !hasAutoSaved.current) {
+      hasAutoSaved.current = true;
+      const autoSave = async () => {
+        setIsSaving(true);
+        const payload: VisionProfile = {
+          cvd_type: diagnosedProfile.type || 'deuteranopia',
+          severity: customSeverity,
+          contrast_multiplier: customContrast,
+          saturation_multiplier: customSaturation,
+          intensity: customIntensity
+        };
+        localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
+        try {
+          await profileService.updateProfile(payload);
+          triggerNotification('success', 'Calibration completed and auto-saved!');
+        } catch (e) {
+          try {
+            await profileService.createProfile(payload);
+            triggerNotification('success', 'Calibration completed and auto-saved!');
+          } catch (err) {
+            triggerNotification('info', 'Calibration auto-saved locally.');
+          }
+        } finally {
+          setIsSaving(false);
+        }
+      };
+      autoSave();
+    }
+  }, [step, diagnosedProfile, customSeverity, customContrast, customSaturation, customIntensity]);
 
   return (
     <>
@@ -681,9 +716,9 @@ export const CalibrationWizard: FC = () => {
             </div>
 
             <div className="vstack gap-2" style={{ alignItems: 'center', textAlign: 'center' }}>
-              <h2 className="text-gradient">Personalized Vision Calibration</h2>
+              <h2 className="text-gradient">Calibrate Vision</h2>
               <p style={{ maxWidth: '600px', fontSize: '0.95rem' }}>
-                An adaptive, interactive diagnostics test that maps your color sensitivity to create a physiological remapping filter tailored to your color perception.
+                A quick, interactive test that adapts to how you see color, creating a custom filter tailored perfectly to your eyes.
               </p>
             </div>
 
@@ -693,31 +728,31 @@ export const CalibrationWizard: FC = () => {
             <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', width: '100%' }}>
               <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
                 <span className="badge badge-primary" style={{ padding: '8px' }}>
-                  Anomaloscope
+                  Step 1
                 </span>
-                <strong>Active Diagnostics</strong>
+                <strong>Compare Color Patterns</strong>
                 <p style={{ fontSize: '0.85rem' }}>
-                  Compares dynamically generated plate variations to pinpoint color blindness patterns.
+                  Look at two patterns side-by-side and choose the one that looks clearest or most natural.
                 </p>
               </div>
 
               <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
                 <span className="badge badge-primary" style={{ padding: '8px', color: 'var(--primary-violet)', backgroundColor: 'rgba(124, 58, 237, 0.1)' }}>
-                  Bayesian Opt
+                  Step 2
                 </span>
-                <strong>Active Learning</strong>
+                <strong>Smart Adaptation</strong>
                 <p style={{ fontSize: '0.85rem' }}>
-                  Algorithm adapts after every selection, converging on your profile in as few as 5 rounds.
+                  The test adapts after each choice, saving your time and finding your profile in just 5 rounds.
                 </p>
               </div>
 
               <div className="card-solid vstack gap-3" style={{ backgroundColor: 'var(--bg-secondary)', alignItems: 'center', textAlign: 'center' }}>
                 <span className="badge badge-primary" style={{ padding: '8px', color: 'var(--color-success)', backgroundColor: 'rgba(13, 148, 136, 0.1)' }}>
-                  Fidelity
+                  Step 3
                 </span>
-                <strong>Physiological Matrix</strong>
+                <strong>Enjoy Clearer Colors</strong>
                 <p style={{ fontSize: '0.85rem' }}>
-                  Calculates custom remapping variables to Daltonize your uploads with zero GPU latency.
+                  Use your customized filters to automatically correct images and videos on the platform.
                 </p>
               </div>
             </div>
@@ -762,7 +797,7 @@ export const CalibrationWizard: FC = () => {
                     {round <= 3 ? 'CVD Group Testing' : 'Bayesian Anomaloscope'}
                   </span>
                 </div>
-                <h3 style={{ fontFamily: 'var(--font-heading)' }}>Select the clearer symbol</h3>
+                <h3 style={{ fontFamily: 'var(--font-heading)' }}>Select clearer symbol</h3>
               </div>
 
               {/* Confidence progress */}
@@ -855,7 +890,7 @@ export const CalibrationWizard: FC = () => {
             <div className="hstack gap-3">
               <FiCheckCircle size={32} style={{ color: 'var(--color-success)' }} />
               <div className="vstack" style={{ alignItems: 'flex-start' }}>
-                <h3 style={{ margin: 0, fontFamily: 'var(--font-heading)' }}>Vision Calibration Resolved</h3>
+                <h3 style={{ margin: 0, fontFamily: 'var(--font-heading)' }}>Calibration Complete</h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estimated active remapping variables.</span>
               </div>
             </div>
@@ -887,7 +922,6 @@ export const CalibrationWizard: FC = () => {
 
                 <div className="card-solid vstack gap-5" style={{ padding: '20px' }}>
                   <div className="hstack gap-2">
-                    <SparkleIcon />
                     <strong style={{ fontSize: '0.85rem' }}>Fine-tune Daltonization Coefficients</strong>
                   </div>
 
@@ -992,47 +1026,52 @@ export const CalibrationWizard: FC = () => {
                   </div>
                 </div>
 
-                <div className="card-solid vstack gap-3" style={{ padding: '20px' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    Personalized 3x3 Transform Matrix
-                  </span>
+                <details className="card-solid" style={{ padding: '16px', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+                  <summary style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', outline: 'none' }}>
+                    View Engineering Specs & Matrix
+                  </summary>
+                  <div style={{ marginTop: '16px', cursor: 'default' }} className="vstack gap-3" onClick={(e) => e.stopPropagation()}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Personalized 3x3 Transform Matrix
+                    </span>
 
-                  <div style={{
-                    backgroundColor: '#0f172a',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '16px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '0.85rem',
-                    color: '#10b981',
-                    textAlign: 'center',
-                    border: '1px solid #1e293b'
-                  }} className="vstack gap-2">
-                    <div>[{matrix[0][0].toFixed(2)}] [{matrix[0][1].toFixed(2)}] [{matrix[0][2].toFixed(2)}]</div>
-                    <div>[{matrix[1][0].toFixed(2)}] [{matrix[1][1].toFixed(2)}] [{matrix[1][2].toFixed(2)}]</div>
-                    <div>[{matrix[2][0].toFixed(2)}] [{matrix[2][1].toFixed(2)}] [{matrix[2][2].toFixed(2)}]</div>
-                  </div>
+                    <div style={{
+                      backgroundColor: '#0f172a',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '16px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.85rem',
+                      color: '#10b981',
+                      textAlign: 'center',
+                      border: '1px solid #1e293b'
+                    }} className="vstack gap-2">
+                      <div>[{matrix[0][0].toFixed(2)}] [{matrix[0][1].toFixed(2)}] [{matrix[0][2].toFixed(2)}]</div>
+                      <div>[{matrix[1][0].toFixed(2)}] [{matrix[1][1].toFixed(2)}] [{matrix[1][2].toFixed(2)}]</div>
+                      <div>[{matrix[2][0].toFixed(2)}] [{matrix[2][1].toFixed(2)}] [{matrix[2][2].toFixed(2)}]</div>
+                    </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    <span>Profile config schema</span>
-                    <button 
-                      onClick={() => {
-                        const payload = JSON.stringify({
-                          cvd_type: diagnosedProfile.type,
-                          severity: parseFloat(customSeverity.toFixed(3)),
-                          contrast_multiplier: parseFloat(customContrast.toFixed(2)),
-                          saturation_multiplier: parseFloat(customSaturation.toFixed(2)),
-                          intensity: parseFloat(customIntensity.toFixed(2))
-                        }, null, 2);
-                        navigator.clipboard?.writeText(payload);
-                        triggerNotification('success', 'Config copied to clipboard!');
-                      }}
-                      className="btn-ghost"
-                      style={{ fontWeight: 'bold', color: 'var(--primary)' }}
-                    >
-                      Copy JSON
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <span>Profile config schema</span>
+                      <button 
+                        onClick={() => {
+                          const payload = JSON.stringify({
+                            cvd_type: diagnosedProfile.type,
+                            severity: parseFloat(customSeverity.toFixed(3)),
+                            contrast_multiplier: parseFloat(customContrast.toFixed(2)),
+                            saturation_multiplier: parseFloat(customSaturation.toFixed(2)),
+                            intensity: parseFloat(customIntensity.toFixed(2))
+                          }, null, 2);
+                          navigator.clipboard?.writeText(payload);
+                          triggerNotification('success', 'Config copied to clipboard!');
+                        }}
+                        className="btn-ghost"
+                        style={{ fontWeight: 'bold', color: 'var(--primary)' }}
+                      >
+                        Copy JSON
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </details>
               </div>
 
             </div>
@@ -1069,36 +1108,36 @@ export const CalibrationWizard: FC = () => {
               </button>
             </div>
 
-            {/* Account Delete Danger area */}
-            <div className="card-solid vstack gap-3" style={{ border: '1px solid rgba(185, 28, 28, 0.25)', backgroundColor: 'rgba(185, 28, 28, 0.02)', marginTop: '24px', padding: '20px' }}>
-              <h4 style={{ color: 'var(--color-error)', fontFamily: 'var(--font-heading)', margin: 0 }}>Danger Zone</h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Wipe all visual calibration datasets, S3-stored media, and telemetry reports. Account deletion is permanent.
-              </p>
-              <button 
-                onClick={async () => {
-                  if (window.confirm("ARE YOU SURE? This will permanently delete your account, calibration files, and S3-stored media. This cannot be undone.")) {
-                    try {
-                      const { default: api } = await import('../services/api');
-                      await api.delete('/auth/me');
-                      triggerNotification('success', 'Account wiped.');
-                      localStorage.clear();
-                      setTimeout(() => { window.location.href = '/'; }, 1000);
-                    } catch (e) {
-                      triggerNotification('error', 'Deletion failed.');
-                    }
-                  }
-                }}
-                className="btn btn-sm btn-primary" 
-                style={{ backgroundColor: 'var(--color-error)', alignSelf: 'flex-start', display: 'flex', gap: '6px', alignItems: 'center' }}
-              >
-                <FiTrash2 size={12} />
-                <span>Delete Account</span>
-              </button>
-            </div>
-
           </div>
         )}
+
+        {/* Account Delete Danger area */}
+        <div className="card-solid vstack gap-3" style={{ border: '1px solid rgba(185, 28, 28, 0.25)', backgroundColor: 'rgba(185, 28, 28, 0.02)', marginTop: '24px', padding: '20px' }}>
+          <h4 style={{ color: 'var(--color-error)', fontFamily: 'var(--font-heading)', margin: 0 }}>Danger Zone</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+            Wipe all visual calibration datasets, stored media, and telemetry reports. Account deletion is permanent.
+          </p>
+          <button 
+            onClick={async () => {
+              if (window.confirm("ARE YOU SURE? This will permanently delete your account, calibration files, and stored media. This cannot be undone.")) {
+                try {
+                  const { default: api } = await import('../services/api');
+                  await api.delete('/auth/me');
+                  triggerNotification('success', 'Account wiped.');
+                  localStorage.clear();
+                  setTimeout(() => { window.location.href = '/'; }, 1000);
+                } catch (e) {
+                  triggerNotification('error', 'Deletion failed.');
+                }
+              }
+            }}
+            className="btn btn-sm btn-primary" 
+            style={{ backgroundColor: 'var(--color-error)', alignSelf: 'flex-start', display: 'flex', gap: '6px', alignItems: 'center' }}
+          >
+            <FiTrash2 size={12} />
+            <span>Delete Account</span>
+          </button>
+        </div>
 
       </div>
     </div>
