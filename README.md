@@ -2,11 +2,12 @@
 
 > **Empowering the chromatic digital divide.** Beyond Basic Filters. Truly Smart Colorblind Accessibility for the 300 million individuals living with Color Vision Deficiency (CVD).
 
-**🔗 Live Preview:** [chromashift-py.vercel.app](https://chromashift-py.vercel.app/)  
+**🔗 Live Preview:** <a href="https://chromashift-py.vercel.app/" target="_blank">chromashift-py.vercel.app</a>
+
 *(Try it instantly! The live demo includes pre-loaded sample images so you can test the daltonization effect in one click without creating an account or uploading your own photos.)*
 
 <div align="center">
-  <video src="./frontend/public/demo/Demo.mp4" width="800" autoplay loop muted playsinline></video>
+  <img src="./frontend/public/demo/Hero.png" width="800" alt="ChromaShift Hero Image" ></img>
 </div>
 
 ## The Problem: Basic Filters
@@ -14,8 +15,6 @@ Standard accessibility tools treat everyone the same. They apply rigid, generic 
 
 ## The Solution: Smart Rendering
 ChromaShift introduces a **content-aware rendering engine**. It calibrates to your specific eyes and understands what you're looking at. By leveraging lightweight machine learning, it treats a photograph, a bar chart, and a text document exactly how they should be treated.
-
----
 
 ## Key Features & User Benefits
 
@@ -30,7 +29,7 @@ ChromaShift introduces a **content-aware rendering engine**. It calibrates to yo
   <img src="./frontend/public/demo/Non-Destructive%20PDF%20Vectors.png" width="800" alt="Non-Destructive PDF Demo" />
 - **Flicker-Free Video**: Enjoy smooth, color-corrected videos without the flashing and jittering caused by basic accessibility tools, thanks to Optical Flow and Temporal Smoothing.
   <br/>
-  <video src="./frontend/public/demo/Flicker-Free%20Video.mp4" width="800" autoplay loop muted playsinline></video>
+  <img src="./frontend/public/demo/Flicker-Free%20Video.gif" width="800" alt="Flicker-Free Video Demo" ></img>
 - **Actionable WCAG Audits**: Don't just find out you failed an audit. ChromaShift generates detailed JSON reports with the exact, calculated hex codes developers need to fix contrast issues.
 - **Personalized Vision Calibration**: A quick interactive wizard tunes the screen to your specific eyes, rather than forcing you into a generic category.
 
@@ -78,8 +77,6 @@ flowchart TD
     end
 ```
 
----
-
 ## The Core Engine (The Technology)
 
 Under the hood, ChromaShift goes far beyond basic CSS `filter: hue-rotate()`. It uses legitimate, physiologically-based computer vision tensor math mixed with AI semantic segmentation.
@@ -115,8 +112,6 @@ flowchart TD
     end
 ```
 
----
-
 ## Tech Stack
 
 ### Frontend
@@ -129,8 +124,6 @@ flowchart TD
 - **Database**: PostgreSQL (SQLAlchemy) + Redis (Caching)
 - **Storage**: S3-compatible (MinIO)
 - **Media Processing**: OpenCV + FFmpeg + ONNX Runtime
-
----
 
 ## Getting Started (Local Development)
 
@@ -157,8 +150,6 @@ For local development and testing, we use Docker to instantly spin up the requir
    - **Frontend**: `http://localhost` (Port 80)
    - **Backend API**: `http://localhost:8000`
    - **Swagger UI**: `http://localhost:8000/docs`
-
----
 
 ## License
 

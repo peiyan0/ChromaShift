@@ -2,6 +2,8 @@ import { getSlicFallbackMask } from './fallback_slic';
 import * as ort from 'onnxruntime-web';
 
 ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+// Fix "function signature mismatch" in ort-wasm-simd-threaded.jsep.wasm by disabling multi-threading
+ort.env.wasm.numThreads = 1;
 
 // YOLO26n-seg: NMS-free instance segmentation from Ultralytics
 // https://docs.ultralytics.com/models/yolo26
