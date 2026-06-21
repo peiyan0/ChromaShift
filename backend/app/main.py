@@ -11,8 +11,8 @@ if settings.SENTRY_DSN:
         import sentry_sdk
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
         )
     except ImportError:
         print("sentry-sdk not installed, skipping monitoring initialization")
