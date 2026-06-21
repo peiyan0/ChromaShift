@@ -42,6 +42,26 @@ const Login = () => {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+    setMessage(null);
+    try {
+      const response = await api.post('/auth/guest');
+      login(response.data.access_token, true);
+      setMessage({ type: 'success', text: 'Logged in as guest.' });
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: 'Failed to continue as guest.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -152,6 +172,16 @@ const Login = () => {
               style={{ width: '100%', marginTop: 'var(--space-2)' }}
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="btn btn-ghost"
+              disabled={isLoading}
+              style={{ width: '100%', marginTop: 'var(--space-1)' }}
+            >
+              Continue as Guest
             </button>
 
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: 'var(--space-2)' }}>

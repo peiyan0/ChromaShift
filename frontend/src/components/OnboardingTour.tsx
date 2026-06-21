@@ -102,6 +102,7 @@ export const OnboardingTour: React.FC = () => {
   const handleClose = () => {
     localStorage.setItem('chromashift_onboarding_completed', 'true');
     setVisible(false);
+    navigate('/');
   };
 
   if (!visible || currentStep === -1) return null;

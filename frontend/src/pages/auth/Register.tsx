@@ -10,7 +10,7 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navigate = useNavigate();
-  const { isAuthenticated, isGuest } = useAuth();
+  const { login, isAuthenticated, isGuest } = useAuth();
 
   useEffect(() => {
     if (isAuthenticated && !isGuest) navigate('/');
@@ -33,6 +33,26 @@ const Register = () => {
       setMessage({
         type: 'error',
         text: error.response?.data?.detail || 'Something went wrong.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+    setMessage(null);
+    try {
+      const response = await api.post('/auth/guest');
+      login(response.data.access_token, true);
+      setMessage({ type: 'success', text: 'Logged in as guest.' });
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: 'Failed to continue as guest.'
       });
     } finally {
       setIsLoading(false);
@@ -149,6 +169,16 @@ const Register = () => {
               style={{ width: '100%', marginTop: 'var(--space-2)' }}
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="btn btn-ghost"
+              disabled={isLoading}
+              style={{ width: '100%', marginTop: 'var(--space-1)' }}
+            >
+              Continue as Guest
             </button>
 
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: 'var(--space-2)' }}>

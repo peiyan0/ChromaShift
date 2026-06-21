@@ -366,7 +366,7 @@ export const DragDropUpload: React.FC = () => {
 
           <button 
             onClick={() => navigate('/settings')}
-            className="btn btn-primary"
+            className="btn btn-primary animate-pulse-border"
             style={{ 
               padding: '12px 32px',
               alignSelf: 'center',

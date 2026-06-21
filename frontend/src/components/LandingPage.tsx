@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiEye, FiZap, FiShield, FiArrowRight, FiVideo, FiFileText, FiSliders } from 'react-icons/fi';
 import { CausticsCanvas } from './backgrounds/CausticsCanvas';
+import { BeforeAfterSlider } from './BeforeAfterSlider';
 
 // ─── Animated number counter ──────────────────────────────
 const CountUp = ({ end, suffix = '' }: { end: number; suffix?: string }) => {
@@ -73,15 +74,9 @@ const FeatureCard = ({ icon: Icon, title, body }: FeatureCardProps) => (
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [cvdType, setCvdType] = useState('protanopia');
-  const [severity, setSeverity] = useState(1.0);
-  const [intensity, setIntensity] = useState(1.0);
-  const [contrast, setContrast] = useState(1.0);
-  const [saturation, setSaturation] = useState(1.0);
-  const [sliderPosition, setSliderPosition] = useState(50);
-  const [activeDemoImage, setActiveDemoImage] = useState('/financial_pie_chart.png');
-  const [matrixValues, setMatrixValues] = useState('1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0');
   const [isCalibrated, setIsCalibrated] = useState(false);
+  const [tigerViewMode, setTigerViewMode] = useState<'normal' | 'simulated'>('normal');
+  const [chartViewMode, setChartViewMode] = useState<'normal' | 'simulated'>('normal');
 
   useEffect(() => {
     const cached = localStorage.getItem('chromashift_cvd_profile');
@@ -95,149 +90,38 @@ export const LandingPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const rgb2lms = [
-      [0.3904725,  0.54990437, 0.00890159],
-      [0.07092586, 0.96310739, 0.00135809],
-      [0.02314268, 0.12801221, 0.93605194]
-    ];
-    const lms2rgb = [
-      [ 2.85831110, -1.62870796, -0.02481870],
-      [-0.21043478,  1.15841493,  0.00032046],
-      [-0.04188950, -0.11815433,  1.06888657]
-    ];
-    
-    let cvd: number[][];
-    let err2mod: number[][];
-    
-    if (cvdType === 'protanopia') {
-      cvd = [
-        [0.0, 0.90822864, 0.00819200],
-        [0.0, 1.0,        0.0],
-        [0.0, 0.0,        1.0]
-      ];
-      err2mod = [
-        [0.0, 0.0, 0.0],
-        [0.7, 1.0, 0.0],
-        [0.7, 0.0, 1.0]
-      ];
-    } else if (cvdType === 'tritanopia') {
-      cvd = [
-        [1.0,         0.0,        0.0],
-        [0.0,         1.0,        0.0],
-        [-0.15773032, 1.19465634, 0.0]
-      ];
-      err2mod = [
-        [1.0, 0.0, 0.7],
-        [0.0, 1.0, 0.7],
-        [0.0, 0.0, 0.0]
-      ];
-    } else {
-      // Deuteranopia
-      cvd = [
-        [1.0,        0.0, 0.0],
-        [1.10104433, 0.0, -0.00901975],
-        [0.0,        0.0, 1.0]
-      ];
-      err2mod = [
-        [1.0, 0.7, 0.0],
-        [0.0, 0.0, 0.0],
-        [0.0, 0.7, 1.0]
-      ];
-    }
 
-    const matMul3x3 = (A: number[][], B: number[][]) => {
-      const C = Array(3).fill(0).map(() => Array(3).fill(0));
-      for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-          let sum = 0;
-          for (let k = 0; k < 3; k++) {
-            sum += A[i][k] * B[k][j];
-          }
-          C[i][j] = sum;
-        }
-      }
-      return C;
-    };
-    
-    const matSub3x3 = (A: number[][], B: number[][]) => {
-      const C = Array(3).fill(0).map(() => Array(3).fill(0));
-      for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-          C[i][j] = A[i][j] - B[i][j];
-        }
-      }
-      return C;
-    };
-    
-    const identity3x3 = [
-      [1, 0, 0],
-      [0, 1, 0],
-      [0, 0, 1]
-    ];
-
-    const S_mat = matMul3x3(matMul3x3(lms2rgb, cvd), rgb2lms);
-    const I_minus_S = matSub3x3(identity3x3, S_mat);
-    const M_err_remap = matMul3x3(err2mod, I_minus_S);
-    
-    const M_daltonize = Array(3).fill(0).map(() => Array(3).fill(0));
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        M_daltonize[i][j] = identity3x3[i][j] + severity * M_err_remap[i][j];
-      }
-    }
-
-    setMatrixValues(
-      `${M_daltonize[0][0]} ${M_daltonize[0][1]} ${M_daltonize[0][2]} 0 0  ${M_daltonize[1][0]} ${M_daltonize[1][1]} ${M_daltonize[1][2]} 0 0  ${M_daltonize[2][0]} ${M_daltonize[2][1]} ${M_daltonize[2][2]} 0 0  0 0 0 1 0`
-    );
-  }, [cvdType, severity]);
-
-  // Keyboard control for split slider
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft')  setSliderPosition(p => Math.max(0, p - 2));
-      if (e.key === 'ArrowRight') setSliderPosition(p => Math.min(100, p + 2));
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  const demoImages = [
-    { key: '/financial_pie_chart.png',             label: 'Pie Chart' },
-    { key: '/financial_multi_line.webp', label: 'Line Graph' },
-    { key: '/temperature_heatmap.png',              label: 'Heatmap' },
-  ];
 
   const technicalCredibility = [
     {
       icon: FiZap,
-      title: 'Real-Time Color Correction',
-      body: 'Runs instantly on your computer using local browser processing for fast, private remapping.',
+      title: 'Smart AI Image Detection',
+      body: 'Our advanced AI engine distinguishes people from backgrounds, ensuring skin tones stay natural while correcting everything else.',
     },
     {
       icon: FiVideo,
-      title: 'Flicker-Free Viewing',
-      body: 'Enjoy smooth, color-corrected videos without the flashing and jittering caused by basic tools.',
+      title: 'Smooth Video Processing',
+      body: 'Enjoy seamless, color-corrected videos without the distracting flashing and flickering caused by basic tools.',
     },
     {
       icon: FiFileText,
       title: 'Preserves Selectable Text',
-      body: 'Color-corrects documents without rasterizing them, so your screen readers and links still work.',
+      body: 'Color-corrects documents without turning them into flat images, so your screen readers and links still work perfectly.',
     },
     {
       icon: FiEye,
-      title: 'Protects Skin Tones',
-      body: 'While other filters turn faces green or grey, our smart engine only corrects what needs correcting.',
+      title: 'Interactive Personal Calibration',
+      body: 'A quick, intuitive wizard learns exactly how your eyes work to tune the screen to your specific needs, not generic presets.',
     },
     {
       icon: FiShield,
-      title: 'Smart Charts & Graphs',
-      body: 'Adds physical patterns to data charts so you don\'t rely only on color to read them.',
+      title: 'Automatic Chart Textures',
+      body: 'Automatically adds subtle patterns to data charts, ensuring you don\'t have to rely purely on color to read them.',
     },
     {
       icon: FiSliders,
-      title: 'Personalized Vision Tuning',
-      body: 'A quick interactive wizard tunes the screen to your specific eyes, rather than generic presets.',
+      title: 'Real-Time & Private',
+      body: 'All adjustments happen instantly on your device. Your data stays private and never leaves your computer.',
     },
   ];
 
@@ -319,7 +203,7 @@ export const LandingPage: React.FC = () => {
                 e.currentTarget.style.boxShadow = '0 8px 20px rgba(79, 70, 229, 0.3)';
               }}
             >
-              <span>Start Free</span>
+              <span>Start Now</span>
               <FiArrowRight />
             </button>
             <button
@@ -469,238 +353,146 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── Interactive Demo Section ── */}
+      {/* ── Basic Filters vs. Smart Rendering ── */}
       <section style={{
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border-primary)',
         borderRadius: 'var(--radius-xl)',
-        padding: '64px 24px',
+        padding: '64px clamp(12px, 4vw, 24px)',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* SVG filter matrix definition */}
+        {/* SVG filter matrix definition for simulation */}
         <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
           <defs>
-            <filter id="demo-daltonize-filter" colorInterpolationFilters="linearRGB">
-              <feColorMatrix type="matrix" values={matrixValues} />
+            <filter id="sim-deuteranopia" colorInterpolationFilters="linearRGB">
+              <feColorMatrix type="matrix" values="0.41563 0.58437 0 0 0  0.41563 0.58437 0 0 0  -0.04239 0.04239 1 0 0  0 0 0 1 0" />
             </filter>
           </defs>
         </svg>
 
-        <div className="container vstack gap-6" style={{ maxWidth: '800px' }}>
+        <div className="container vstack gap-12" style={{ maxWidth: '1000px' }}>
           <div style={{ textAlign: 'center' }}>
-            <span className="badge badge-primary" style={{ marginBottom: '16px', padding: '6px 12px' }}>Interactive Sandbox</span>
-            <h2 style={{ marginBottom: '12px' }}>Experience the Shift</h2>
-            <p style={{ color: 'var(--text-secondary)' }}>
-              Select a data chart below, choose your vision deficiency type, and drag the slider to verify how ChromaShift restores legibility.
+            <span className="badge badge-primary" style={{ marginBottom: '16px', padding: '6px 12px' }}>Smart Rendering Engine</span>
+            <h2 style={{ marginBottom: '12px' }}>Basic Filters vs. ChromaShift</h2>
+            <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
+              Standard tools use rigid color overlays that ruin photos and break documents. Our content-aware engine treats every pixel intelligently.
             </p>
           </div>
 
-          {/* Controls Dashboard */}
-          <div className="card-solid vstack gap-4" style={{ width: '100%', border: '1px solid var(--border-secondary)' }}>
-            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-              <div className="form-group">
-                <label className="label" htmlFor="cvd-selector">Deficiency Type</label>
-                <select
-                  id="cvd-selector"
-                  value={cvdType}
-                  onChange={e => setCvdType(e.target.value)}
-                  className="select"
-                >
-                  <option value="protanopia">Protanopia (Red-Blind)</option>
-                  <option value="deuteranopia">Deuteranopia (Green-Blind)</option>
-                  <option value="tritanopia">Tritanopia (Blue-Blind)</option>
-                </select>
+          <div className="grid gap-8" style={{ gridTemplateColumns: '1fr' }}>
+            {/* Protects Natural Tones */}
+            <div className="card-solid animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: 'clamp(16px, 5vw, 32px)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="hstack gap-3" style={{ alignItems: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FiEye size={20} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.25rem)' }}>Protects Natural Skin Tones</h3>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>While standard filters turn faces grey or green, our Smart AI Image Detection identifies people and animals. It aggressively corrects the background while leaving skin tones perfectly natural.</p>
               </div>
 
-              {[
-                { label: 'Severity',   val: severity,   setVal: setSeverity,   min: 0.1, max: 1.5 },
-                { label: 'Brightness', val: intensity,  setVal: setIntensity,  min: 0.5, max: 1.5 },
-                { label: 'Contrast',   val: contrast,   setVal: setContrast,   min: 0.5, max: 1.5 },
-                { label: 'Saturation', val: saturation, setVal: setSaturation, min: 0.5, max: 1.5 },
-              ].map(({ label, val, setVal, min, max }) => (
-                <div key={label} className="form-group">
-                  <div className="hstack" style={{ justifyContent: 'space-between' }}>
-                    <label className="label">{label}</label>
-                    <span className="text-mono" style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'var(--fw-bold)' }}>
-                      {val.toFixed(2)}
-                    </span>
+              {/* Toggle Buttons */}
+              <div className="hstack gap-2" style={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
+                <button 
+                  onClick={() => setTigerViewMode('normal')} 
+                  className={`btn btn-sm ${tigerViewMode === 'normal' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '6px 10px', fontSize: 'clamp(0.7rem, 2.5vw, 0.85rem)', whiteSpace: 'nowrap' }}
+                >
+                  Normal Vision
+                </button>
+                <button 
+                  onClick={() => setTigerViewMode('simulated')} 
+                  className={`btn btn-sm ${tigerViewMode === 'simulated' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '6px 10px', fontSize: 'clamp(0.7rem, 2.5vw, 0.85rem)', whiteSpace: 'nowrap' }}
+                >
+                  Colorblind Simulation
+                </button>
+              </div>
+
+              <div style={{ 
+                borderRadius: 'var(--radius-md)', 
+                overflow: 'hidden', 
+                border: '1px solid var(--border-secondary)',
+                filter: tigerViewMode === 'simulated' ? 'url(#sim-deuteranopia)' : 'none',
+                transition: 'filter 0.3s ease'
+              }}>
+                <BeforeAfterSlider beforeSrc="/demo/tiger_original.jpg" afterSrc="/demo/tiger_processed.jpg" alt="tiger skin tones" />
+              </div>
+            </div>
+
+            {/* Smart Charts & Graphs */}
+            <div className="card-solid animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: 'clamp(16px, 5vw, 32px)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="hstack gap-3" style={{ alignItems: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FiSliders size={20} />
                   </div>
-                  <div className="slider-container">
-                    <input
-                      type="range"
-                      min={min}
-                      max={max}
-                      step={0.05}
-                      value={val}
-                      onChange={e => setVal(parseFloat(e.target.value))}
-                      className="slider"
-                    />
-                  </div>
+                  <h3 style={{ margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.25rem)' }}>Automatic Chart Textures</h3>
                 </div>
-              ))}
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Color isn't enough. ChromaShift detects charts and injects physical textures (like stripes and dots) into the data, guaranteeing WCAG 1.4.1 compliance.</p>
+              </div>
+
+              {/* Toggle Buttons */}
+              <div className="hstack gap-2" style={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
+                <button 
+                  onClick={() => setChartViewMode('normal')} 
+                  className={`btn btn-sm ${chartViewMode === 'normal' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '6px 10px', fontSize: 'clamp(0.7rem, 2.5vw, 0.85rem)', whiteSpace: 'nowrap' }}
+                >
+                  Normal Vision
+                </button>
+                <button 
+                  onClick={() => setChartViewMode('simulated')} 
+                  className={`btn btn-sm ${chartViewMode === 'simulated' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '6px 10px', fontSize: 'clamp(0.7rem, 2.5vw, 0.85rem)', whiteSpace: 'nowrap' }}
+                >
+                  Colorblind Simulation
+                </button>
+              </div>
+
+              <div style={{ 
+                borderRadius: 'var(--radius-md)', 
+                overflow: 'hidden', 
+                border: '1px solid var(--border-secondary)',
+                filter: chartViewMode === 'simulated' ? 'url(#sim-deuteranopia)' : 'none',
+                transition: 'filter 0.3s ease'
+              }}>
+                <BeforeAfterSlider beforeSrc="/stacked_bar_chart.png" afterSrc="/demo/chart_processed.png" alt="chart textures" />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button
-                onClick={() => { setCvdType('protanopia'); setSeverity(1.0); setIntensity(1.0); setContrast(1.0); setSaturation(1.0); }}
-                className="btn btn-sm btn-ghost"
-              >
-                Reset Demo
-              </button>
-            </div>
-          </div>
-
-          {/* Active Image Selector */}
-          <div className="hstack gap-2" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            {demoImages.map(img => (
-              <button
-                key={img.key}
-                onClick={() => setActiveDemoImage(img.key)}
-                className={`btn btn-sm ${activeDemoImage === img.key ? 'btn-primary' : 'btn-outline'}`}
-              >
-                {img.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Split Slider Preview Box */}
-          <div
-            className="card-solid"
-            style={{
-              position: 'relative',
-              width: '100%',
-              height: '380px',
-              padding: 0,
-              overflow: 'hidden',
-              backgroundColor: '#0f0a2e',
-              border: '1px solid var(--border-secondary)',
-              boxShadow: 'var(--shadow-xl)',
-            }}
-          >
-            {/* Original Image */}
-            <img 
-              src={activeDemoImage} 
-              alt="Original chart prior to color calibration" 
-              style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }} 
-            />
-
-            {/* Corrected Overlay */}
-            <img
-              src={activeDemoImage}
-              alt="Calibrated chart using Daltonization filter"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                pointerEvents: 'none',
-                userSelect: 'none',
-                filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})`,
-                clipPath: `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)`,
-              }}
-            />
-
-            {/* Split Line */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: `${sliderPosition}%`,
-              width: '2px',
-              backgroundColor: 'white',
-              boxShadow: '0 0 8px rgba(0,0,0,0.5)',
-              transform: 'translateX(-50%)',
-              pointerEvents: 'none',
-              zIndex: 2
-            }} />
-
-            {/* Slider Handle */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: `${sliderPosition}%`,
-              transform: 'translate(-50%, -50%)',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              backgroundColor: 'white',
-              border: '3px solid var(--primary)',
-              boxShadow: 'var(--shadow-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
-              zIndex: 3,
-              fontSize: '0.6rem',
-              fontWeight: 'bold',
-              color: 'var(--primary)'
-            }}>
-              ◀ ▶
+            {/* Non-Destructive PDF Vectors */}
+            <div className="card-solid animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: 'clamp(16px, 5vw, 32px)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="hstack gap-3" style={{ alignItems: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FiFileText size={20} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.25rem)' }}>Non-Destructive PDFs</h3>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Unlike tools that turn PDFs into giant, unreadable images, ChromaShift redraws the vector paths. Text remains selectable, screen readers work, and hyperlinks stay active.</p>
+              </div>
+              <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-secondary)' }}>
+                <img src="/demo/Non-Destructive PDF Vectors.png" alt="PDF comparison" style={{ width: '100%', height: 'auto', display: 'block' }} />
+              </div>
             </div>
 
-            {/* HUD badges */}
-            <div className="badge badge-success" style={{ position: 'absolute', left: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'rgba(0, 0, 0, 0.65)', border: 'none', color: 'white', padding: '6px 12px' }}>
-              Original
-            </div>
-            <div className="badge badge-primary" style={{ position: 'absolute', right: '16px', top: '16px', zIndex: 4, textTransform: 'uppercase', backgroundColor: 'var(--primary)', border: 'none', color: 'white', padding: '6px 12px' }}>
-              Calibrated
-            </div>
-
-            {/* Native range input to handle dragging */}
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={sliderPosition}
-              onChange={e => setSliderPosition(parseInt(e.target.value))}
-              aria-label="Before after comparison slider"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                opacity: 0,
-                cursor: 'ew-resize',
-                zIndex: 5
-              }}
-            />
-          </div>
-
-          {/* Live Video Demo */}
-          <div style={{ width: '100%', marginTop: '32px' }}>
-            <div className="vstack gap-2" style={{ alignItems: 'center', marginBottom: '16px' }}>
-              <span className="text-mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Flicker-Free Temporal Video Remapping
-              </span>
-            </div>
-            <div style={{
-              borderRadius: 'var(--radius-md)',
-              overflow: 'hidden',
-              border: '1px solid var(--border-secondary)',
-              position: 'relative',
-              backgroundColor: 'black'
-            }}>
-              <span className="badge badge-primary" style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 6, fontSize: '0.65rem', padding: '6px 12px' }}>
-                WebGL Engine
-              </span>
-              <video
-                src="/infographic_motion.mp4"
-                controls
-                autoPlay
-                loop
-                muted
-                playsInline
-                style={{
-                  width: '100%',
-                  height: 'auto',
-                  display: 'block',
-                  filter: `url(#demo-daltonize-filter) brightness(${intensity}) contrast(${contrast}) saturate(${saturation})`
-                }}
-              />
+            {/* Flicker-Free Temporal Video Remapping */}
+            <div className="card-solid animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: 'clamp(16px, 5vw, 32px)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="hstack gap-3" style={{ alignItems: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FiVideo size={20} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.25rem)' }}>Smooth Video Processing</h3>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Enjoy perfectly smooth, color-corrected videos without the flashing, jittering, or fatigue caused by standard accessibility tools.</p>
+              </div>
+              <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-secondary)' }}>
+                <img src="/demo/Flicker-Free Video.gif" alt="Smooth Video Processing" style={{ width: '100%', height: 'auto', display: 'block' }} />
+              </div>
             </div>
           </div>
         </div>

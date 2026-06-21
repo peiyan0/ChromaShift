@@ -773,7 +773,7 @@ export const CalibrationWizard: FC = () => {
 
             <button 
               onClick={startCalibration}
-              className="btn btn-lg btn-primary"
+              className="btn btn-lg btn-primary animate-pulse-border"
               style={{ marginTop: '16px', padding: '14px 40px' }}
             >
               <FiPlay size={16} />
