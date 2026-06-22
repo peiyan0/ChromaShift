@@ -256,6 +256,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
       >
 
       <div
+        key={step}
         style={windowWidth <= 768 ? {
           padding: '16px',
           backgroundColor: 'var(--bg-primary)'
@@ -272,15 +273,15 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
           <div className="vstack gap-2" style={{ width: '100%', marginBottom: 'var(--space-4)' }}>
             <div className="hstack" style={{ justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
               <span className="badge badge-primary" style={{ padding: '6px 12px' }}>
-                Step {step} of {totalSteps}
+                <span>Step </span><span>{step}</span><span> of </span><span>{totalSteps}</span>
               </span>
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', flexWrap: 'wrap', textAlign: 'right' }}>
-                {step === 1 && "Demographics Intake"}
-                {step === 2 && "System Usability Scale (SUS)"}
-                {step === 3 && "NASA Task Load Index"}
-                {step === 4 && "Visual Comfort Scale"}
-                {step === 5 && "Open-Ended Interview Logs"}
-                {step === 6 && "Summary & Verification"}
+                {step === 1 && <span>Demographics Intake</span>}
+                {step === 2 && <span>System Usability Scale (SUS)</span>}
+                {step === 3 && <span>NASA Task Load Index</span>}
+                {step === 4 && <span>Visual Comfort Scale</span>}
+                {step === 5 && <span>Open-Ended Interview Logs</span>}
+                {step === 6 && <span>Summary & Verification</span>}
               </span>
             </div>
             {/* Progress bar */}
@@ -605,7 +606,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                   }}
                 >
                   <span style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                    {idx + 1}. {q.label}
+                    <span>{idx + 1}. </span><span>{q.label}</span>
                   </span>
 
                   <div className="vstack gap-2">
@@ -686,7 +687,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>1. Mental Demand</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaMental} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaMental}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   How much mental effort (e.g., thinking, deciding, searching, remembering) did the tasks require?
@@ -728,7 +729,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>2. Physical Demand (Eye Strain)</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaPhysical} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaPhysical}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   How much physical discomfort did you experience? (e.g., squinting, eye strain, head positioning, focusing)
@@ -770,7 +771,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>3. Temporal Demand</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaTemporal} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaTemporal}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   Did you feel rushed or pressured by the rate or pace at which the tasks had to be completed?
@@ -812,7 +813,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>4. Performance Success</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaPerformance} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaPerformance}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   How successful and satisfied were you with your ability to complete the tasks?
@@ -854,7 +855,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>5. Overall Effort</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaEffort} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaEffort}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   How hard did you have to work (both mentally and physically) to achieve your level of performance?
@@ -896,7 +897,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-2" style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--text-primary)' }}>6. Frustration Level</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{nasaFrustration} / 20</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{nasaFrustration}</span> / 20</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 var(--space-2) 0' }}>
                   How discouraged, irritated, stressed, or annoyed did you feel during the tasks?
@@ -982,7 +983,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>My eyes felt comfortable while using the app.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ1} / 5</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{comfortQ1}</span> / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -1005,7 +1006,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I experienced eye strain or tired eyes.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ2} / 5</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{comfortQ2}</span> / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -1028,7 +1029,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I developed a headache during the tests.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ3} / 5</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{comfortQ3}</span> / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -1051,7 +1052,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-3" style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>The adjusted colors (Daltonized view) were more comfortable to view than the original.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ4} / 5</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{comfortQ4}</span> / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -1074,7 +1075,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <div className="vstack gap-3">
                 <div className="hstack" style={{ justifyContent: 'space-between', fontSize: '0.875rem', gap: '8px' }}>
                   <span style={{ fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>I would use these color settings for daily screen time.</span>
-                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>{comfortQ5} / 5</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}><span>{comfortQ5}</span> / 5</span>
                 </div>
                 <div className="slider-container">
                   <input
@@ -1305,11 +1306,11 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
                 color: 'var(--text-primary)'
               }}
             >
-              <div><strong>Age</strong>: {age}</div>
-              <div><strong>CVD Type</strong>: {cvdType}</div>
-              <div><strong>Formally Diagnosed</strong>: {diagnosed}</div>
-              <div><strong>Average SUS Confidence</strong>: Rating registered</div>
-              <div><strong>NASA Workload Score</strong>: Rating registered</div>
+              <div><strong>Age</strong>: <span>{age}</span></div>
+              <div><strong>CVD Type</strong>: <span>{cvdType}</span></div>
+              <div><strong>Formally Diagnosed</strong>: <span>{diagnosed}</span></div>
+              <div><strong>Average SUS Confidence</strong>: <span>Rating registered</span></div>
+              <div><strong>NASA Workload Score</strong>: <span>Rating registered</span></div>
             </div>
 
             <div 

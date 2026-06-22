@@ -648,6 +648,7 @@ export const VisionTest: FC = () => {
         </svg>
 
       <div
+        key={`${testPhase}-${currentTaskIndex}`}
         style={{
           padding: 'var(--space-8)',
           backgroundColor: 'var(--bg-primary)',
@@ -802,7 +803,7 @@ export const VisionTest: FC = () => {
 
             <div className="vstack gap-2">
               <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                {testMode === 'official' ? 'Visual Testing' : 'Visual Playground'}
+                <span>{testMode === 'official' ? 'Visual Testing' : 'Visual Playground'}</span>
               </h2>
               <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto' }}>
                 Complete the tasks in two phases: Phase 1 with <strong>Original Colors</strong>, and Phase 2 with <strong>Corrected Colors</strong>.
@@ -892,16 +893,16 @@ export const VisionTest: FC = () => {
                   {testPhase === 'test_original' ? 'Phase 1: Original Colors' : 'Phase 2: Corrected Colors (Active)'}
                 </span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--text-primary)' }}>
-                  {currentTaskIndex === 0 && "Task 1 of 6: Line Graph Legibility"}
-                  {currentTaskIndex === 1 && "Task 2 of 6: Color-Dependent Bar Status"}
-                  {currentTaskIndex === 2 && "Task 3 of 6: Interactive Server Node Alert"}
-                  {currentTaskIndex === 3 && "Task 4 of 6: Dynamic Video Target Tracking"}
-                  {currentTaskIndex === 4 && "Task 5 of 6: PDF Map Shading Comprehension"}
-                  {currentTaskIndex === 5 && "Task 6 of 6: Natural Scene Fruit Spotting"}
+                  {currentTaskIndex === 0 && <span>Task 1 of 6: Line Graph Legibility</span>}
+                  {currentTaskIndex === 1 && <span>Task 2 of 6: Color-Dependent Bar Status</span>}
+                  {currentTaskIndex === 2 && <span>Task 3 of 6: Interactive Server Node Alert</span>}
+                  {currentTaskIndex === 3 && <span>Task 4 of 6: Dynamic Video Target Tracking</span>}
+                  {currentTaskIndex === 4 && <span>Task 5 of 6: PDF Map Shading Comprehension</span>}
+                  {currentTaskIndex === 5 && <span>Task 6 of 6: Natural Scene Fruit Spotting</span>}
                 </h3>
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>
-                Progress: {Math.round(((currentTaskIndex) / 6) * 100)}%
+                <span>Progress: </span><span>{Math.round(((currentTaskIndex) / 6) * 100)}</span><span>%</span>
               </span>
             </div>
             
@@ -1313,8 +1314,8 @@ export const VisionTest: FC = () => {
                                 );
                               }}
                             >
-                              <span style={{ flex: 1, fontSize: '0.875rem', color: 'white', fontWeight: '700' }}>#{rowId}</span>
-                              <span style={{ flex: 2, fontSize: '0.875rem', color: 'white' }}>{rowName}</span>
+                              <span style={{ flex: 1, fontSize: '0.875rem', color: 'white', fontWeight: '700' }}><span>#</span><span>{rowId}</span></span>
+                              <span style={{ flex: 2, fontSize: '0.875rem', color: 'white' }}><span>{rowName}</span></span>
                               <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', color: 'white' }}>
                                 {isSelected && <FiCheckCircle size={16} />}
                               </div>
@@ -1364,16 +1365,16 @@ export const VisionTest: FC = () => {
                     </span>
                   </div>
                   <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                    {currentTaskIndex === 0 && (testPhase === 'test_original' ? task1Data.original.question : task1Data.corrected.question)}
-                    {currentTaskIndex === 1 && (testPhase === 'test_original' ? task2Data.original.question : task2Data.corrected.question)}
-                    {currentTaskIndex === 2 && "Click on the single status node in critical alert (Red)."}
-                    {currentTaskIndex === 3 && (testMode === 'official' 
+                    {currentTaskIndex === 0 && <span>{testPhase === 'test_original' ? task1Data.original.question : task1Data.corrected.question}</span>}
+                    {currentTaskIndex === 1 && <span>{testPhase === 'test_original' ? task2Data.original.question : task2Data.corrected.question}</span>}
+                    {currentTaskIndex === 2 && <span>Click on the single status node in critical alert (Red).</span>}
+                    {currentTaskIndex === 3 && <span>{testMode === 'official' 
                       ? "Transition Rule: Only Accept (Orange → Green) transitions. Evaluate the transition when it completes." 
-                      : "Transition Rule: Only Accept (Red → Green) transitions. Evaluate the transition when it completes.")}
-                    {currentTaskIndex === 4 && (testMode === 'official' 
+                      : "Transition Rule: Only Accept (Red → Green) transitions. Evaluate the transition when it completes."}</span>}
+                    {currentTaskIndex === 4 && <span>{testMode === 'official' 
                       ? "Select all rows indicating 'Failure' status (Red backgrounds)." 
-                      : "Select all rows indicating 'Success' status (Green backgrounds).")}
-                    {currentTaskIndex === 5 && (testPhase === 'test_original' ? task6Data.original.question : task6Data.corrected.question)}
+                      : "Select all rows indicating 'Success' status (Green backgrounds)."}</span>}
+                    {currentTaskIndex === 5 && <span>{testPhase === 'test_original' ? task6Data.original.question : task6Data.corrected.question}</span>}
                   </h4>
                 </div>
 
@@ -1432,7 +1433,7 @@ export const VisionTest: FC = () => {
                               />
                             )}
                           </div>
-                          <span style={{ fontWeight: '600' }}>{opt}</span>
+                          <span style={{ fontWeight: '600' }}><span>{opt}</span></span>
                         </button>
                       );
                     })}
@@ -1642,7 +1643,7 @@ export const VisionTest: FC = () => {
                 }}
               >
                 <span style={{ fontSize: '0.875rem', color: 'var(--primary)', fontWeight: '700' }}>
-                  🔐 Participant ID Registered: <code style={{ fontFamily: 'var(--font-mono)' }}>{participantUuid}</code>
+                  <span>🔐 Participant ID Registered: </span><code style={{ fontFamily: 'var(--font-mono)' }}>{participantUuid}</code>
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                   All metrics, System Usability values, and NASA workloads have been securely locked in ChromaShift's central database for admin review.
@@ -1672,17 +1673,17 @@ export const VisionTest: FC = () => {
                     Overall Task Accuracy
                   </span>
                   <span className={`badge ${corrAccuracy >= origAccuracy ? 'badge-success' : 'badge-error'}`} style={{ padding: '6px 12px' }}>
-                    {corrAccuracy >= origAccuracy ? `+${corrAccuracy - origAccuracy}% Accuracy` : 'No improvement'}
+                    <span>{corrAccuracy >= origAccuracy ? `+${corrAccuracy - origAccuracy}% Accuracy` : 'No improvement'}</span>
                   </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   <div className="card-solid vstack gap-1" style={{ backgroundColor: 'rgba(234, 88, 12, 0.05)', border: '1px solid rgba(234, 88, 12, 0.1)', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>Original Colors</span>
-                    <span style={{ fontSize: '1.75rem', color: 'var(--color-warning)', fontWeight: '900' }}>{origAccuracy}%</span>
+                    <span style={{ fontSize: '1.75rem', color: 'var(--color-warning)', fontWeight: '900' }}><span>{origAccuracy}</span><span>%</span></span>
                   </div>
                   <div className="card-solid vstack gap-1" style={{ backgroundColor: 'rgba(13, 148, 136, 0.05)', border: '1px solid rgba(13, 148, 136, 0.1)', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>Corrected Colors</span>
-                    <span style={{ fontSize: '1.75rem', color: 'var(--color-success)', fontWeight: '900' }}>{corrAccuracy}%</span>
+                    <span style={{ fontSize: '1.75rem', color: 'var(--color-success)', fontWeight: '900' }}><span>{corrAccuracy}</span><span>%</span></span>
                   </div>
                 </div>
               </div>
@@ -1701,17 +1702,17 @@ export const VisionTest: FC = () => {
                     Average Completion Speed
                   </span>
                   <span className={`badge ${origTime > corrTime ? 'badge-success' : 'badge-error'}`} style={{ padding: '6px 12px' }}>
-                    {origTime > corrTime ? `${Math.round((origTime / corrTime) * 10) / 10}x Faster` : 'No improvement'}
+                    <span>{origTime > corrTime ? `${Math.round((origTime / corrTime) * 10) / 10}x Faster` : 'No improvement'}</span>
                   </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   <div className="card-solid vstack gap-1" style={{ backgroundColor: 'rgba(234, 88, 12, 0.05)', border: '1px solid rgba(234, 88, 12, 0.1)', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>Original Colors</span>
-                    <span style={{ fontSize: '1.75rem', color: 'var(--color-warning)', fontWeight: '900' }}>{origTime}s</span>
+                    <span style={{ fontSize: '1.75rem', color: 'var(--color-warning)', fontWeight: '900' }}><span>{origTime}</span><span>s</span></span>
                   </div>
                   <div className="card-solid vstack gap-1" style={{ backgroundColor: 'rgba(13, 148, 136, 0.05)', border: '1px solid rgba(13, 148, 136, 0.1)', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>Corrected Colors</span>
-                    <span style={{ fontSize: '1.75rem', color: 'var(--color-success)', fontWeight: '900' }}>{corrTime}s</span>
+                    <span style={{ fontSize: '1.75rem', color: 'var(--color-success)', fontWeight: '900' }}><span>{corrTime}</span><span>s</span></span>
                   </div>
                 </div>
               </div>
@@ -1733,11 +1734,11 @@ export const VisionTest: FC = () => {
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto', lineHeight: '1.4' }}>
                 {corrAccuracy > origAccuracy && origTime > corrTime ? (
-                  `Active color remapping successfully resolved color confusion! You achieved ${corrAccuracy}% accuracy (${corrAccuracy - origAccuracy}% higher than original) while solving tasks ${Math.round((origTime / corrTime) * 10) / 10}x faster.`
+                  <span>Active color remapping successfully resolved color confusion! You achieved <span>{corrAccuracy}</span>% accuracy (<span>{corrAccuracy - origAccuracy}</span>% higher than original) while solving tasks <span>{Math.round((origTime / corrTime) * 10) / 10}</span>x faster.</span>
                 ) : origTime > corrTime ? (
-                  `Color correction significantly reduced visual strain! You completed tasks in ${corrTime} seconds average, which is ${(origTime - corrTime).toFixed(1)}s faster than standard colors.`
+                  <span>Color correction significantly reduced visual strain! You completed tasks in <span>{corrTime}</span> seconds average, which is <span>{(origTime - corrTime).toFixed(1)}</span>s faster than standard colors.</span>
                 ) : (
-                  `Color remapping allows you to clearly identify intersecting lines, alert highlights, and bar statuses with absolute confidence!`
+                  <span>Color remapping allows you to clearly identify intersecting lines, alert highlights, and bar statuses with absolute confidence!</span>
                 )}
               </p>
             </div>
