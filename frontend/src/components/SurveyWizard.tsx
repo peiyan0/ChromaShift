@@ -448,7 +448,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="gender">Gender</label>
+                <label className="label" htmlFor="gender">Gender <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="gender" className="select" value={gender} onChange={e => setGender(e.target.value)}>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -471,7 +471,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="education">Education Level</label>
+                <label className="label" htmlFor="education">Education Level <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="education" className="select" value={education} onChange={e => setEducation(e.target.value)}>
                   <option value="High School">High School</option>
                   <option value="Bachelor's">Bachelor's</option>
@@ -482,7 +482,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="cvdType">Color Blindness (CVD) Type</label>
+                <label className="label" htmlFor="cvdType">Color Blindness (CVD) Type <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="cvdType" className="select" value={cvdType} onChange={e => setCvdType(e.target.value)}>
                   <option value="Normal">Normal / Standard Vision</option>
                   <option value="Deuteran">Green-weak (Deuteran / Deuteranomaly)</option>
@@ -493,7 +493,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="diagnosed">Is this Formally Diagnosed?</label>
+                <label className="label" htmlFor="diagnosed">Is this Formally Diagnosed? <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="diagnosed" className="select" value={diagnosed} onChange={e => setDiagnosed(e.target.value)}>
                   <option value="Yes">Yes (By eye professional)</option>
                   <option value="No">No</option>
@@ -502,7 +502,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="priorTools">Prior CVD Correction Tool Usage</label>
+                <label className="label" htmlFor="priorTools">Prior CVD Correction Tool Usage <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="priorTools" className="select" value={priorTools} onChange={e => setPriorTools(e.target.value)}>
                   <option value="None">None</option>
                   <option value="EnChroma">EnChroma Glasses</option>
@@ -512,7 +512,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="glassesFreq">Do you regularly wear color glasses?</label>
+                <label className="label" htmlFor="glassesFreq">Do you regularly wear color glasses? <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="glassesFreq" className="select" value={glassesFreq} onChange={e => setGlassesFreq(e.target.value)}>
                   <option value="Never">Never</option>
                   <option value="Occasionally">Occasionally</option>
@@ -521,7 +521,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="appComfort">Web Application Comfort Level</label>
+                <label className="label" htmlFor="appComfort">Web Application Comfort Level <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="appComfort" className="select" value={appComfort} onChange={e => setAppComfort(e.target.value)}>
                   <option value="Very Uncomf.">Very Uncomfortable</option>
                   <option value="Uncomf.">Uncomfortable</option>
@@ -532,7 +532,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               </div>
 
               <div className="form-group">
-                <label className="label" htmlFor="deviceFreq">Weekly Computer / Screen Use</label>
+                <label className="label" htmlFor="deviceFreq">Weekly Computer / Screen Use <span style={{ color: 'var(--color-error)' }}>*</span></label>
                 <select id="deviceFreq" className="select" value={deviceFreq} onChange={e => setDeviceFreq(e.target.value)}>
                   <option value="<5 hrs/week">&lt; 5 hours/week</option>
                   <option value="5-15 hrs">5–15 hours/week</option>
@@ -563,7 +563,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <button
                 className="btn btn-primary btn-lg"
                 onClick={nextStep}
-                disabled={!age || !occupation}
+                disabled={!age || !gender || !occupation || !education || !cvdType || !diagnosed || !priorTools || !glassesFreq || !appComfort || !deviceFreq}
                 style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
               >
                 Proceed to Usability Scale
@@ -1147,7 +1147,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
             >
               <div className="form-group">
                 <label className="label" htmlFor="visualTransitions">
-                  1. Did you experience any flickering, lag, or visual latency during transitions?
+                  1. Did you experience any flickering, lag, or visual latency during transitions? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="visualTransitions"
@@ -1160,7 +1160,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="naturalness">
-                  2. Was the remapped color contrast correction natural, wrong, or oversaturated?
+                  2. Was the remapped color contrast correction natural, wrong, or oversaturated? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="naturalness"
@@ -1173,7 +1173,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="onboardingWizard">
-                  3. Was the interactive profile calibration easy to understand?
+                  3. Was the interactive profile calibration easy to understand? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="onboardingWizard"
@@ -1186,7 +1186,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="frustratingAspects">
-                  4. What was the most frustrating part of using the ChromaShift platform?
+                  4. What was the most frustrating part of using the ChromaShift platform? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="frustratingAspects"
@@ -1199,7 +1199,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="helpfulAspects">
-                  5. What was the most helpful or surprising feature you discovered?
+                  5. What was the most helpful or surprising feature you discovered? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="helpfulAspects"
@@ -1212,7 +1212,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="dailyLifeUse">
-                  6. How would you integrate ChromaShift into your daily digital routine?
+                  6. How would you integrate ChromaShift into your daily digital routine? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="dailyLifeUse"
@@ -1225,7 +1225,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="scenariosUse">
-                  7. In what scenarios or daily activities would this application be most useful to you?
+                  7. In what scenarios or daily activities would this application be most useful to you? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="scenariosUse"
@@ -1238,7 +1238,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="openFeedback">
-                  8. Open-Ended Comments / Recommendations
+                  8. Open-Ended Comments / Recommendations <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="openFeedback"
@@ -1270,6 +1270,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
               <button 
                 className="btn btn-primary btn-lg" 
                 onClick={nextStep}
+                disabled={!visualTransitions || !naturalness || !onboardingWizard || !frustratingAspects || !helpfulAspects || !dailyLifeUse || !scenariosUse || !openFeedback}
                 style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
               >
                 Proceed to Verification

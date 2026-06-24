@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type FC } from 'react';
 import { profileService, type VisionProfile } from '../services/profile';
-import { FiSliders, FiCheckCircle, FiTrash2, FiPlay } from 'react-icons/fi';
+import { FiSliders, FiCheckCircle, FiTrash2, FiPlay, FiSave, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 // SVG Icons for clean, zero-dependency rendering
 const CheckIcon = () => (
@@ -66,6 +66,7 @@ export const CalibrationWizard: FC = () => {
   const [customIntensity, setCustomIntensity] = useState<number>(1.0);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   
   const canvasRefA = useRef<HTMLCanvasElement>(null);
@@ -616,10 +617,11 @@ export const CalibrationWizard: FC = () => {
         triggerNotification('success', 'Profile Created & Saved');
       } catch (err) {
         // Sync failure is now non-blocking for Guest/Local operations
-        triggerNotification('info', 'Profile saved locally (Offline mode).');
+        triggerNotification('info', 'Profile saved.');
       }
     } finally {
       setIsSaving(false);
+      setHasUnsavedChanges(false);
     }
   };
 
@@ -647,7 +649,7 @@ export const CalibrationWizard: FC = () => {
             await profileService.createProfile(payload);
             triggerNotification('success', 'Calibration completed and auto-saved!');
           } catch (err) {
-            triggerNotification('info', 'Calibration auto-saved locally.');
+            triggerNotification('info', 'Calibration auto-saved.');
           }
         } finally {
           setIsSaving(false);
@@ -937,7 +939,7 @@ export const CalibrationWizard: FC = () => {
                         max="2.0"
                         step="0.05"
                         value={customSeverity}
-                        onChange={e => setCustomSeverity(parseFloat(e.target.value))}
+                        onChange={e => { setCustomSeverity(parseFloat(e.target.value)); setHasUnsavedChanges(true); }}
                         className="slider"
                       />
                     </div>
@@ -955,7 +957,7 @@ export const CalibrationWizard: FC = () => {
                         max="1.5"
                         step="0.05"
                         value={customIntensity}
-                        onChange={e => setCustomIntensity(parseFloat(e.target.value))}
+                        onChange={e => { setCustomIntensity(parseFloat(e.target.value)); setHasUnsavedChanges(true); }}
                         className="slider"
                       />
                     </div>
@@ -973,7 +975,7 @@ export const CalibrationWizard: FC = () => {
                         max="1.5"
                         step="0.05"
                         value={customContrast}
-                        onChange={e => setCustomContrast(parseFloat(e.target.value))}
+                        onChange={e => { setCustomContrast(parseFloat(e.target.value)); setHasUnsavedChanges(true); }}
                         className="slider"
                       />
                     </div>
@@ -989,7 +991,7 @@ export const CalibrationWizard: FC = () => {
                         max="1.5"
                         step="0.05"
                         value={customSaturation}
-                        onChange={e => setCustomSaturation(parseFloat(e.target.value))}
+                        onChange={e => { setCustomSaturation(parseFloat(e.target.value)); setHasUnsavedChanges(true); }}
                         className="slider"
                       />
                     </div>
@@ -1083,28 +1085,60 @@ export const CalibrationWizard: FC = () => {
               className={windowWidth <= 480 ? "vstack gap-3" : "hstack gap-3"} 
               style={{ 
                 justifyContent: 'flex-end', 
-                alignItems: 'stretch',
+                alignItems: 'center',
                 width: '100%',
-                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row'
+                flexDirection: windowWidth <= 480 ? 'column-reverse' : 'row',
+                backgroundColor: 'var(--bg-secondary)',
+                padding: '16px 20px',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '16px',
+                border: '1px solid var(--border-primary)'
               }}
             >
               <button 
                 onClick={() => setStep('welcome')} 
-                className="btn btn-outline"
-                style={{ width: windowWidth <= 480 ? '100%' : 'auto' }}
+                className="btn-ghost"
+                style={{ 
+                  width: windowWidth <= 480 ? '100%' : 'auto', 
+                  color: 'var(--text-secondary)',
+                  marginRight: windowWidth <= 480 ? '0' : 'auto',
+                  display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center'
+                }}
               >
-                Recalibrate
+                <FiRefreshCw size={16} />
+                <span>Recalibrate</span>
               </button>
+
+              <button
+                onClick={() => window.location.href = '/upload'}
+                className="btn btn-outline"
+                disabled={hasUnsavedChanges || isSaving}
+                style={{ 
+                  width: windowWidth <= 480 ? '100%' : 'auto',
+                  display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center',
+                  opacity: (hasUnsavedChanges || isSaving) ? 0.5 : 1
+                }}
+              >
+                <FiEye size={16} />
+                <span>View Preview</span>
+              </button>
+
               <button 
                 onClick={handleSaveProfile}
                 disabled={isSaving}
                 className="btn btn-primary"
                 style={{ 
                   padding: '10px 24px',
-                  width: windowWidth <= 480 ? '100%' : 'auto' 
+                  width: windowWidth <= 480 ? '100%' : 'auto',
+                  display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center'
                 }}
               >
-                {isSaving ? 'Saving...' : 'Save & Apply Vision Profile'}
+                {isSaving ? 'Saving...' : (
+                  <>
+                    <FiSave size={16} />
+                    <span>Save Profile</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -1112,7 +1146,7 @@ export const CalibrationWizard: FC = () => {
         )}
 
         {/* Account Delete Danger area */}
-        <div className="card-solid vstack gap-3" style={{ border: '1px solid rgba(185, 28, 28, 0.25)', backgroundColor: 'rgba(185, 28, 28, 0.02)', marginTop: '24px', padding: '20px' }}>
+        <div className="card-solid vstack gap-3" style={{ border: '1px solid rgba(185, 28, 28, 0.3)', backgroundColor: 'rgba(185, 28, 28, 0.05)', marginTop: '48px', padding: '24px' }}>
           <h4 style={{ color: 'var(--color-error)', fontFamily: 'var(--font-heading)', margin: 0 }}>Danger Zone</h4>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
             Wipe all visual calibration datasets, stored media, and telemetry reports. Account deletion is permanent.
