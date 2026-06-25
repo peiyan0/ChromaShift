@@ -367,7 +367,7 @@ def get_research_analytics(
             "remapped_comfort": get_avg(comfort_remapped),
             "long_reading": get_avg(comfort_reading)
         },
-        "interview_feedback": feedbacks[:15], # Top 15 logs
+        "interview_feedback": feedbacks, 
         "platform_stats": platform_stats
     }
 
