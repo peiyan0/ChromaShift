@@ -1173,7 +1173,7 @@ export const SurveyWizard: React.FC<SurveyWizardProps> = ({ performanceMetrics, 
 
               <div className="form-group">
                 <label className="label" htmlFor="onboardingWizard">
-                  3. Was the interactive profile calibration easy to understand? <span style={{ color: 'var(--color-error)' }}>*</span>
+                  3. Did you find the vision profile creation easy to follow? <span style={{ color: 'var(--color-error)' }}>*</span>
                 </label>
                 <textarea
                   id="onboardingWizard"

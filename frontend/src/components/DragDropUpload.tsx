@@ -26,12 +26,12 @@ export const DragDropUpload: React.FC = () => {
 
   // Processing status messages
   const processingMessages = [
-    "Uploading file securely to cloud storage...",
-    "Analyzing image structure and color matrices...",
-    "Applying Daltonization color transformation algorithms...",
-    "Optimizing contrast for accessibility...",
-    "Finalizing image processing...",
-    "Generating compliance report..."
+    "Uploading your file securely...",
+    "Applying color corrections tailored to your vision...",
+    "Did you know? 1 in 12 men are color blind",
+    "Almost done preparing your accessible media...",
+    "Red-green color blindness is the most common type",
+    "Generating your compliance report..."
   ];
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
@@ -39,7 +39,7 @@ export const DragDropUpload: React.FC = () => {
     if (isUploading) {
       const interval = setInterval(() => {
         setLoadingMessageIndex(prev => (prev + 1) % processingMessages.length);
-      }, 3500);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [isUploading]);
@@ -689,8 +689,8 @@ export const DragDropUpload: React.FC = () => {
                 <div className="card-solid" style={{ padding: '16px' }}>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                     {activeTab === 0 
-                      ? 'Upload the file to secure S3 storage and process it via fine-tuned server models. Perfect for keeping a permanent archive in your history dashboard.'
-                      : 'Remap colors directly on your device using TensorFlow.js GPU-acceleration. Zero file uploads needed. Faster processing.'}
+                      ? 'Upload your file securely to process and save it to your history.'
+                      : 'Process directly on your device for faster results without uploading.'}
                   </p>
                 </div>
               </div>
@@ -701,10 +701,10 @@ export const DragDropUpload: React.FC = () => {
               <div className="card-solid" style={{ padding: '16px', width: '100%' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   {isPdf 
-                    ? 'Your PDF will be uploaded to securely hosted S3 storage. Our PyMuPDF pipeline will semantically recolor charts and diagrams while perfectly preserving all vector text layers for screen-reader accessibility.'
+                    ? 'Your PDF will be securely processed to ensure charts and diagrams are accessible while keeping text readable for screen readers.'
                     : isImage
-                    ? 'Your image will be uploaded to securely hosted S3 storage. Our YOLO26n-seg pipeline will apply precise semantic Daltonization while ensuring 100% lightness preservation.'
-                    : 'Your file will be uploaded to securely hosted S3 storage. Our backend fine-tuned Daltonization pipelines will apply CVD accessibility corrections.'}
+                    ? 'Your image will be securely processed to ensure colors are accessible while preserving brightness.'
+                    : 'Your file will be securely processed for color accessibility.'}
                 </p>
               </div>
             )}

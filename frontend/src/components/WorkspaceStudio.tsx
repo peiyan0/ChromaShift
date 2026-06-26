@@ -28,12 +28,12 @@ export const WorkspaceStudio: React.FC = () => {
   
   // Processing status messages
   const processingMessages = [
-    "Uploading file securely to cloud storage...",
-    "Analyzing image structure and color matrices...",
-    "Applying Daltonization color transformation algorithms...",
-    "Optimizing contrast for accessibility...",
-    "Finalizing image processing...",
-    "Generating compliance report..."
+    "Uploading your file securely...",
+    "Applying color corrections tailored to your vision...",
+    "Did you know? 1 in 12 men are color blind",
+    "Almost done preparing your accessible media...",
+    "Red-green color blindness is the most common type",
+    "Generating your compliance report..."
   ];
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
@@ -41,7 +41,7 @@ export const WorkspaceStudio: React.FC = () => {
     if (status?.status === 'processing' || status?.status === 'uploaded') {
       const interval = setInterval(() => {
         setLoadingMessageIndex(prev => (prev + 1) % processingMessages.length);
-      }, 3500);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [status?.status]);
@@ -401,7 +401,7 @@ export const WorkspaceStudio: React.FC = () => {
         <div className="skeleton animate-pulse-border" style={{ width: '64px', height: '64px', borderRadius: '50%' }} />
         <h3 style={{ fontFamily: 'var(--font-heading)' }}>AI Re-rendering File...</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          Our server-side pipeline is applying semantic corrections for your vision deficiency. This will complete in a moment.
+          We are applying your personalized color corrections. This will just take a moment.
         </p>
         <div 
           style={{ 
@@ -442,7 +442,12 @@ export const WorkspaceStudio: React.FC = () => {
   }
 
   const getFilterStyle = (isProcessed: boolean) => {
-    if (!isProcessed) return 'none';
+    if (!isProcessed) {
+      if (selectedPreviewCvd !== 'profile') {
+        return `url(#sim-${selectedPreviewCvd})`;
+      }
+      return 'none';
+    }
     if (selectedPreviewCvd !== 'profile') {
       return `url(#sim-${selectedPreviewCvd})`;
     }
@@ -795,6 +800,7 @@ export const WorkspaceStudio: React.FC = () => {
                             width: '100%', 
                             height: '100%', 
                             objectFit: 'contain',
+                            filter: getFilterStyle(false),
                             transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
                             transformOrigin: 'center center',
                             cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -895,11 +901,19 @@ export const WorkspaceStudio: React.FC = () => {
                         src={status?.download_url_original || ''}
                         controls
                         playsInline
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', filter: getFilterStyle(false) }}
                         onPlay={() => syncPlayback('original')}
                         onPause={() => syncPlayback('original')}
                         onSeeking={() => syncPlayback('original')}
                         onSeeked={() => syncPlayback('original')}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          el.addEventListener('fullscreenchange', () => {
+                            if (document.fullscreenElement === el) {
+                               el.style.filter = getFilterStyle(false);
+                            }
+                          });
+                        }}
                       />
                     </div>
                   </div>
