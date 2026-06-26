@@ -334,7 +334,7 @@ export const WorkspaceStudio: React.FC = () => {
     setIsDeleting(true);
     try {
       await mediaService.deleteMedia(jobId);
-      triggerNotification('success', 'File deleted. Media cleared from active storage.');
+      triggerNotification('success', 'File deleted. Media cleared from storage.');
       navigate('/hub');
     } catch (err) {
       triggerNotification('error', 'Failed to delete file');
@@ -929,6 +929,7 @@ export const WorkspaceStudio: React.FC = () => {
                         ref={processedVideoRef}
                         src={status?.download_url || (status?.download_url_original || '')}
                         controls
+                        muted
                         playsInline
                         style={{ 
                           width: '100%', 
@@ -1001,7 +1002,7 @@ export const WorkspaceStudio: React.FC = () => {
             {mediaType === 'pdf' && (
               isMobile ? (
                 <div className="vstack gap-4" style={{ padding: isMobile ? '16px 12px' : '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', alignItems: 'center', textAlign: 'center' }}>
-                  <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold' }}>Mobile Viewer Mode</div>
+                  <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold', padding: '8px 16px' }}>Mobile Viewer Mode</div>
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
                     Scrolling PDF files inside frames can be limited on mobile web browsers. Open the documents in a new tab to view, scroll, and zoom using your device's native PDF reader.
                   </p>

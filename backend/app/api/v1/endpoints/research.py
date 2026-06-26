@@ -128,65 +128,40 @@ def submit_research(
             detail=f"Database submission failed: {str(e)}"
         )
 
-@router.get("/analytics", response_model=Dict[str, Any])
-def get_research_analytics(
-    current_admin: models.User = Depends(deps.get_current_admin_user),
-    db: Session = Depends(deps.get_db)
-):
-    # Total Participants
-    total_count = db.query(models.ResearchParticipant).count()
-    if total_count == 0:
-        return {
-            "total_participants": 0,
-            "avg_sus_score": 0.0,
-            "demographics": {},
-            "task_performance": {},
-            "nasa_tlx": {},
-            "visual_comfort": {},
-            "interview_feedback": []
-        }
 
+def _get_analytics_dict(db, participant_ids=None):
+    from sqlalchemy import func
     # Demographics Splits
-    cvd_splits = db.query(
-        models.ResearchParticipant.cvd_type,
-        func.count(models.ResearchParticipant.id)
-    ).group_by(models.ResearchParticipant.cvd_type).all()
+    q_cvd = db.query(models.ResearchParticipant.cvd_type, func.count(models.ResearchParticipant.id)).group_by(models.ResearchParticipant.cvd_type)
+    q_gender = db.query(models.ResearchParticipant.gender, func.count(models.ResearchParticipant.id)).group_by(models.ResearchParticipant.gender)
+    q_surveys = db.query(models.SurveyResponse)
+    q_sessions = db.query(models.VisionTestSession)
     
-    gender_splits = db.query(
-        models.ResearchParticipant.gender,
-        func.count(models.ResearchParticipant.id)
-    ).group_by(models.ResearchParticipant.gender).all()
+    if participant_ids is not None:
+        q_cvd = q_cvd.filter(models.ResearchParticipant.id.in_(participant_ids))
+        q_gender = q_gender.filter(models.ResearchParticipant.id.in_(participant_ids))
+        q_surveys = q_surveys.filter(models.SurveyResponse.participant_id.in_(participant_ids))
+        q_sessions = q_sessions.filter(models.VisionTestSession.participant_id.in_(participant_ids))
+        total_count = len(participant_ids)
+    else:
+        total_count = db.query(models.ResearchParticipant).count()
 
-    # Calculate Average SUS Score
-    # Formula: Sum of (Odd item - 1) + (5 - Even item) multiplied by 2.5
-    all_surveys = db.query(models.SurveyResponse).all()
-    sus_scores = []
-    nasa_mental = []
-    nasa_physical = []
-    nasa_temporal = []
-    nasa_performance = []
-    nasa_effort = []
-    nasa_frustration = []
-    comfort_strain = []
-    comfort_fatigue = []
-    comfort_headache = []
-    comfort_remapped = []
-    comfort_reading = []
+    cvd_splits = q_cvd.all()
+    gender_splits = q_gender.all()
+
+    all_surveys = q_surveys.all()
+    sus_scores, nasa_mental, nasa_physical, nasa_temporal, nasa_performance, nasa_effort, nasa_frustration = [], [], [], [], [], [], []
+    comfort_strain, comfort_fatigue, comfort_headache, comfort_remapped, comfort_reading = [], [], [], [], []
     feedbacks = []
 
     for s in all_surveys:
-        # Calculate SUS
         try:
             q_odd = [s.sus_q1, s.sus_q3, s.sus_q5, s.sus_q7, s.sus_q9]
             q_even = [s.sus_q2, s.sus_q4, s.sus_q6, s.sus_q8, s.sus_q10]
             if all(v is not None for v in q_odd + q_even):
-                odd_sum = sum(v - 1 for v in q_odd)
-                even_sum = sum(5 - v for v in q_even)
-                sus_scores.append((odd_sum + even_sum) * 2.5)
-        except Exception:
-            pass
+                sus_scores.append((sum(v - 1 for v in q_odd) + sum(5 - v for v in q_even)) * 2.5)
+        except: pass
 
-        # Calculate NASA-TLX averages (0 to 20 scale)
         if s.nasa_mental is not None: nasa_mental.append(s.nasa_mental)
         if s.nasa_physical is not None: nasa_physical.append(s.nasa_physical)
         if s.nasa_temporal is not None: nasa_temporal.append(s.nasa_temporal)
@@ -194,17 +169,13 @@ def get_research_analytics(
         if s.nasa_effort is not None: nasa_effort.append(s.nasa_effort)
         if s.nasa_frustration is not None: nasa_frustration.append(s.nasa_frustration)
 
-        # Custom Visual Comfort averages (1 to 5 scale)
         if s.comfort_q1 is not None: comfort_strain.append(s.comfort_q1)
         if s.comfort_q2 is not None: comfort_fatigue.append(s.comfort_q2)
         if s.comfort_q3 is not None: comfort_headache.append(s.comfort_q3)
         if s.comfort_q4 is not None: comfort_remapped.append(s.comfort_q4)
         if s.comfort_q5 is not None: comfort_reading.append(s.comfort_q5)
 
-        # Interview text logs
-        p_uuid = db.query(models.ResearchParticipant.participant_uuid).filter(
-            models.ResearchParticipant.id == s.participant_id
-        ).scalar()
+        p_uuid = db.query(models.ResearchParticipant.participant_uuid).filter(models.ResearchParticipant.id == s.participant_id).scalar()
         if s.interview_open_feedback or s.interview_frustrating_aspects or s.interview_helpful_aspects:
             feedbacks.append({
                 "participant_uuid": p_uuid[:8] if p_uuid else "unknown",
@@ -216,8 +187,7 @@ def get_research_analytics(
                 "general": s.interview_open_feedback
             })
 
-    # Performance analytics
-    all_sessions = db.query(models.VisionTestSession).all()
+    all_sessions = q_sessions.all()
     task_times = {
         "task1_orig": [], "task1_corr": [], "task1_orig_acc": [], "task1_corr_acc": [],
         "task2_orig": [], "task2_corr": [], "task2_orig_acc": [], "task2_corr_acc": [],
@@ -225,7 +195,6 @@ def get_research_analytics(
         "video_orig": [], "video_corr": [], "video_orig_acc": [], "video_corr_acc": [],
         "doc_orig": [], "doc_corr": [], "doc_orig_acc": [], "doc_corr_acc": []
     }
-
     for ses in all_sessions:
         if ses.task1_original_time is not None: task_times["task1_orig"].append(ses.task1_original_time)
         if ses.task1_corrected_time is not None: task_times["task1_corr"].append(ses.task1_corrected_time)
@@ -252,63 +221,29 @@ def get_research_analytics(
         if ses.document_original_correct is not None: task_times["doc_orig_acc"].append(1.0 if ses.document_original_correct else 0.0)
         if ses.document_corrected_correct is not None: task_times["doc_corr_acc"].append(1.0 if ses.document_corrected_correct else 0.0)
 
-        # Task 6 (Orchard Photo MCQ)
-        if hasattr(ses, 'task6_original_time') and ses.task6_original_time is not None: 
+        if hasattr(ses, "task6_original_time") and ses.task6_original_time is not None: 
             task_times.setdefault("task6_orig", []).append(ses.task6_original_time)
-        if hasattr(ses, 'task6_corrected_time') and ses.task6_corrected_time is not None: 
+        if hasattr(ses, "task6_corrected_time") and ses.task6_corrected_time is not None: 
             task_times.setdefault("task6_corr", []).append(ses.task6_corrected_time)
-        if hasattr(ses, 'task6_original_correct') and ses.task6_original_correct is not None: 
+        if hasattr(ses, "task6_original_correct") and ses.task6_original_correct is not None: 
             task_times.setdefault("task6_orig_acc", []).append(1.0 if ses.task6_original_correct else 0.0)
-        if hasattr(ses, 'task6_corrected_correct') and ses.task6_corrected_correct is not None: 
+        if hasattr(ses, "task6_corrected_correct") and ses.task6_corrected_correct is not None: 
             task_times.setdefault("task6_corr_acc", []).append(1.0 if ses.task6_corrected_correct else 0.0)
 
-    # Compute Averages
     def get_avg(lst):
         return sum(lst) / len(lst) if lst else 0.0
 
     perf_report = {
-        "task1": {
-            "avg_original_time": get_avg(task_times["task1_orig"]),
-            "avg_corrected_time": get_avg(task_times["task1_corr"]),
-            "avg_original_accuracy": get_avg(task_times["task1_orig_acc"]),
-            "avg_corrected_accuracy": get_avg(task_times["task1_corr_acc"])
-        },
-        "task2": {
-            "avg_original_time": get_avg(task_times["task2_orig"]),
-            "avg_corrected_time": get_avg(task_times["task2_corr"]),
-            "avg_original_accuracy": get_avg(task_times["task2_orig_acc"]),
-            "avg_corrected_accuracy": get_avg(task_times["task2_corr_acc"])
-        },
-        "task3": {
-            "avg_original_time": get_avg(task_times["task3_orig"]),
-            "avg_corrected_time": get_avg(task_times["task3_corr"]),
-            "avg_original_accuracy": get_avg(task_times["task3_orig_acc"]),
-            "avg_corrected_accuracy": get_avg(task_times["task3_corr_acc"])
-        },
-        "video": {
-            "avg_original_time": get_avg(task_times["video_orig"]),
-            "avg_corrected_time": get_avg(task_times["video_corr"]),
-            "avg_original_accuracy": get_avg(task_times["video_orig_acc"]),
-            "avg_corrected_accuracy": get_avg(task_times["video_corr_acc"])
-        },
-        "document": {
-            "avg_original_time": get_avg(task_times["doc_orig"]),
-            "avg_corrected_time": get_avg(task_times["doc_corr"]),
-            "avg_original_accuracy": get_avg(task_times["doc_orig_acc"]),
-            "avg_corrected_accuracy": get_avg(task_times["doc_corr_acc"])
-        },
-        "task6": {
-            "avg_original_time": get_avg(task_times.get("task6_orig", [])),
-            "avg_corrected_time": get_avg(task_times.get("task6_corr", [])),
-            "avg_original_accuracy": get_avg(task_times.get("task6_orig_acc", [])),
-            "avg_corrected_accuracy": get_avg(task_times.get("task6_corr_acc", []))
-        }
+        "task1": { "avg_original_time": get_avg(task_times["task1_orig"]), "avg_corrected_time": get_avg(task_times["task1_corr"]), "avg_original_accuracy": get_avg(task_times["task1_orig_acc"]), "avg_corrected_accuracy": get_avg(task_times["task1_corr_acc"]) },
+        "task2": { "avg_original_time": get_avg(task_times["task2_orig"]), "avg_corrected_time": get_avg(task_times["task2_corr"]), "avg_original_accuracy": get_avg(task_times["task2_orig_acc"]), "avg_corrected_accuracy": get_avg(task_times["task2_corr_acc"]) },
+        "task3": { "avg_original_time": get_avg(task_times["task3_orig"]), "avg_corrected_time": get_avg(task_times["task3_corr"]), "avg_original_accuracy": get_avg(task_times["task3_orig_acc"]), "avg_corrected_accuracy": get_avg(task_times["task3_corr_acc"]) },
+        "video": { "avg_original_time": get_avg(task_times["video_orig"]), "avg_corrected_time": get_avg(task_times["video_corr"]), "avg_original_accuracy": get_avg(task_times["video_orig_acc"]), "avg_corrected_accuracy": get_avg(task_times["video_corr_acc"]) },
+        "document": { "avg_original_time": get_avg(task_times["doc_orig"]), "avg_corrected_time": get_avg(task_times["doc_corr"]), "avg_original_accuracy": get_avg(task_times["doc_orig_acc"]), "avg_corrected_accuracy": get_avg(task_times["doc_corr_acc"]) },
+        "task6": { "avg_original_time": get_avg(task_times.get("task6_orig", [])), "avg_corrected_time": get_avg(task_times.get("task6_corr", [])), "avg_original_accuracy": get_avg(task_times.get("task6_orig_acc", [])), "avg_corrected_accuracy": get_avg(task_times.get("task6_corr_acc", [])) }
     }
 
-    # === Out of Survey / Platform Stats ===
+    # Out of Survey / Platform Stats (Global, not filtered by participant)
     total_users = db.query(models.User).count()
-    
-    # Vision Profiles split
     profiles = db.query(models.VisionProfile).all()
     profile_splits = {}
     severity_sum = 0.0
@@ -317,16 +252,11 @@ def get_research_analytics(
         severity_sum += p.severity
     avg_severity = severity_sum / len(profiles) if profiles else 0.0
     
-    # Media jobs
     total_jobs = db.query(models.MediaJob).count()
     completed_jobs = db.query(models.MediaJob).filter(models.MediaJob.status == "completed").count()
-    media_type_splits_raw = db.query(
-        models.MediaJob.media_type,
-        func.count(models.MediaJob.id)
-    ).group_by(models.MediaJob.media_type).all()
+    media_type_splits_raw = db.query(models.MediaJob.media_type, func.count(models.MediaJob.id)).group_by(models.MediaJob.media_type).all()
     media_type_splits = {m_type: count for m_type, count in media_type_splits_raw}
     
-    # Compliance reports
     total_reports = db.query(models.ComplianceReport).count()
     avg_compliance_score = db.query(func.avg(models.ComplianceReport.score)).scalar() or 0.0
     pass_reports = db.query(models.ComplianceReport).filter(models.ComplianceReport.status == "pass").count()
@@ -371,6 +301,13 @@ def get_research_analytics(
         "platform_stats": platform_stats
     }
 
+@router.get("/analytics", response_model=Dict[str, Any])
+def get_research_analytics(
+    current_admin: models.User = Depends(deps.get_current_admin_user),
+    db: Session = Depends(deps.get_db)
+):
+    return _get_analytics_dict(db)
+
 @router.get("/participants", response_model=List[Dict[str, Any]])
 def get_research_participants(
     current_admin: models.User = Depends(deps.get_current_admin_user),
@@ -395,3 +332,36 @@ def get_research_participants(
             "created_at": p.created_at.isoformat() if p.created_at else None
         })
     return res
+
+import numpy as np
+
+
+@router.get("/analytics/segmented", response_model=Dict[str, Any])
+def get_segmented_analytics(
+    cvd_type: str = "all",
+    prior_tool_use: str = "all",
+    current_admin: models.User = Depends(deps.get_current_admin_user),
+    db: Session = Depends(deps.get_db)
+):
+    query = db.query(models.ResearchParticipant)
+    if cvd_type and cvd_type != "all":
+        query = query.filter(models.ResearchParticipant.cvd_type == cvd_type)
+    if prior_tool_use and prior_tool_use != "all":
+        query = query.filter(models.ResearchParticipant.prior_tool_use == prior_tool_use)
+    
+    participants = query.all()
+    participant_ids = [p.id for p in participants]
+    
+    if not participant_ids:
+        return {
+            "total_participants": 0,
+            "avg_sus_score": 0.0,
+            "demographics": {"cvd_types": {}, "genders": {}},
+            "task_performance": {},
+            "nasa_tlx": {},
+            "visual_comfort": {},
+            "interview_feedback": [],
+            "platform_stats": {}
+        }
+        
+    return _get_analytics_dict(db, participant_ids)

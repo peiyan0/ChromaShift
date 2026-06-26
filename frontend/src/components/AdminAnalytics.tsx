@@ -64,7 +64,7 @@ export const AdminAnalytics: React.FC = () => {
     setError('');
     try {
       const [analyticsRes, participantsRes] = await Promise.all([
-        api.get('research/analytics'),
+        api.get('research/analytics/segmented', { params: { cvd_type: cvdFilter } }),
         api.get('research/participants')
       ]);
       setData(analyticsRes.data);
@@ -80,7 +80,7 @@ export const AdminAnalytics: React.FC = () => {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [cvdFilter]);
 
   if (loading) {
     return (
@@ -158,7 +158,7 @@ export const AdminAnalytics: React.FC = () => {
     );
   }
 
-  const sus = data.avg_sus_score;
+  const sus = data.avg_sus_score || 0;
   const susGrade = sus >= 80.3 ? 'A (Excellent)' : sus >= 68.0 ? 'C (Acceptable / Good)' : 'F (Needs Improvement)';
   const susColorClass = sus >= 80.3 ? 'badge-success' : sus >= 68.0 ? 'badge-primary' : 'badge-error';
 

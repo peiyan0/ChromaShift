@@ -601,7 +601,9 @@ export const CalibrationWizard: FC = () => {
       severity: customSeverity,
       contrast_multiplier: customContrast,
       saturation_multiplier: customSaturation,
-      intensity: customIntensity
+      intensity: customIntensity,
+      calibration_steps_taken: round,
+      calibration_method: 'bayesian'
     };
     
     // Always store locally first to guarantee guest session / offline compatibility works
@@ -638,7 +640,9 @@ export const CalibrationWizard: FC = () => {
           severity: customSeverity,
           contrast_multiplier: customContrast,
           saturation_multiplier: customSaturation,
-          intensity: customIntensity
+          intensity: customIntensity,
+          calibration_steps_taken: round,
+          calibration_method: 'bayesian'
         };
         localStorage.setItem('chromashift_cvd_profile', JSON.stringify(payload));
         try {

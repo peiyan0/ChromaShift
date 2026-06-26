@@ -183,7 +183,9 @@ export const DragDropUpload: React.FC = () => {
     
     try {
       // 1. Upload to S3
+      const uploadStartTime = performance.now();
       const uploadRes = await mediaService.uploadMedia(file);
+      const uploadLatencyMs = Math.round(performance.now() - uploadStartTime);
       setProgress(40);
       
       // Save job ID to localStorage for guest tracking
@@ -228,8 +230,16 @@ export const DragDropUpload: React.FC = () => {
           }
         }
       }
+      // Chapter 4 Telemetry hooks
+      const telemetry = {
+        cvd_type: cvdType,
+        severity,
+        upload_latency_ms: uploadLatencyMs,
+        original_size_bytes: file.size,
+        processing_mode: "server_docker" // Since this is the drag-drop to backend flow
+      };
       
-      await mediaService.processMedia(uploadRes.job_id, { cvd_type: cvdType, severity });
+      await mediaService.processMedia(uploadRes.job_id, telemetry);
       setProgress(60);
 
       // 3. Poll for status with progressive backoff

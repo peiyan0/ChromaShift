@@ -20,6 +20,7 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
     """
     Background task to process media using the AI models.
     """
+    start_time = time.time()
     print(f"Background task started for job {job_id}")
     
     # Query database to retrieve media_type for fallback
@@ -138,6 +139,10 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
                 storage_service.upload_from_path(local_thumb, thumb_key)
                 print(f"PDF page-1 thumbnail generated and uploaded to {thumb_key}")
                 
+                # Extract page count for telemetry
+                job.pdf_page_count = len(pdf)
+                db.commit()
+                
                 if os.path.exists(local_thumb):
                     os.remove(local_thumb)
             except Exception as thumb_err:
@@ -169,6 +174,11 @@ def background_process_media(job_id: str, s3_key: str, cvd_type: str, severity: 
             if job:
                 job.status = "completed"
                 job.s3_key_processed = processed_key
+                # Save backend processing telemetry
+                if job.processing_duration_ms is None:
+                    job.processing_duration_ms = int((time.time() - start_time) * 1000)
+                if job.processed_size_bytes is None and os.path.exists(local_output):
+                    job.processed_size_bytes = os.path.getsize(local_output)
                 db.commit()
                 print(f"Background task completed for job {job_id}")
         except Exception as e:
@@ -288,6 +298,9 @@ async def upload_media(
             frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
             cap.release()
             
+            # Save video fps for telemetry later
+            file.video_fps = fps
+            
             if fps > 0 and frames > 0:
                 duration = frames / fps
                 if duration > 600: # 10 minutes
@@ -311,7 +324,9 @@ async def upload_media(
         filename=file.filename,
         media_type=media_type,
         status="uploaded",
-        s3_key_original=s3_key
+        s3_key_original=s3_key,
+        original_size_bytes=file_size,
+        video_fps=getattr(file, 'video_fps', None)
     )
     db.add(new_job)
     db.commit()
@@ -358,6 +373,35 @@ async def process_media(
     if job.compliance_report:
         db.delete(job.compliance_report)
         
+    # Save telemetry fields
+    job.cvd_type = cvd_type
+    job.severity = severity
+    job.processing_mode = request.processing_mode or "server_docker"
+    
+    if request.processing_duration_ms is not None:
+        job.processing_duration_ms = request.processing_duration_ms
+    if request.upload_latency_ms is not None:
+        job.upload_latency_ms = request.upload_latency_ms
+    if request.pdf_page_count is not None:
+        job.pdf_page_count = request.pdf_page_count
+    if request.pdf_vector_complexity is not None:
+        job.pdf_vector_complexity = request.pdf_vector_complexity
+    if request.original_size_bytes is not None:
+        job.original_size_bytes = request.original_size_bytes
+    if request.processed_size_bytes is not None:
+        job.processed_size_bytes = request.processed_size_bytes
+    if request.video_fps is not None:
+        job.video_fps = request.video_fps
+
+    # If client-side processed, mark completed immediately and skip background task
+    if request.processing_mode == "client_onnx":
+        job.status = "completed"
+        db.commit()
+        return {
+            "task_id": job.job_id,
+            "status": "completed"
+        }
+
     job.status = "processing"
     db.commit()
     
@@ -496,9 +540,9 @@ async def get_media_history(
         if not job_ids:
             return []
         job_id_list = [jid.strip() for jid in job_ids.split(",") if jid.strip()]
-        jobs = db.query(MediaJob).filter(MediaJob.job_id.in_(job_id_list), MediaJob.user_id == "guest").order_by(MediaJob.created_at.desc()).all()
+        jobs = db.query(MediaJob).filter(MediaJob.job_id.in_(job_id_list), MediaJob.user_id == "guest", MediaJob.status != 'deleted').order_by(MediaJob.created_at.desc()).all()
     else:
-        query = db.query(MediaJob).filter(MediaJob.user_id == current_user.id)
+        query = db.query(MediaJob).filter(MediaJob.user_id == current_user.id, MediaJob.status != 'deleted')
         if job_ids:
             job_id_list = [jid.strip() for jid in job_ids.split(",") if jid.strip()]
             query = query.filter(MediaJob.job_id.in_(job_id_list))
@@ -536,7 +580,7 @@ async def clear_all_media(
     """
     Delete all media jobs and physical S3 files for the authenticated user.
     """
-    jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id).all()
+    jobs = db.query(MediaJob).filter(MediaJob.user_id == current_user.id, MediaJob.status != 'deleted').all()
     for job in jobs:
         # Delete original file physically
         if job.s3_key_original:
@@ -548,10 +592,11 @@ async def clear_all_media(
         if job.s3_key_processed:
             try:
                 storage_service.delete_file(job.s3_key_processed)
-            except Exception as e:
-                print(f"Failed to delete processed key {job.s3_key_processed}: {e}")
-        # Delete job from DB
-        db.delete(job)
+            except:
+                pass
+            job.s3_key_processed = None
+        
+        job.status = 'deleted'
     
     db.commit()
     return {"status": "ok", "message": f"Successfully deleted {len(jobs)} jobs."}
@@ -575,16 +620,17 @@ async def delete_media_job(
             storage_service.delete_file(job.s3_key_original)
         except Exception as e:
             print(f"Failed to delete original key {job.s3_key_original}: {e}")
+        job.s3_key_original = None
             
     # Delete processed file physically
     if job.s3_key_processed:
         try:
             storage_service.delete_file(job.s3_key_processed)
-        except Exception as e:
-            print(f"Failed to delete processed key {job.s3_key_processed}: {e}")
+        except:
+            pass
+        job.s3_key_processed = None
             
-    db.delete(job)
+    # Soft delete: update status instead of deleting the row
+    job.status = 'deleted'
     db.commit()
-    return {"status": "ok", "message": "Job successfully deleted."}
-
-
+    return {"message": "Job deleted"}
