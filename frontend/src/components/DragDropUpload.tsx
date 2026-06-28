@@ -582,7 +582,7 @@ export const DragDropUpload: React.FC = () => {
                         }}
                       >
                         <div style={{ height: '60px', overflow: 'hidden', backgroundColor: 'black', position: 'relative' }}>
-                          <video src={s.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} preload="metadata" />
+                          <video src={`${s.url}#t=0.001`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} preload="metadata" muted playsInline />
                         </div>
                         <div style={{ padding: '6px', fontSize: '0.65rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }} title={s.name}>
                           {s.name}

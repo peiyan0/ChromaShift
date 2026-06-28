@@ -566,10 +566,11 @@ export const DashboardHistory: FC = () => {
                       ) : item.type === 'video' && item.download_url ? (
                         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                           <video 
-                            src={item.download_url} 
+                            src={`${item.download_url}#t=0.001`}
                             muted 
                             loop 
-                            playsInline 
+                            playsInline
+                            preload="metadata"
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onMouseEnter={e => e.currentTarget.play().catch(() => {})}
                             onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
