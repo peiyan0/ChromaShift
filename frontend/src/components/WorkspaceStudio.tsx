@@ -28,12 +28,12 @@ export const WorkspaceStudio: React.FC = () => {
   
   // Processing status messages
   const processingMessages = [
-    "Uploading file securely to cloud storage...",
-    "Analyzing image structure and color matrices...",
-    "Applying Daltonization color transformation algorithms...",
-    "Optimizing contrast for accessibility...",
-    "Finalizing image processing...",
-    "Generating compliance report..."
+    "Uploading your file securely...",
+    "Applying color corrections tailored to your vision...",
+    "Did you know? 1 in 12 men are color blind",
+    "Almost done preparing your accessible media...",
+    "Red-green color blindness is the most common type",
+    "Generating your compliance report..."
   ];
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
@@ -41,7 +41,7 @@ export const WorkspaceStudio: React.FC = () => {
     if (status?.status === 'processing' || status?.status === 'uploaded') {
       const interval = setInterval(() => {
         setLoadingMessageIndex(prev => (prev + 1) % processingMessages.length);
-      }, 3500);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [status?.status]);
@@ -334,7 +334,7 @@ export const WorkspaceStudio: React.FC = () => {
     setIsDeleting(true);
     try {
       await mediaService.deleteMedia(jobId);
-      triggerNotification('success', 'File deleted. Media cleared from active storage.');
+      triggerNotification('success', 'File deleted. Media cleared from storage.');
       navigate('/hub');
     } catch (err) {
       triggerNotification('error', 'Failed to delete file');
@@ -401,7 +401,7 @@ export const WorkspaceStudio: React.FC = () => {
         <div className="skeleton animate-pulse-border" style={{ width: '64px', height: '64px', borderRadius: '50%' }} />
         <h3 style={{ fontFamily: 'var(--font-heading)' }}>AI Re-rendering File...</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          Our server-side pipeline is applying semantic corrections for your vision deficiency. This will complete in a moment.
+          We are applying your personalized color corrections. This will just take a moment.
         </p>
         <div 
           style={{ 
@@ -442,7 +442,12 @@ export const WorkspaceStudio: React.FC = () => {
   }
 
   const getFilterStyle = (isProcessed: boolean) => {
-    if (!isProcessed) return 'none';
+    if (!isProcessed) {
+      if (selectedPreviewCvd !== 'profile') {
+        return `url(#sim-${selectedPreviewCvd})`;
+      }
+      return 'none';
+    }
     if (selectedPreviewCvd !== 'profile') {
       return `url(#sim-${selectedPreviewCvd})`;
     }
@@ -795,6 +800,8 @@ export const WorkspaceStudio: React.FC = () => {
                             width: '100%', 
                             height: '100%', 
                             objectFit: 'contain',
+                            filter: getFilterStyle(false),
+                            WebkitFilter: getFilterStyle(false),
                             transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
                             transformOrigin: 'center center',
                             cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -827,6 +834,7 @@ export const WorkspaceStudio: React.FC = () => {
                             objectFit: 'contain', 
                             opacity: isDirty ? 0.6 : 1,
                             filter: getFilterStyle(true),
+                            WebkitFilter: getFilterStyle(true),
                             transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
                             transformOrigin: 'center center',
                             cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -864,6 +872,7 @@ export const WorkspaceStudio: React.FC = () => {
                         objectFit: 'contain', 
                         opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
                         filter: getFilterStyle(toggleActive === 'processed'),
+                        WebkitFilter: getFilterStyle(toggleActive === 'processed'),
                         transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
                         transformOrigin: 'center center',
                         cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -895,11 +904,20 @@ export const WorkspaceStudio: React.FC = () => {
                         src={status?.download_url_original || ''}
                         controls
                         playsInline
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', filter: getFilterStyle(false), WebkitFilter: getFilterStyle(false) }}
                         onPlay={() => syncPlayback('original')}
                         onPause={() => syncPlayback('original')}
                         onSeeking={() => syncPlayback('original')}
                         onSeeked={() => syncPlayback('original')}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          el.addEventListener('fullscreenchange', () => {
+                            if (document.fullscreenElement === el) {
+                               el.style.filter = getFilterStyle(false);
+                               el.style.webkitFilter = getFilterStyle(false);
+                            }
+                          });
+                        }}
                       />
                     </div>
                   </div>
@@ -915,13 +933,15 @@ export const WorkspaceStudio: React.FC = () => {
                         ref={processedVideoRef}
                         src={status?.download_url || (status?.download_url_original || '')}
                         controls
+                        muted
                         playsInline
                         style={{ 
                           width: '100%', 
                           height: '100%', 
                           objectFit: 'contain', 
                           opacity: isDirty ? 0.6 : 1,
-                          filter: getFilterStyle(true)
+                          filter: getFilterStyle(true),
+                          WebkitFilter: getFilterStyle(true)
                         }}
                         onPlay={() => syncPlayback('processed')}
                         onPause={() => syncPlayback('processed')}
@@ -933,6 +953,7 @@ export const WorkspaceStudio: React.FC = () => {
                           el.addEventListener('fullscreenchange', () => {
                             if (document.fullscreenElement === el) {
                                el.style.filter = getFilterStyle(true);
+                               el.style.webkitFilter = getFilterStyle(true);
                             }
                           });
                         }}
@@ -961,13 +982,15 @@ export const WorkspaceStudio: React.FC = () => {
                       height: '100%', 
                       objectFit: 'contain', 
                       opacity: toggleActive === 'processed' && isDirty ? 0.6 : 1,
-                      filter: getFilterStyle(toggleActive === 'processed')
+                      filter: getFilterStyle(toggleActive === 'processed'),
+                      WebkitFilter: getFilterStyle(toggleActive === 'processed')
                     }}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget;
                       el.addEventListener('fullscreenchange', () => {
                         if (document.fullscreenElement === el) {
                           el.style.filter = getFilterStyle(toggleActive === 'processed');
+                          el.style.webkitFilter = getFilterStyle(toggleActive === 'processed');
                         }
                       });
                     }}
@@ -985,9 +1008,9 @@ export const WorkspaceStudio: React.FC = () => {
 
             {/* PDF renderer */}
             {mediaType === 'pdf' && (
-              isMobile ? (
+              (isMobile || /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) ? (
                 <div className="vstack gap-4" style={{ padding: isMobile ? '16px 12px' : '24px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', alignItems: 'center', textAlign: 'center' }}>
-                  <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold' }}>Mobile Viewer Mode</div>
+                  <div className="badge badge-info" style={{ textTransform: 'none', fontWeight: 'bold', padding: '8px 16px' }}>Mobile Viewer Mode</div>
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
                     Scrolling PDF files inside frames can be limited on mobile web browsers. Open the documents in a new tab to view, scroll, and zoom using your device's native PDF reader.
                   </p>
@@ -1022,7 +1045,7 @@ export const WorkspaceStudio: React.FC = () => {
                           src={`${status?.download_url_original}#toolbar=0`}
                           width="100%"
                           height="100%"
-                          style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(false) }}
+                          style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(false), WebkitFilter: getFilterStyle(false) }}
                           title="Original PDF"
                         />
                       </div>
@@ -1034,7 +1057,7 @@ export const WorkspaceStudio: React.FC = () => {
                           src={`${status?.download_url}#toolbar=0`}
                           width="100%"
                           height="100%"
-                          style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(true) }}
+                          style={{ border: '1px solid rgba(79, 70, 229, 0.2)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(true), WebkitFilter: getFilterStyle(true) }}
                           title="Processed PDF"
                         />
                       </div>
@@ -1047,7 +1070,7 @@ export const WorkspaceStudio: React.FC = () => {
                       src={toggleActive === 'original' ? (status?.download_url_original || '') : (status?.download_url || '')}
                       width="100%"
                       height="100%"
-                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(toggleActive === 'processed') }}
+                      style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', backgroundColor: 'white', minHeight: '580px', filter: getFilterStyle(toggleActive === 'processed'), WebkitFilter: getFilterStyle(toggleActive === 'processed') }}
                       title="PDF Toggle Viewer"
                     />
                   </div>

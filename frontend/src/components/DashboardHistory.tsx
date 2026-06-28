@@ -162,7 +162,7 @@ export const DashboardHistory: FC = () => {
       const updated = history.filter(item => item.job_id !== jobToDelete);
       setHistory(updated);
       sessionStorage.setItem('chromashift_history_cache', JSON.stringify(updated));
-      triggerNotification('success', 'File deleted. Media cleared from active storage.');
+      triggerNotification('success', 'File deleted. Media cleared from storage.');
     } catch (error) {
       console.error("Deletion failed", error);
       triggerNotification('error', 'Deletion failed. Please try again.');

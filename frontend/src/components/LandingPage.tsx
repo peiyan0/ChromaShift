@@ -180,7 +180,7 @@ export const LandingPage: React.FC = () => {
             maxWidth: '640px',
             margin: '0 auto 40px auto'
           }}>
-            Most tools just slap a color filter over your screen. ChromaShift understands what you're looking at—protecting skin tones, preserving text, and tuning exactly to your eyes.
+            Most tools just apply a color filter over your screen. ChromaShift understands what you're looking at—protecting skin tones, preserving text, and tuning exactly to your eyes.
           </p>
 
           <div className="hstack gap-4 animate-slide-up" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>

@@ -161,7 +161,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           flexWrap: 'wrap',
           zIndex: 101
         }}>
-          <span>🎨 Guest session — calibration auto-prunes in 24 hours.</span>
+          <span>Guest session — calibration auto-prunes in 24 hours.</span>
         </div>
       )}
 

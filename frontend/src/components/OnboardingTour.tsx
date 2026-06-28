@@ -137,7 +137,9 @@ export const OnboardingTour: React.FC = () => {
       <div className="hstack gap-2" style={{ justifyContent: 'flex-end', marginTop: '8px' }}>
         <button onClick={handleClose} className="btn btn-sm btn-ghost">Skip</button>
         <button onClick={handleNext} className="btn btn-sm btn-primary">
-          {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
+          {currentStep === steps.length - 1 
+            ? (localStorage.getItem('chromashift_survey_completed') === 'true' ? 'Complete Tour' : 'Get Started') 
+            : 'Next'}
         </button>
       </div>
     </div>

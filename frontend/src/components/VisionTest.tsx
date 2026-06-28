@@ -697,7 +697,7 @@ export const VisionTest: FC = () => {
                   lineHeight: '1.4'
                 }}
               >
-                💡 <strong>Recommendation:</strong> Play the <strong>Playground Sandbox</strong> first to get familiar with the tasks before starting the <strong>Official Usability Study</strong>.
+                <strong>Recommendation:</strong> Play the <strong>Playground Sandbox</strong> first to get familiar with the tasks before starting the <strong>Official Usability Study</strong>.
               </div>
             </div>
 
@@ -949,7 +949,7 @@ export const VisionTest: FC = () => {
               >
                 {/* TASK 1: Line Chart */}
                 {currentTaskIndex === 0 && (
-                  <div style={{ height: '260px', width: '100%', position: 'relative', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none' }}>
+                  <div style={{ height: '260px', width: '100%', position: 'relative', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none', transform: 'translate3d(0, 0, 0)', WebkitTransform: 'translate3d(0, 0, 0)', willChange: 'filter' }}>
                     <svg viewBox="0 0 400 200" width="100%" height="100%" style={{ backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '10px' }}>
                       <line x1="40" y1="20" x2="380" y2="20" stroke="#e2e8f0" strokeWidth="1" />
                       <line x1="40" y1="60" x2="380" y2="60" stroke="#e2e8f0" strokeWidth="1" />
@@ -1050,7 +1050,7 @@ export const VisionTest: FC = () => {
 
                 {/* TASK 2: Bar Chart */}
                 {currentTaskIndex === 1 && (
-                  <div style={{ height: '260px', width: '100%', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none' }}>
+                  <div style={{ height: '260px', width: '100%', filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none', transform: 'translate3d(0, 0, 0)', WebkitTransform: 'translate3d(0, 0, 0)', willChange: 'filter' }}>
                     <svg viewBox="0 0 400 200" width="100%" height="100%" style={{ backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '10px' }}>
                       <line x1="40" y1="40" x2="380" y2="40" stroke="#e2e8f0" strokeWidth="1" />
                       <line x1="40" y1="75" x2="380" y2="75" stroke="#e2e8f0" strokeWidth="1" />
@@ -1130,7 +1130,10 @@ export const VisionTest: FC = () => {
                         maxWidth: '260px',
                         width: '100%',
                         margin: '0 auto',
-                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none',
+                        transform: 'translate3d(0, 0, 0)',
+                        WebkitTransform: 'translate3d(0, 0, 0)',
+                        willChange: 'filter'
                       }}
                     >
                       {Array.from({ length: 4 }).map((_, rIdx) => 
@@ -1184,7 +1187,10 @@ export const VisionTest: FC = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
-                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none',
+                        transform: 'translate3d(0, 0, 0)',
+                        WebkitTransform: 'translate3d(0, 0, 0)',
+                        willChange: 'filter'
                       }}
                     >
                       <div className="hstack gap-6" style={{ alignItems: 'center' }}>
@@ -1257,7 +1263,10 @@ export const VisionTest: FC = () => {
                         borderRadius: 'var(--radius-md)',
                         border: '1px solid var(--border-primary)',
                         overflow: 'hidden',
-                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none'
+                        filter: (testPhase === 'test_corrected') ? 'url(#vision-daltonize-filter)' : 'none',
+                        transform: 'translate3d(0, 0, 0)',
+                        WebkitTransform: 'translate3d(0, 0, 0)',
+                        willChange: 'filter'
                       }}
                     >
                       <div className="vstack" style={{ width: '100%' }}>
