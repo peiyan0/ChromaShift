@@ -6,6 +6,8 @@ export interface VisionProfile {
   contrast_multiplier?: number;
   saturation_multiplier?: number;
   intensity?: number;
+  calibration_steps_taken?: number;
+  calibration_method?: string;
 }
 
 export const profileService = {

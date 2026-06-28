@@ -9,6 +9,15 @@ export interface MediaUploadResponse {
 export interface MediaProcessRequest {
   cvd_type?: string;
   severity?: number;
+  compression_level?: string;
+  processing_mode?: string;
+  processing_duration_ms?: number;
+  upload_latency_ms?: number;
+  pdf_page_count?: number;
+  pdf_vector_complexity?: number;
+  original_size_bytes?: number;
+  processed_size_bytes?: number;
+  video_fps?: number;
 }
 
 export interface MediaStatusResponse {

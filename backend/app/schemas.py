@@ -25,6 +25,8 @@ class VisionProfileBase(BaseModel):
     contrast_multiplier: float = 1.0
     saturation_multiplier: float = 1.0
     intensity: float = 1.0
+    calibration_steps_taken: Optional[int] = None
+    calibration_method: Optional[str] = None
 
 class VisionProfileCreate(VisionProfileBase):
     pass
@@ -49,6 +51,16 @@ class MediaProcessRequest(BaseModel):
     cvd_type: Optional[str] = None
     severity: Optional[float] = None
     compression_level: Optional[str] = None
+    
+    # Telemetry
+    processing_mode: Optional[str] = None
+    processing_duration_ms: Optional[int] = None
+    upload_latency_ms: Optional[int] = None
+    pdf_page_count: Optional[int] = None
+    pdf_vector_complexity: Optional[int] = None
+    original_size_bytes: Optional[int] = None
+    processed_size_bytes: Optional[int] = None
+    video_fps: Optional[float] = None
 
 class MediaProcessResponse(BaseModel):
     task_id: str

@@ -326,16 +326,21 @@ class MediaProcessor:
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
+        page_count = 0
+        total_drawings = 0
+        
         doc = None
         try:
             # Open the input file directly (read-only)
             doc = fitz.open(input_path)
-            for page_num in range(len(doc)):
+            page_count = len(doc)
+            for page_num in range(page_count):
                 page = doc[page_num]
                 
                 # 1. Process Vector Drawings (Recolor and Redraw)
                 drawings = page.get_drawings()
                 if drawings:
+                    total_drawings += len(drawings)
                     def is_colored(rgb_tuple):
                         if not rgb_tuple:
                             return False
@@ -506,6 +511,11 @@ class MediaProcessor:
 
             # Save directly to output_path using garbage collection and deflation
             doc.save(output_path, garbage=4, deflate=True, clean=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+            
+            self.last_pdf_metrics = {
+                "page_count": page_count,
+                "vector_complexity": total_drawings
+            }
         finally:
             if doc and not doc.is_closed:
                 doc.close()

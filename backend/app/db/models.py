@@ -35,6 +35,10 @@ class VisionProfile(Base):
     saturation_multiplier = Column(Float, default=1.0)
     intensity = Column(Float, default=1.0)
     
+    # Telemetry
+    calibration_steps_taken = Column(Integer, nullable=True)
+    calibration_method = Column(String, nullable=True)
+    
     user = relationship("User", back_populates="vision_profile")
 
 class MediaJob(Base):
@@ -55,6 +59,18 @@ class MediaJob(Base):
     s3_key_processed = Column(String, nullable=True)
     share_id = Column(String, unique=True, index=True, nullable=True)
     
+    # Telemetry
+    cvd_type = Column(String, nullable=True)
+    severity = Column(Float, nullable=True)
+    processing_mode = Column(String, nullable=True)
+    processing_duration_ms = Column(Integer, nullable=True)
+    upload_latency_ms = Column(Integer, nullable=True)
+    pdf_page_count = Column(Integer, nullable=True)
+    pdf_vector_complexity = Column(Integer, nullable=True)
+    original_size_bytes = Column(Integer, nullable=True)
+    processed_size_bytes = Column(Integer, nullable=True)
+    video_fps = Column(Float, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -72,6 +88,12 @@ class ComplianceReport(Base):
     
     # Store the list of issues as JSON
     issues = Column(JSON, default=list)
+    
+    # Telemetry
+    original_delta_e = Column(Float, nullable=True)
+    remapped_delta_e = Column(Float, nullable=True)
+    luminance_drift = Column(Float, nullable=True)
+    audit_accuracy_verified = Column(Boolean, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
