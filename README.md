@@ -2,7 +2,10 @@
 
 > **Empowering the chromatic digital divide.** Beyond Basic Filters. Truly Smart Colorblind Accessibility for the 300 million individuals living with Color Vision Deficiency (CVD).
 
-**🔗 Live Preview:** <a href="https://chromashift-py.vercel.app/" target="_blank">chromashift-py.vercel.app</a>
+**🔗 Live Preview:** <a href="https://chromashift-py.vercel.app/" target="_blank">chromashift-py.vercel.app</a>  
+**🤗 ONNX Models:** <a href="https://huggingface.co/peiyan2/cvd-onnx-models" target="_blank">huggingface.co/peiyan2/cvd-onnx-models</a>  
+**🤗 Backend Deployment:** <a href="https://huggingface.co/spaces/peiyan2/ChromaShift-backend" target="_blank">huggingface.co/spaces/peiyan2/ChromaShift-backend</a>  
+**GitHub Repository:** <a href="https://github.com/peiyan0/ChromaShift" target="_blank">github.com/peiyan0/ChromaShift</a>  
 
 *(Try it instantly! The live demo includes pre-loaded sample images so you can test the daltonization effect in one click without creating an account or uploading your own photos.)*
 
